@@ -1,0 +1,28 @@
+{
+  "name": "coreburn",
+  "version": "1.0.0",
+  "private": true,
+  "description": "COREBURN - endless arena brawler (web + Android via Capacitor)",
+  "type": "module",
+  "scripts": {
+    "serve": "npx --yes serve -l 8000 .",
+    "build:web": "node scripts/build-web.mjs",
+    "release:update": "node scripts/make-update.mjs",
+    "android:sync": "node scripts/build-web.mjs && npx cap sync android",
+    "android:assets": "npx capacitor-assets generate --android --iconBackgroundColor \"#14191d\" --iconBackgroundColorDark \"#14191d\" --splashBackgroundColor \"#14191d\" --splashBackgroundColorDark \"#14191d\"",
+    "android:build": "node scripts/build-web.mjs && npx cap sync android && cd android && ./gradlew bundleRelease assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor-community/admob": "^8.2.1",
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capgo/capacitor-updater": "^8.52.1"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.3",
+    "adm-zip": "^0.5.16"
+  }
+}

@@ -1,0 +1,15 @@
+node_modules/
+dist/
+# Android build output and local files
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/app/release/
+android/capacitor-cordova-android-plugins/build/
+*.apk
+*.aab
+# NEVER commit signing keys or passwords
+*.jks
+*.keystore
+keystore.properties

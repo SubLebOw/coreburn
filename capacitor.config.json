@@ -1,0 +1,27 @@
+{
+  "appId": "com.sublebow.coreburn",
+  "appName": "COREBURN",
+  "webDir": "dist",
+  "backgroundColor": "#14191d",
+  "android": {
+    "backgroundColor": "#14191d",
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1000,
+      "launchAutoHide": true,
+      "backgroundColor": "#14191d",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP"
+    },
+    "CapacitorUpdater": {
+      "autoUpdate": false,
+      "appReadyTimeout": 10000,
+      "resetWhenUpdate": true,
+      "updateUrl": "",
+      "statsUrl": "",
+      "channelUrl": ""
+    }
+  }
+}

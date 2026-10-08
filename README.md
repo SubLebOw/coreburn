@@ -19,6 +19,7 @@ with a boss fight every 5 waves. How far can you get?
 | Overdrive spin (8 s cooldown, half damage taken) | L | OVERDRIVE button |
 | Start | Enter / J / START | START button |
 | Restart after game over | any key or click | tap anywhere |
+| Mute / unmute sound | M or the speaker button | speaker button (top right) |
 
 **Core recharge:** Sarrow's health slowly refills by itself, faster if he avoids hits for 3 seconds.
 Clearing a wave heals 25; beating a boss heals 60.
@@ -68,7 +69,7 @@ npx serve .                   # or Node.js
 ```
 
 Then open http://localhost:8000. Edit a file, save, refresh the page. That's the whole workflow, with no build step.
-Three.js is loaded from a CDN (see the import map in `index.html`), so you need an internet connection.
+Three.js is bundled in `vendor/` (MIT licence), so the game also works offline.
 
 ## File layout
 
@@ -86,6 +87,18 @@ js/input.js        Keyboard + mouse input, turned into simple "move" and "action
 js/touch.js        Phone controls: floating virtual joystick and on-screen buttons
 js/effects.js      Sparks, rings and red attack warnings (pooled so it stays fast on phones)
 js/hud.js          Updates the health bar, score, cooldowns, boss bar and banners
+js/audio.js        All sound: procedural sound effects + looping music (Web Audio, no sound files)
+js/ads-config.js   THE ONE PLACE for AdMob IDs and ad frequency settings
+js/ads.js          Interstitial + rewarded revive + consent (UMP). Does nothing on the website
+js/updater.js      Android app: downloads new game versions from GitHub Pages (see below)
+js/native.js       Tiny helper: "are we inside the Android app?"
+js/version.js      GAME_VERSION - bump it when you publish an update
+privacy.html       Privacy policy (needed for Google Play + AdMob)
+vendor/            Three.js (bundled so the app works offline)
+android/           The Android Studio / Gradle project made by Capacitor
+assets/            Source art for the app icon + splash (and a 512px Play Store icon)
+scripts/           build-web.mjs (copies the game into dist/), make-update.mjs (builds an app update)
+updates/           latest.json + the zipped game the Android app downloads updates from
 ```
 
 ### Easy things to tweak first
@@ -93,6 +106,61 @@ js/hud.js          Updates the health bar, score, cooldowns, boss bar and banner
 - `js/player.js`: `COMBO` damage/range, `MOVE_SPEED`, `DASH_COOLDOWN`, `SPIN_COOLDOWN`
 - `js/enemy.js`: `ENEMY_TYPES`; `js/boss.js`: `BOSSES`
 - Browser console: `game.player.hp = 1000` (god mode while testing), `game.skipTo(10)` (jump to a wave)
+
+## Android app (Google Play)
+
+The Android app is the same web game wrapped with [Capacitor](https://capacitorjs.com).
+App id `com.sublebow.coreburn`, name COREBURN, works in landscape and portrait, fullscreen.
+
+### One-time setup (already done on the build box)
+- Node.js 22+ (Capacitor's CLI needs it), JDK 21, Android SDK (platform 36, build-tools 36)
+- `npm install`
+- `android/local.properties` with `sdk.dir=/path/to/android-sdk` (not committed)
+- Upload keystore in `/home/box/coreburn-keys/` (**never commit it**, back it up!)
+
+### Build
+```bash
+npm run android:build      # -> android/app/build/outputs/bundle/release/app-release.aab  (upload this to Play)
+                           #    android/app/build/outputs/apk/debug/app-debug.apk        (sideload to test)
+npm run android:assets     # only if you change the icon/splash art in assets/
+```
+**Before each Play upload:** raise `versionCode` (and `versionName`) in `android/app/build.gradle`.
+
+### How game updates reach app players (no Play Store review needed)
+
+The app ships with the whole game inside it, so it **works offline** from the first launch.
+On every launch it also checks `https://sublebow.github.io/coreburn/updates/latest.json`. If there's a newer
+game version, it downloads the zip quietly in the background and switches to it **the next time the app starts**
+(never in the middle of a run or an ad). If a new version fails to start, the app automatically rolls back to the
+last good one. This uses [@capgo/capacitor-updater](https://github.com/Cap-go/capacitor-updater) in self-hosted
+mode (no Capgo account, no tracking; everything comes from this GitHub Pages site).
+
+To publish an update (website + app at once):
+1. Change the game (JS/CSS/HTML).
+2. Bump `GAME_VERSION` in `js/version.js` (e.g. `1.0.1`).
+3. `npm run release:update` (builds `updates/coreburn-<version>.zip` + `updates/latest.json`)
+4. Commit and push. Website players get it right away. App players download it the next time they open the app (with internet) and get it the time after that.
+
+This is allowed by Google Play because it only changes the game's JavaScript/HTML/CSS running in the WebView,
+not native code. **These still need a new Play Store build:** the AdMob App ID, adding/upgrading Capacitor plugins
+or Capacitor itself, Android permissions, app name/icon/splash, target SDK bumps, anything in `android/`.
+If an update needs a newer app build, set `minNativeBuild` in `scripts/make-update.mjs` to that `versionCode`
+so older app installs skip it.
+
+### Ads (currently Google TEST ads)
+
+All IDs live in `js/ads-config.js`. Right now they're Google's official test IDs, which is safe to click.
+- **Interstitial:** only on the game over screen, when you choose to restart, at most every 3rd death and
+  at least 2 minutes apart. Never during a fight.
+- **Rewarded revive:** on the game over screen, "REVIVE (watch an ad)" brings you back with half health,
+  once per run. Only if you watch the whole ad.
+- **Consent:** Google's UMP consent form is shown where required (EEA/UK) once you set up a GDPR message
+  in AdMob; an "Ad privacy choices" link appears on the title screen when needed.
+- On the website, ads do nothing and the revive button never shows.
+
+To go live: create your AdMob app, put your real App ID + ad unit IDs in `js/ads-config.js`, set
+`testMode: false`, rebuild with `npm run android:build`, and upload the new `.aab`.
+**Never click your own real ads.** Add your phone to `testDeviceIds` instead.
 
 ## License / credits
 

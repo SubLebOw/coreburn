@@ -167,6 +167,7 @@ export class Boss {
     this.state = 'telegraph';
     this.stateTime = 0;
     const fx = this.world.effects;
+    if (name !== 'summon') this.world.sfx('bossWarning'); // audio cue for every telegraphed attack
     switch (name) {
       case 'charge':
         this.chargesLeft = 1;
@@ -232,6 +233,7 @@ export class Boss {
         fx.spawnRing(this.position, 0xff5a20, this.slamRadius, 0.5);
         fx.spawnSparks(this.position.clone().setY(0.3), 0xffb060, 14, 8);
         this.world.shake(0.5);
+        this.world.sfx('enemyDeath'); // big crunch
         this.recover(0.9);
         return;
 
@@ -267,6 +269,7 @@ export class Boss {
           const a = (i / n) * Math.PI * 2 + offset;
           this.world.projectiles.fire(this.position.clone().setY(1.6), new THREE.Vector3(Math.cos(a), 0, Math.sin(a)), 7, 10 * this.dmgMult, 0xffb020, 1.3);
         }
+        this.world.sfx('shot');
         this.burstsLeft--;
         if (this.burstsLeft > 0) { this.stateTime = 0; this.telegraphTime = 0.55 * this.tempo; }
         else this.recover(0.7);
@@ -279,6 +282,7 @@ export class Boss {
           const a = Math.atan2(toPlayer.z, toPlayer.x) + i * 0.22;
           this.world.projectiles.fire(this.position.clone().setY(1.4), new THREE.Vector3(Math.cos(a), 0, Math.sin(a)), 9, 10 * this.dmgMult, 0xff8a1e, 1.2);
         }
+        this.world.sfx('shot');
         this.shotsLeft--;
         if (this.shotsLeft > 0) { this.stateTime = 0; this.telegraphTime = 0.4 * this.tempo; }
         else this.recover(0.7);

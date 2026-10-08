@@ -286,6 +286,7 @@ export class Enemy {
       // spit a slow molten bolt: blink through it or step aside
       const from = this.position.clone().setY(1.6 * this.scale);
       this.world.projectiles.fire(from, toPlayer, 8.5, this.damage, 0xff8a1e, this.elite ? 1.4 : 1);
+      this.world.sfx('shot');
       this.state = 'recover';
       this.attackCooldown = 2.0 + Math.random() * 0.8;
     } else {

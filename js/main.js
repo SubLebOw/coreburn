@@ -12,6 +12,10 @@ import { WaveManager, isBossWave } from './waves.js';
 import { Projectiles } from './projectiles.js';
 import { Effects } from './effects.js';
 import { Hud } from './hud.js';
+import { sound } from './audio.js';
+import { ads } from './ads.js';
+import { checkForUpdates } from './updater.js';
+import { GAME_VERSION } from './version.js';
 
 const IS_TOUCH = isTouchDevice();
 if (IS_TOUCH) document.body.classList.add('touch'); // shows the touch controls (see style.css)
@@ -58,6 +62,9 @@ let score = 0;
 let hitstopTimer = 0;
 let deathTimer = 0;
 let gameOverTime = 0;
+let revivedThisRun = false; // the rewarded-ad revive can be used once per run
+let reviveOffered = false;
+let restarting = false;
 const best = JSON.parse(localStorage.getItem('coreburn-best') || '{"score":0,"wave":0}');
 
 // "world" is a shared object that the player and enemies use to reach each other
@@ -69,10 +76,12 @@ const world = {
   player: null,
   enemies: null,
   shake(amount) { shakeAmount = Math.max(shakeAmount, amount); },
+  sfx(name, option) { sound.play(name, option); },
   hitstop(seconds) { hitstopTimer = Math.max(hitstopTimer, seconds); }, // tiny freeze = punchy hits
   onPlayerHurt() { hud.flashDamage(); world.shake(0.2); },
   onEnemyKilled(e) {
     kills++;
+    sound.play('enemyDeath');
     score += e.points;
     // Hive splitters burst into mites (unless they're crumbling because the boss died)
     if (e.type.splits && !e.crumble) {
@@ -86,8 +95,14 @@ const world = {
   onWaveStart(n) {
     const msgs = { 1: 'The Grindchoir is coming', 2: 'Ripper hounds: they lunge!', 3: 'Slag spitters: dodge the bolts', 4: 'Bulwarks: only heavy hits stagger them', 6: 'Hive splitters burst into mites', 7: 'Elites (amber crowns) incoming' };
     hud.showBanner(`WAVE ${n}`, msgs[n] || '');
+    sound.play('waveStart');
+    sound.setIntensity(1);
   },
-  onBossWave(n, def) { hud.showBanner(def.name, `Wave ${n} · ${def.subtitle}`); },
+  onBossWave(n, def) {
+    hud.showBanner(def.name, `Wave ${n} · ${def.subtitle}`);
+    sound.play('bossWarning');
+    sound.setIntensity(2); // boss music: faster and busier
+  },
   onBossKilled(boss) {
     // Reward: big heal + score bonus, and its minions crumble
     score += boss.points;
@@ -96,6 +111,8 @@ const world = {
     enemies.killAllAdds();
     world.shake(0.6);
     hud.showBanner('BOSS DOWN!', `+${boss.points} pts · +60 health`);
+    sound.play('bossDefeated');
+    sound.setIntensity(1);
   },
   onWaveCleared(n) {
     const bonus = 25 * n;
@@ -122,6 +139,7 @@ function startGame() {
   player.reset();
   hud.hideOverlay();
   state = 'playing';
+  revivedThisRun = false;
   enemies.startWave(1);
 }
 
@@ -135,18 +153,82 @@ function gameOver() {
     localStorage.setItem('coreburn-best', JSON.stringify(best));
   }
   hud.showGameOver(score, enemies.wave, kills, best, newBest);
+  sound.play('gameOver');
+  sound.setIntensity(0);
+  ads.onGameOver();
+  // Offer the optional rewarded-ad revive (Android app only, once per run)
+  reviveOffered = !revivedThisRun && ads.canRevive;
+  reviveBtn.classList.toggle('hidden', !reviveOffered);
+  document.getElementById('restart-hint').classList.toggle('hidden', reviveOffered);
 }
 
-// Instant restart: any key, click or tap on the game over screen
-// (with a short delay so a button you were mashing doesn't skip it immediately)
-function tryRestart() {
-  if (state === 'gameover' && performance.now() - gameOverTime > 600) startGame();
+// Restart: any key, click or tap on the game over screen
+// (with a short delay so a button you were mashing doesn't skip it immediately).
+// Every few deaths an interstitial ad may show first (Android app only, see ads.js).
+async function tryRestart(e) {
+  if (state !== 'gameover' || restarting || performance.now() - gameOverTime < 600) return;
+  if (e && e.code === 'KeyM') return;                 // M is the mute key
+  if (reviveOffered && e && e.type !== 'click') return; // with a revive on offer, use the buttons
+  restarting = true;
+  try { await ads.maybeShowInterstitial(); } finally { restarting = false; }
+  startGame();
 }
+
+// Rewarded ad -> come back with half health, once per run
+const reviveBtn = document.getElementById('revive-btn');
+reviveBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+reviveBtn.addEventListener('click', async (e) => {
+  e.stopPropagation();
+  if (state !== 'gameover' || restarting) return;
+  restarting = true;
+  const rewarded = await ads.showRewarded();
+  restarting = false;
+  if (!rewarded) return;
+  revivedThisRun = true;
+  reviveOffered = false;
+  reviveBtn.classList.add('hidden');
+  // push nearby enemies away so the player gets a fair restart
+  for (const en of enemies.list) {
+    if (en.dead || en.isBoss) continue;
+    const away = en.position.clone().sub(player.position).setY(0);
+    if (away.length() < 8) { en.knockback.add(away.normalize().multiplyScalar(14)); en.stun = 1; }
+  }
+  projectiles.reset();
+  player.revive();
+  deathTimer = 0;
+  hud.hideOverlay();
+  state = 'playing';
+  sound.play('revive');
+  sound.setIntensity(enemies.boss && !enemies.boss.dead ? 2 : 1);
+});
+
 window.addEventListener('keydown', tryRestart);
 document.getElementById('overlay').addEventListener('pointerdown', tryRestart);
 document.getElementById('start-btn').addEventListener('click', startGame);
 document.getElementById('restart-btn').addEventListener('click', tryRestart);
 hud.showTitle(best);
+document.getElementById('version-text').textContent = `v${GAME_VERSION}`;
+
+// ---------- Sound ----------
+// Browsers only allow audio after a tap/click/key press, so start it on the first one.
+const unlockAudio = () => sound.unlock();
+for (const ev of ['pointerdown', 'keydown', 'touchend']) window.addEventListener(ev, unlockAudio, { capture: true });
+const muteBtn = document.getElementById('mute-btn');
+const showMute = () => muteBtn.classList.toggle('muted', sound.muted);
+muteBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+muteBtn.addEventListener('click', (e) => { e.stopPropagation(); sound.unlock(); sound.toggleMute(); showMute(); });
+window.addEventListener('keydown', (e) => { if (e.code === 'KeyM') { sound.toggleMute(); showMute(); } });
+showMute();
+
+// ---------- Android-only extras (do nothing on the website) ----------
+checkForUpdates();
+ads.init().then(() => {
+  const btn = document.getElementById('privacy-options-btn');
+  if (ads.privacyOptionsRequired) {
+    btn.classList.remove('hidden');
+    btn.addEventListener('click', () => ads.showPrivacyOptions());
+  }
+});
 
 // ---------- Resizing (also handles phones rotating between portrait and landscape) ----------
 function onResize() {
@@ -221,7 +303,7 @@ frame();
 
 // Handy for testing in the browser console: try  game.player.hp = 1000  or  game.skipTo(10)
 window.game = {
-  player, enemies, world, startGame,
+  player, enemies, world, startGame, sound, ads,
   get score() { return score; },
   skipTo(n) { enemies.reset(); projectiles.reset(); enemies.startWave(n); },
 };

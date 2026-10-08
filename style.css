@@ -178,3 +178,24 @@ body.touch .kb-only { display: none !important; }
 #boss-name { font-weight: 900; letter-spacing: 3px; font-size: 14px; color: #ffb070; text-shadow: 0 2px 0 #000; margin-bottom: 3px; }
 .boss-track { height: 14px; background: #2a0f08; border: 2px solid #000; border-radius: 4px; overflow: hidden; }
 #boss-fill { height: 100%; width: 100%; background: linear-gradient(#ff9a3c, #c2410c); transition: width .15s; }
+
+/* Sound toggle (top right, under the score) */
+#mute-btn {
+  position: fixed; z-index: 30;
+  top: calc(64px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right));
+  width: 38px; height: 38px; border-radius: 50%; padding: 7px;
+  background: rgba(20,25,29,.7); color: #3ff6e0; border: 2px solid #3ff6e0; cursor: pointer;
+  touch-action: manipulation;
+}
+#mute-btn svg { width: 100%; height: 100%; display: block; }
+#mute-btn .icon-off { display: none; }
+#mute-btn.muted { color: #888; border-color: #888; }
+#mute-btn.muted .icon-on { display: none; }
+#mute-btn.muted .icon-off { display: block; }
+
+/* Revive (rewarded ad) button and title footer */
+.big-btn.revive { display: block; margin: 12px auto 4px; background: #e0702a; color: #fff; border-color: #3ff6e0; box-shadow: 0 4px 0 #8a3b12; font-size: 18px; }
+.big-btn.revive small { font-size: 12px; font-weight: normal; }
+.big-btn.hidden, .link-btn.hidden { display: none; }
+.footer-links { margin-top: 14px; font-size: 12px; opacity: .75; display: flex; gap: 14px; justify-content: center; align-items: center; flex-wrap: wrap; }
+.footer-links a, .link-btn { color: #3ff6e0; background: none; border: none; font: inherit; text-decoration: underline; cursor: pointer; padding: 0; }

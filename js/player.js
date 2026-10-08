@@ -83,6 +83,7 @@ export class Player {
     this.dashCooldown = 0;
     this.spinCooldown = 0;
     this.hurtTimer = 0;
+    this.invulnTimer = 0;
     this.timeSinceHit = 99;
     this.walkPhase = 0;
     this.dead = false;
@@ -106,6 +107,7 @@ export class Player {
     this.comboGrace -= dt;
     this.attackBuffer -= dt;
     this.hurtTimer -= dt;
+    this.invulnTimer -= dt;
     this.timeSinceHit += dt;
 
     // ----- Core recharge: slow regen, faster if you avoid getting hit for 3 seconds -----
@@ -199,6 +201,7 @@ export class Player {
   startAttack(step, moveDir) {
     this.state = 'attack';
     this.comboStep = step;
+    this.world.sfx('slash', step);
     this.stateTime = 0;
     this.hasHit = false;
     this.attackBuffer = 0;
@@ -229,6 +232,7 @@ export class Player {
       hitSomething = true;
     }
     if (hitSomething) {
+      this.world.sfx('hit');
       this.world.shake(this.comboStep === 3 ? 0.35 : 0.15);
       this.world.hitstop(this.comboStep === 3 ? 0.08 : 0.03);
     }
@@ -242,6 +246,7 @@ export class Player {
     this.dashCooldown = DASH_COOLDOWN;
     this.dashHitSet = new Set();
     this.world.effects.spawnRing(this.position, 0x3ff6e0, 1.5, 0.3);
+    this.world.sfx('blink');
   }
 
   dashHits() {
@@ -255,6 +260,7 @@ export class Player {
         e.hit(10, side.x * 7, side.z * 7, false);
         this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0x9ffff5, 6);
         this.world.shake(0.12);
+        this.world.sfx('hit');
       }
     }
   }
@@ -267,6 +273,7 @@ export class Player {
     this.spinRing.visible = true;
     this.world.effects.spawnRing(this.position, 0xe0702a, 4, 0.5);
     this.world.shake(0.25);
+    this.world.sfx('overdrive');
   }
 
   spinHits() {
@@ -279,6 +286,7 @@ export class Player {
         to.normalize();
         e.hit(8, to.x * 7, to.z * 7, true);
         this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0xff8040, 4);
+        this.world.sfx('hit');
       }
     }
   }
@@ -297,11 +305,13 @@ export class Player {
 
   takeDamage(amount) {
     if (this.dead || this.state === 'dash') return false; // blinking = untouchable
+    if (this.invulnTimer > 0) return false;              // just revived
     if (this.state === 'spin') amount *= 0.5;             // overdrive = tougher
     this.hp -= amount;
     this.hurtTimer = 0.15;
     this.timeSinceHit = 0;
     this.world.onPlayerHurt();
+    this.world.sfx('hurt');
     if (this.hp <= 0) {
       this.hp = 0;
       this.dead = true;
@@ -314,6 +324,19 @@ export class Player {
   }
 
   heal(amount) { this.hp = Math.min(this.maxHp, this.hp + amount); }
+
+  // Back on your feet (from the rewarded "Revive" ad): half health and 2.5s of invincibility
+  revive() {
+    this.dead = false;
+    this.state = 'normal';
+    this.stateTime = 0;
+    this.hp = this.maxHp * 0.5;
+    this.invulnTimer = 2.5;
+    this.timeSinceHit = 0;
+    this.model.body.rotation.set(0, 0, 0);
+    this.model.body.position.set(0, 0, 0);
+    this.model.core.visible = true;
+  }
 
   // ---------- Animation ----------
 
@@ -367,7 +390,8 @@ export class Player {
     }
 
     // flash red when hurt
-    this.setFlash(this.hurtTimer > 0 ? 0x990000 : (this.state === 'spin' ? 0x0a3a36 : 0x000000));
+    const reviveGlow = this.invulnTimer > 0 && Math.floor(this.invulnTimer * 8) % 2 === 0;
+    this.setFlash(this.hurtTimer > 0 ? 0x990000 : (this.state === 'spin' || reviveGlow ? 0x0a3a36 : 0x000000));
     // the chest core pulses (faster while in overdrive)
     const pulse = 0.16 * (1 + 0.25 * Math.sin(performance.now() / (this.state === 'spin' ? 60 : 250)));
     m.core.scale.set(pulse, pulse, 0.06);

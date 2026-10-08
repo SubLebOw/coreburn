@@ -13,6 +13,9 @@ const SPIT_MAT = new THREE.MeshBasicMaterial({ color: 0xff8a1e });   // spitter'
 //   ai: 'melee'  = walk up, raise fists, swing
 //       'lunge'  = crouch, then leap at you
 //       'ranged' = keep distance and spit dodgeable molten bolts
+// Names used on the game over screen / share text ("died to an elite Ripper Hound")
+const DISPLAY_NAMES = { acolyte: 'Acolyte', hound: 'Ripper Hound', spitter: 'Slag Spitter', bulwark: 'Bulwark', splitter: 'Hive Splitter', mite: 'Mite' };
+
 export const ENEMY_TYPES = {
   acolyte:  { hp: 30,  speed: 3.4, damage: 8,  scale: 1.0,  windup: 0.45, reach: 1.5, armored: false, points: 10, ai: 'melee',  main: 0x8a3b1e, dark: 0x3a3430 },
   hound:    { hp: 22,  speed: 5.4, damage: 9,  scale: 0.9,  windup: 0.45, reach: 5.5, armored: false, points: 15, ai: 'lunge',  main: 0xa4521f, dark: 0x2e2a27 },
@@ -170,6 +173,13 @@ export class Enemy {
     if (this.hp <= 0) this.die();
   }
 
+  // e.g. "an elite Bulwark" or "a Slag Spitter"
+  get killerName() {
+    const name = DISPLAY_NAMES[this.typeName] || 'Grindchoir drone';
+    if (this.elite) return `an elite ${name}`;
+    return (/^[AEIOU]/.test(name) ? 'an ' : 'a ') + name;
+  }
+
   die() {
     if (this.dead) return;
     this.dead = true;
@@ -242,7 +252,7 @@ export class Enemy {
         this.position.addScaledVector(this.lungeDir, 15 * dt);
         if (!this.lungeHit && this.position.distanceTo(player.position) < this.radius + player.radius + 0.35) {
           this.lungeHit = true;
-          player.takeDamage(this.damage);
+          player.takeDamage(this.damage, this);
         }
         if (this.stateTime > 0.32) { this.state = 'recover'; this.stateTime = 0; }
         break;
@@ -285,7 +295,7 @@ export class Enemy {
     } else if (ai === 'ranged') {
       // spit a slow molten bolt: blink through it or step aside
       const from = this.position.clone().setY(1.6 * this.scale);
-      this.world.projectiles.fire(from, toPlayer, 8.5, this.damage, 0xff8a1e, this.elite ? 1.4 : 1);
+      this.world.projectiles.fire(from, toPlayer, 8.5, this.damage, 0xff8a1e, this.elite ? 1.4 : 1, this);
       this.world.sfx('shot');
       this.state = 'recover';
       this.attackCooldown = 2.0 + Math.random() * 0.8;
@@ -293,7 +303,7 @@ export class Enemy {
       // melee swing: hits if the player is still close and in front of us
       const forward = new THREE.Vector3(Math.sin(this.facing), 0, Math.cos(this.facing));
       if (dist < this.type.reach * (this.elite ? 1.2 : 1) + 0.6 && forward.dot(toPlayer) > 0.3) {
-        if (player.takeDamage(this.damage)) {
+        if (player.takeDamage(this.damage, this)) {
           this.world.effects.spawnSparks(player.position.clone().setY(1.2), 0xff3030, 6);
         }
       }

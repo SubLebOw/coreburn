@@ -13,19 +13,19 @@ const HALO_MAT = new THREE.MeshBasicMaterial({ color: 0xffb020 });
 // The boss line-up. `pattern` is the order they cycle through their attacks.
 export const BOSSES = [
   {
-    id: 'deacon', name: 'THE FURNACE DEACON', subtitle: 'Keeper of the Melt',
+    id: 'deacon', name: 'THE FURNACE DEACON', killerName: 'the Furnace Deacon', subtitle: 'Keeper of the Melt',
     hp: 650, speed: 3.0, scale: 2.0,
     pattern: ['charge', 'slam', 'summon', 'charge', 'slam'],
     summon: ['acolyte', 'acolyte', 'hound'],
   },
   {
-    id: 'choirmother', name: 'CHOIRMOTHER', subtitle: 'Voice of the Grindchoir',
+    id: 'choirmother', name: 'CHOIRMOTHER', killerName: 'Choirmother', subtitle: 'Voice of the Grindchoir',
     hp: 600, speed: 2.6, scale: 2.0,
     pattern: ['burst', 'markslam', 'summon', 'burst', 'charge'],
     summon: ['mite', 'mite', 'mite', 'mite', 'spitter'],
   },
   {
-    id: 'rivetjaw', name: 'RIVETJAW', subtitle: 'The Scrap Engine',
+    id: 'rivetjaw', name: 'RIVETJAW', killerName: 'Rivetjaw', subtitle: 'The Scrap Engine',
     hp: 850, speed: 2.8, scale: 1.9,
     pattern: ['triplecharge', 'volley', 'slam', 'summon'],
     summon: ['bulwark', 'acolyte', 'acolyte'],
@@ -40,6 +40,7 @@ export class Boss {
     this.world = world;
     this.def = def;
     this.name = def.name;
+    this.killerName = def.killerName; // for the game over screen / share text
     this.isBoss = true;
     this.bossNumber = bossNumber;
     this.tier = Math.floor((bossNumber - 1) / BOSSES.length); // how many full loops we've done
@@ -126,7 +127,7 @@ export class Boss {
         const hitWall = this.position.distanceTo(before) > 0.01;
         if (!this.chargeHit && !player.dead && this.position.distanceTo(player.position) < this.radius + player.radius + 0.2) {
           this.chargeHit = true;
-          player.takeDamage(22 * this.dmgMult);
+          player.takeDamage(22 * this.dmgMult, this);
         }
         if (hitWall || this.stateTime > 0.95) {
           if (hitWall) { this.world.shake(0.35); this.world.effects.spawnSparks(this.position.clone().setY(1), 0xffb060, 10); }
@@ -229,7 +230,7 @@ export class Boss {
         return;
 
       case 'slam':
-        if (dist < this.slamRadius + player.radius) player.takeDamage(26 * this.dmgMult);
+        if (dist < this.slamRadius + player.radius) player.takeDamage(26 * this.dmgMult, this);
         fx.spawnRing(this.position, 0xff5a20, this.slamRadius, 0.5);
         fx.spawnSparks(this.position.clone().setY(0.3), 0xffb060, 14, 8);
         this.world.shake(0.5);
@@ -240,7 +241,7 @@ export class Boss {
       case 'markslam': {
         let hit = false;
         for (const m of this.marks) {
-          if (!hit && m.distanceTo(player.position) < 2.6 + player.radius) { player.takeDamage(18 * this.dmgMult); hit = true; }
+          if (!hit && m.distanceTo(player.position) < 2.6 + player.radius) { player.takeDamage(18 * this.dmgMult, this); hit = true; }
           fx.spawnRing(m, 0xffb020, 2.6, 0.4);
         }
         this.world.shake(0.3);
@@ -267,7 +268,7 @@ export class Boss {
         const offset = this.burstsLeft * 0.26;
         for (let i = 0; i < n; i++) {
           const a = (i / n) * Math.PI * 2 + offset;
-          this.world.projectiles.fire(this.position.clone().setY(1.6), new THREE.Vector3(Math.cos(a), 0, Math.sin(a)), 7, 10 * this.dmgMult, 0xffb020, 1.3);
+          this.world.projectiles.fire(this.position.clone().setY(1.6), new THREE.Vector3(Math.cos(a), 0, Math.sin(a)), 7, 10 * this.dmgMult, 0xffb020, 1.3, this);
         }
         this.world.sfx('shot');
         this.burstsLeft--;
@@ -280,7 +281,7 @@ export class Boss {
         // fan of 5 bolts aimed at the player
         for (let i = -2; i <= 2; i++) {
           const a = Math.atan2(toPlayer.z, toPlayer.x) + i * 0.22;
-          this.world.projectiles.fire(this.position.clone().setY(1.4), new THREE.Vector3(Math.cos(a), 0, Math.sin(a)), 9, 10 * this.dmgMult, 0xff8a1e, 1.2);
+          this.world.projectiles.fire(this.position.clone().setY(1.4), new THREE.Vector3(Math.cos(a), 0, Math.sin(a)), 9, 10 * this.dmgMult, 0xff8a1e, 1.2, this);
         }
         this.world.sfx('shot');
         this.shotsLeft--;

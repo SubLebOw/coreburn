@@ -87,6 +87,8 @@ export class Player {
     this.timeSinceHit = 99;
     this.walkPhase = 0;
     this.dead = false;
+    this.lastHitBy = null;
+    this.killedBy = null;
     this.model.body.rotation.set(0, 0, 0);
     this.model.body.position.set(0, 0, 0);
     this.spinRing.visible = false;
@@ -303,18 +305,22 @@ export class Player {
 
   // ---------- Getting hurt ----------
 
-  takeDamage(amount) {
+  // `source` = the enemy, boss or bolt owner that hit us (remembered so the game over
+  // screen and the share text can say what killed Sarrow)
+  takeDamage(amount, source = null) {
     if (this.dead || this.state === 'dash') return false; // blinking = untouchable
     if (this.invulnTimer > 0) return false;              // just revived
     if (this.state === 'spin') amount *= 0.5;             // overdrive = tougher
     this.hp -= amount;
     this.hurtTimer = 0.15;
     this.timeSinceHit = 0;
+    if (source) this.lastHitBy = source;
     this.world.onPlayerHurt();
     this.world.sfx('hurt');
     if (this.hp <= 0) {
       this.hp = 0;
       this.dead = true;
+      this.killedBy = source || this.lastHitBy || null;
       this.state = 'dead';
       this.stateTime = 0;
       this.spinRing.visible = false;
@@ -328,6 +334,7 @@ export class Player {
   // Back on your feet (from the rewarded "Revive" ad): half health and 2.5s of invincibility
   revive() {
     this.dead = false;
+    this.killedBy = null;
     this.state = 'normal';
     this.stateTime = 0;
     this.hp = this.maxHp * 0.5;

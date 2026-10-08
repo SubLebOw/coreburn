@@ -14,7 +14,7 @@ export class Projectiles {
       const mesh = new THREE.Mesh(geo, this.material(0xff8a1e));
       mesh.visible = false;
       scene.add(mesh);
-      this.list.push({ mesh, vel: new THREE.Vector3(), life: 0, damage: 0, size: 1 });
+      this.list.push({ mesh, vel: new THREE.Vector3(), life: 0, damage: 0, size: 1, source: null });
     }
   }
 
@@ -23,8 +23,9 @@ export class Projectiles {
     return this.materials.get(color);
   }
 
-  // Fire a bolt from `from` in direction `dir` (on the floor plane)
-  fire(from, dir, speed, damage, color = 0xff8a1e, size = 1) {
+  // Fire a bolt from `from` in direction `dir` (on the floor plane).
+  // `source` = the enemy/boss that fired it (so the game over screen can say who got you)
+  fire(from, dir, speed, damage, color = 0xff8a1e, size = 1, source = null) {
     const p = this.list.find((x) => x.life <= 0);
     if (!p) return; // pool is full, skip this shot
     p.mesh.material = this.material(color);
@@ -35,6 +36,7 @@ export class Projectiles {
     p.life = 4;
     p.damage = damage;
     p.size = size;
+    p.source = source;
   }
 
   update(dt, player, arena, effects) {
@@ -50,7 +52,7 @@ export class Projectiles {
       }
       // hit the player? (takeDamage returns false while blinking, so the bolt flies on)
       if (!done && !player.dead && Math.hypot(pos.x - player.position.x, pos.z - player.position.z) < 0.3 * p.size + player.radius) {
-        if (player.takeDamage(p.damage)) done = true;
+        if (player.takeDamage(p.damage, p.source)) done = true;
       }
       if (done) {
         p.life = 0;

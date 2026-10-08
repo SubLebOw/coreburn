@@ -16,6 +16,8 @@ import { sound } from './audio.js';
 import { ads } from './ads.js';
 import { checkForUpdates } from './updater.js';
 import { GAME_VERSION } from './version.js';
+import { shareScore, copyScore } from './share.js';
+import { IS_NATIVE } from './native.js';
 
 const IS_TOUCH = isTouchDevice();
 if (IS_TOUCH) document.body.classList.add('touch'); // shows the touch controls (see style.css)
@@ -143,6 +145,8 @@ function startGame() {
   enemies.startWave(1);
 }
 
+let lastRun = { wave: 1, score: 0, killer: null }; // what the share buttons talk about
+
 function gameOver() {
   state = 'gameover';
   gameOverTime = performance.now();
@@ -152,7 +156,10 @@ function gameOver() {
     best.wave = enemies.wave;
     localStorage.setItem('coreburn-best', JSON.stringify(best));
   }
-  hud.showGameOver(score, enemies.wave, kills, best, newBest);
+  const killer = player.killedBy ? player.killedBy.killerName : null; // e.g. "the Furnace Deacon"
+  lastRun = { wave: enemies.wave, score, killer };
+  hud.showGameOver(score, enemies.wave, kills, best, newBest, killer);
+  copyBtn.textContent = 'COPY';
   sound.play('gameOver');
   sound.setIntensity(0);
   ads.onGameOver();
@@ -168,6 +175,7 @@ function gameOver() {
 async function tryRestart(e) {
   if (state !== 'gameover' || restarting || performance.now() - gameOverTime < 600) return;
   if (e && e.code === 'KeyM') return;                 // M is the mute key
+  if (e && e.target && e.target.closest && e.target.closest('.share-row')) return; // share/copy buttons
   if (reviveOffered && e && e.type !== 'click') return; // with a revive on offer, use the buttons
   restarting = true;
   try { await ads.maybeShowInterstitial(); } finally { restarting = false; }
@@ -200,6 +208,23 @@ reviveBtn.addEventListener('click', async (e) => {
   state = 'playing';
   sound.play('revive');
   sound.setIntensity(enemies.boss && !enemies.boss.dead ? 2 : 1);
+});
+
+// Share my score / copy it (game over screen). These must not count as "tap to restart".
+const shareBtn = document.getElementById('share-btn');
+const copyBtn = document.getElementById('copy-btn');
+for (const b of [shareBtn, copyBtn]) b.addEventListener('pointerdown', (e) => e.stopPropagation());
+shareBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  shareBtn.blur();
+  shareScore(lastRun);
+});
+copyBtn.addEventListener('click', async (e) => {
+  e.stopPropagation();
+  copyBtn.blur();
+  const ok = await copyScore(lastRun);
+  copyBtn.textContent = ok ? 'COPIED!' : 'COPY FAILED';
+  setTimeout(() => { copyBtn.textContent = 'COPY'; }, 2000);
 });
 
 window.addEventListener('keydown', tryRestart);
@@ -301,9 +326,14 @@ function frame() {
 }
 frame();
 
-// Handy for testing in the browser console: try  game.player.hp = 1000  or  game.skipTo(10)
-window.game = {
-  player, enemies, world, startGame, sound, ads,
-  get score() { return score; },
-  skipTo(n) { enemies.reset(); projectiles.reset(); enemies.startWave(n); },
-};
+// Testing helpers for the browser console, e.g.  game.player.hp = 1000  or  game.skipTo(10).
+// ONLY when you run the game on your own computer (http://localhost...), never on the live
+// website or in the Android app, so players can't cheat their scores.
+const LOCAL_DEV = !IS_NATIVE && ['localhost', '127.0.0.1'].includes(location.hostname);
+if (LOCAL_DEV) {
+  window.game = {
+    player, enemies, world, startGame, sound, ads,
+    get score() { return score; },
+    skipTo(n) { enemies.reset(); projectiles.reset(); enemies.startWave(n); },
+  };
+}

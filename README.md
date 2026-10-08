@@ -20,6 +20,7 @@ with a boss fight every 5 waves. How far can you get?
 | Start | Enter / J / START | START button |
 | Restart after game over | any key or click | tap anywhere |
 | Mute / unmute sound | M or the speaker button | speaker button (top right) |
+| Share your score | SHARE SCORE / COPY on the game over screen | same |
 
 **Core recharge:** Sarrow's health slowly refills by itself, faster if he avoids hits for 3 seconds.
 Clearing a wave heals 25; beating a boss heals 60.
@@ -92,6 +93,7 @@ js/ads-config.js   THE ONE PLACE for AdMob IDs and ad frequency settings
 js/ads.js          Interstitial + rewarded revive + consent (UMP). Does nothing on the website
 js/updater.js      Android app: downloads new game versions from GitHub Pages (see below)
 js/native.js       Tiny helper: "are we inside the Android app?"
+js/share.js        Share-my-score (phone share sheet / post on X) and Copy on the game over screen
 js/version.js      GAME_VERSION - bump it when you publish an update
 privacy.html       Privacy policy (needed for Google Play + AdMob)
 vendor/            Three.js (bundled so the app works offline)
@@ -105,7 +107,7 @@ updates/           latest.json + the zipped game the Android app downloads updat
 - `js/waves.js`: `waveStats()` and `UNLOCKS` set the whole difficulty curve
 - `js/player.js`: `COMBO` damage/range, `MOVE_SPEED`, `DASH_COOLDOWN`, `SPIN_COOLDOWN`
 - `js/enemy.js`: `ENEMY_TYPES`; `js/boss.js`: `BOSSES`
-- Browser console: `game.player.hp = 1000` (god mode while testing), `game.skipTo(10)` (jump to a wave)
+- Browser console (only when running locally on http://localhost, not on the live site or app): `game.player.hp = 1000` (god mode while testing), `game.skipTo(10)` (jump to a wave)
 
 ## Android app (Google Play)
 
@@ -146,6 +148,14 @@ not native code. **These still need a new Play Store build:** the AdMob App ID, 
 or Capacitor itself, Android permissions, app name/icon/splash, target SDK bumps, anything in `android/`.
 If an update needs a newer app build, set `minNativeBuild` in `scripts/make-update.mjs` to that `versionCode`
 so older app installs skip it.
+
+### Share my score
+The game over screen has **SHARE SCORE** and **COPY** buttons. The text names what killed you, e.g.
+*"I reached wave 12 in COREBURN (score 8,450) and died to an elite Ripper Hound. Can you beat it? 🔥"*
+- Android app: the phone's share sheet via the `@capacitor/share` plugin. It's native code, so it's part of the
+  app build (included from the first Play upload). An app build without it falls back to opening a post on X.
+- Phone browsers: the phone's share sheet (`navigator.share`). Desktop: opens a ready-made post on X.
+- COPY: puts the text + link on the clipboard.
 
 ### Ads (currently Google TEST ads)
 

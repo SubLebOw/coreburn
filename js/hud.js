@@ -88,10 +88,11 @@ export class Hud {
     this.gameoverPanel.classList.add('hidden');
   }
 
-  showGameOver(score, wave, kills, best, newBest) {
+  showGameOver(score, wave, kills, best, newBest, killer = null) {
     $('gameover-score').textContent = `${score.toLocaleString()} pts`;
     $('gameover-stats').innerHTML =
       `Reached <b>wave ${wave}</b> · <b>${kills}</b> kills<br>` +
+      (killer ? `<span class="killer">Killed by ${killer}</span><br>` : '') +
       (newBest ? '<b style="color:#3ff6e0">NEW BEST SCORE!</b>' : `Best: ${best.score.toLocaleString()} pts (wave ${best.wave})`);
     this.overlay.classList.remove('hidden');
     this.titlePanel.classList.add('hidden');

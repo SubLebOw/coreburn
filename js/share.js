@@ -13,10 +13,11 @@ import { IS_NATIVE, getPlugin } from './native.js';
 
 export const SHARE_URL = 'https://sublebow.github.io/coreburn/';
 
-// e.g. "I reached wave 12 in COREBURN (score 8,450) and died to an elite Ripper Hound. Can you beat it? 🔥"
-export function shareText({ wave, score, killer }) {
+// e.g. "I reached wave 23 in COREBURN (score 18,450) in the Frozen Scrap Tundra and died to the Gulletworm. Can you beat it? 🔥"
+export function shareText({ wave, score, killer, place }) {
+  const where = place ? ` in ${place}` : '';
   const died = killer ? ` and died to ${killer}` : '';
-  return `I reached wave ${wave} in COREBURN (score ${score.toLocaleString('en-US')})${died}. Can you beat it? 🔥`;
+  return `I reached wave ${wave} in COREBURN (score ${score.toLocaleString('en-US')})${where}${died}. Can you beat it? 🔥`;
 }
 
 export function xIntentUrl(text) {

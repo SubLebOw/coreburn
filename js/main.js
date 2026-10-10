@@ -1,17 +1,19 @@
 // main.js
 // The starting point of COREBURN. It:
 //   1. sets up Three.js (renderer, scene, camera, lights)
-//   2. creates the arena, Sarrow, the waves, the HUD and the controls
+//   2. creates the arena, Sarrow, the waves, power-ups, the HUD and the controls
 //   3. runs the game loop ~60 times a second: update everything, then draw
+//   4. handles SLOW-MO (everything but Sarrow runs slower) and the fade between arenas
 import * as THREE from 'three';
 import { Input } from './input.js';
 import { isTouchDevice, setupTouchControls } from './touch.js';
-import { createArena } from './arena.js';
+import { createArena, arenaForWave } from './arena.js';
 import { Player } from './player.js';
 import { WaveManager, isBossWave } from './waves.js';
 import { Projectiles } from './projectiles.js';
 import { Effects } from './effects.js';
 import { Hud } from './hud.js';
+import { PowerUps } from './powerups.js';
 import { sound } from './audio.js';
 import { ads } from './ads.js';
 import { checkForUpdates } from './updater.js';
@@ -29,10 +31,8 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = IS_TOUCH ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 document.getElementById('game').appendChild(renderer.domElement);
 
-// ---------- Scene: dusk over the Slag Yard ----------
+// ---------- Scene (the arena sets the sky colour, fog and light colours) ----------
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x14191d);
-scene.fog = new THREE.Fog(0x14191d, 45, 95);
 
 // ---------- Camera: isometric-style, looking down at about 45 degrees ----------
 const camera = new THREE.PerspectiveCamera(32, 1, 0.5, 200); // low field-of-view = flatter, more 'isometric' look
@@ -42,8 +42,9 @@ const cameraTarget = new THREE.Vector3();
 let shakeAmount = 0;
 
 // ---------- Lights ----------
-scene.add(new THREE.HemisphereLight(0xbfd8e0, 0x4a3426, 1.2)); // cool sky, warm ground bounce
-const sun = new THREE.DirectionalLight(0xffd2a0, 2.5);         // low orange sunset light with shadows
+const hemi = new THREE.HemisphereLight(0xbfd8e0, 0x4a3426, 1.2); // sky colour + ground bounce
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffd2a0, 2.5);           // low sun with shadows
 sun.castShadow = true;
 sun.shadow.mapSize.set(IS_TOUCH ? 512 : 1024, IS_TOUCH ? 512 : 1024);
 Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 1, far: 60 });
@@ -56,7 +57,8 @@ setupTouchControls(input);
 const hud = new Hud();
 const effects = new Effects(scene);
 const projectiles = new Projectiles(scene);
-const arena = createArena(scene);
+const env = { hemi, sun, baseHemi: 1.2 };
+const arena = createArena(scene, env);
 
 let state = 'title'; // 'title' | 'playing' | 'gameover'
 let kills = 0;
@@ -67,16 +69,23 @@ let gameOverTime = 0;
 let revivedThisRun = false; // the rewarded-ad revive can be used once per run
 let reviveOffered = false;
 let restarting = false;
+let timeScale = 1;          // 0.35 during SLOW-MO (eases in and out)
+let slowmoOn = false;
+let transition = null;      // arena change in progress { t, index, loop, wave, swapped }
+const TRANSITION_TIME = 0.9;
+const fadeEl = document.getElementById('fade');
 const best = JSON.parse(localStorage.getItem('coreburn-best') || '{"score":0,"wave":0}');
 
 // "world" is a shared object that the player and enemies use to reach each other
 // and to trigger effects, without needing to know about main.js.
 const world = {
   arena,
+  env,
   effects,
   projectiles,
   player: null,
   enemies: null,
+  powerups: null,
   shake(amount) { shakeAmount = Math.max(shakeAmount, amount); },
   sfx(name, option) { sound.play(name, option); },
   hitstop(seconds) { hitstopTimer = Math.max(hitstopTimer, seconds); }, // tiny freeze = punchy hits
@@ -85,6 +94,7 @@ const world = {
     kills++;
     sound.play('enemyDeath');
     score += e.points;
+    powerups.onKill(e);
     // Hive splitters burst into mites (unless they're crumbling because the boss died)
     if (e.type.splits && !e.crumble) {
       for (let i = 0; i < e.type.splits; i++) {
@@ -94,7 +104,16 @@ const world = {
       }
     }
   },
+  // A new wave is about to start: every 10 waves we move to the next arena
+  onWaveBegin(n) {
+    const next = arenaForWave(n), cur = arena.current;
+    if (next.index !== cur.index || next.loop !== cur.loop) {
+      transition = { t: 0, index: next.index, loop: next.loop, wave: n, swapped: false };
+      sound.play('arenaChange');
+    }
+  },
   onWaveStart(n) {
+    if (transition) { sound.play('waveStart'); sound.setIntensity(1); return; } // the arena banner shows instead
     const msgs = { 1: 'The Grindchoir is coming', 2: 'Ripper hounds: they lunge!', 3: 'Slag spitters: dodge the bolts', 4: 'Bulwarks: only heavy hits stagger them', 6: 'Hive splitters burst into mites', 7: 'Elites (amber crowns) incoming' };
     hud.showBanner(`WAVE ${n}`, msgs[n] || '');
     sound.play('waveStart');
@@ -105,16 +124,28 @@ const world = {
     sound.play('bossWarning');
     sound.setIntensity(2); // boss music: faster and busier
   },
-  onBossKilled(boss) {
-    // Reward: big heal + score bonus, and its minions crumble
+  onBossKilled(boss, parts = [boss]) {
+    // Reward: big heal + score bonus, a power-up, and its minions crumble
     score += boss.points;
-    kills++;
+    kills += parts.length;
     world.player.heal(60);
     enemies.killAllAdds();
     world.shake(0.6);
     hud.showBanner('BOSS DOWN!', `+${boss.points} pts · +60 health`);
     sound.play('bossDefeated');
     sound.setIntensity(1);
+    powerups.onKill(boss);
+  },
+  // One of the Forge Twins fell; the other one gets angry
+  onTwinDown(fallen, survivor) {
+    hud.showBanner(`${fallen.def.partName} DOWN!`, survivor ? `${survivor.def.partName} is enraged!` : '');
+    world.shake(0.5);
+    sound.play('bossDefeated');
+  },
+  onTalonHit(e, damage) { powerups.onTalonHit(e, damage); },
+  onPowerup(type, def) {
+    sound.play('powerup');
+    hud.showToast(def.name + '!', def.hint, '#' + def.color.toString(16).padStart(6, '0'));
   },
   onWaveCleared(n) {
     const bonus = 25 * n;
@@ -127,8 +158,40 @@ const world = {
 };
 const player = new Player(scene, world);
 const enemies = new WaveManager(scene, world);
+const powerups = new PowerUps(scene, world);
 world.player = player;
 world.enemies = enemies;
+world.powerups = powerups;
+
+// SLOW-MO look and sound on/off
+function setSlowmo(on) {
+  if (slowmoOn === on) return;
+  slowmoOn = on;
+  document.body.classList.toggle('slowmo', on);
+  sound.setSlowmo(on);
+  if (state === 'playing') sound.play(on ? 'slowmoIn' : 'slowmoOut');
+}
+
+// Arena change: fade to black, swap the arena while it's dark, fade back in
+function updateTransition(dt) {
+  transition.t += dt;
+  const half = TRANSITION_TIME / 2;
+  if (!transition.swapped && transition.t >= half) {
+    transition.swapped = true;
+    arena.setTheme(transition.index, transition.loop);
+    player.position.set(0, 0, 0); // the middle of every arena is clear
+    player.slide.set(0, 0, 0);
+    projectiles.reset();
+    effects.reset();
+    powerups.clearFloor();
+    updateCamera(0, true);
+    const a = arena.current;
+    hud.showBanner(a.name, a.loop > 0 ? `Wave ${transition.wave} · Loop ${a.loop + 1}: everything hits harder` : `Wave ${transition.wave} · ${a.sub}`);
+  }
+  const t = transition.t;
+  fadeEl.style.opacity = t < half ? t / half : Math.max(0, 1 - (t - half) / half);
+  if (t >= TRANSITION_TIME) { transition = null; fadeEl.style.opacity = 0; }
+}
 
 // ---------- Starting / ending a run ----------
 function startGame() {
@@ -139,13 +202,20 @@ function startGame() {
   projectiles.reset();
   enemies.reset();
   player.reset();
+  powerups.reset();
+  transition = null;
+  fadeEl.style.opacity = 0;
+  timeScale = 1;
+  setSlowmo(false);
+  const cur = arena.current;
+  if (cur.index !== 0 || cur.loop !== 0) arena.setTheme(0, 0); // back to the Slag Yard
   hud.hideOverlay();
   state = 'playing';
   revivedThisRun = false;
   enemies.startWave(1);
 }
 
-let lastRun = { wave: 1, score: 0, killer: null }; // what the share buttons talk about
+let lastRun = { wave: 1, score: 0, killer: null, place: null }; // what the share buttons talk about
 
 function gameOver() {
   state = 'gameover';
@@ -157,8 +227,11 @@ function gameOver() {
     localStorage.setItem('coreburn-best', JSON.stringify(best));
   }
   const killer = player.killedBy ? player.killedBy.killerName : null; // e.g. "the Furnace Deacon"
-  lastRun = { wave: enemies.wave, score, killer };
-  hud.showGameOver(score, enemies.wave, kills, best, newBest, killer);
+  lastRun = { wave: enemies.wave, score, killer, place: arena.current.place };
+  powerups.reset();
+  setSlowmo(false);
+  timeScale = 1;
+  hud.showGameOver(score, enemies.wave, kills, best, newBest, killer, lastRun.place);
   copyBtn.textContent = 'COPY';
   sound.play('gameOver');
   sound.setIntensity(0);
@@ -304,10 +377,22 @@ function frame() {
     dt *= 0.05;
   }
 
+  // SLOW-MO: ease the world's speed towards 35% (Sarrow always uses the real dt)
+  timeScale += (powerups.timeScale - timeScale) * (1 - Math.exp(-10 * dt));
+  if (Math.abs(timeScale - powerups.timeScale) < 0.01) timeScale = powerups.timeScale;
+  const worldDt = dt * timeScale;
+  if (state === 'playing') setSlowmo(powerups.has('slowmo'));
+
   if (state === 'playing') {
-    player.update(dt, input);
-    enemies.update(dt);
-    projectiles.update(dt, player, arena, effects);
+    if (transition) {
+      updateTransition(dt); // everything waits while the screen fades
+    } else {
+      player.update(dt, input);
+      enemies.update(worldDt);
+      projectiles.update(worldDt, player, arena, effects);
+      arena.update(worldDt, player, world, true);
+      powerups.update(dt);
+    }
     if (player.dead) {
       deathTimer += dt;
       if (deathTimer > 1.6) gameOver();
@@ -316,24 +401,23 @@ function frame() {
     // title screen: Enter or J also starts a run
     if (state === 'title' && (input.wasPressed('start') || input.wasPressed('attack'))) startGame();
     if (state === 'gameover') { enemies.update(dt); projectiles.update(dt, player, arena, effects); } // let things settle
+    arena.update(dt, player, world, false);
   }
 
-  effects.update(dt);
+  effects.update(worldDt);
   updateCamera(dt);
-  hud.update(player, Math.max(1, enemies.wave), kills, score, enemies.boss);
+  hud.update(player, Math.max(1, enemies.wave), kills, score, state === 'playing' ? enemies.bossBar : null, powerups.hudList);
   input.endFrame();
   renderer.render(scene, camera);
 }
 frame();
 
-// Testing helpers for the browser console, e.g.  game.player.hp = 1000  or  game.skipTo(10).
-// ONLY when you run the game on your own computer (http://localhost...), never on the live
-// website or in the Android app, so players can't cheat their scores.
+// Testing helpers for the browser console live in js/dev.local.js, which is NOT part of the
+// game: it's git-ignored and left out of the build, so it never reaches the website or the
+// Android app. It only loads when you run the game on your own computer (http://localhost...).
 const LOCAL_DEV = !IS_NATIVE && ['localhost', '127.0.0.1'].includes(location.hostname);
 if (LOCAL_DEV) {
-  window.game = {
-    player, enemies, world, startGame, sound, ads,
-    get score() { return score; },
-    skipTo(n) { enemies.reset(); projectiles.reset(); enemies.startWave(n); },
-  };
+  import('./dev.local.js')
+    .then((m) => m.install({ player, enemies, world, arena, powerups, projectiles, effects, hud, sound, ads, startGame, snapCamera: () => updateCamera(0, true), getScore: () => score }))
+    .catch(() => {}); // no dev file = no helpers, that's fine
 }

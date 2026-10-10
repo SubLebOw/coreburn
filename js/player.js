@@ -4,6 +4,7 @@
 //   - blink dash: untouchable, and hurts enemies you pass through (K / Space / BLINK)
 //   - overdrive spin attack with a cooldown (L / OVERDRIVE)
 //   - core recharge: health slowly comes back by itself
+//   - power-ups (see powerups.js) can double his damage, shield him or electrify his talons
 import * as THREE from 'three';
 
 // The camera looks at the arena from the +X/+Z corner. These are the floor directions
@@ -66,6 +67,15 @@ export class Player {
     marker.position.y = 0.03;
     this.model.root.add(marker);
 
+    // SHIELD power-up bubble
+    this.bubble = new THREE.Mesh(
+      new THREE.SphereGeometry(1.15, 16, 10),
+      new THREE.MeshBasicMaterial({ color: 0x7fd8ff, transparent: true, opacity: 0.22, depthWrite: false })
+    );
+    this.bubble.position.y = 1.1;
+    this.bubble.visible = false;
+    this.model.root.add(this.bubble);
+
     this.reset();
   }
 
@@ -89,6 +99,10 @@ export class Player {
     this.dead = false;
     this.lastHitBy = null;
     this.killedBy = null;
+    this.damageMult = 1;              // 2 while FURY is active
+    this.slide = new THREE.Vector3(); // momentum on ice
+    this.bubble.visible = false;
+    this.setBladeColor(0x7ffff2);
     this.model.body.rotation.set(0, 0, 0);
     this.model.body.position.set(0, 0, 0);
     this.spinRing.visible = false;
@@ -183,6 +197,14 @@ export class Player {
         break;
     }
 
+    // ----- Ice: you keep sliding and turn slowly (not while blinking) -----
+    if (this.state !== 'dash' && this.world.arena.surfaceAt(this.position.x, this.position.z) === 'ice') {
+      this.slide.lerp(this.velocity, 1 - Math.exp(-2.2 * dt));
+      this.velocity.copy(this.slide);
+    } else {
+      this.slide.copy(this.velocity);
+    }
+
     // ----- Move and collide -----
     this.position.addScaledVector(this.velocity, dt);
     this.world.arena.resolve(this.position, this.radius);
@@ -229,7 +251,8 @@ export class Player {
       to.normalize();
       // only hit enemies in front of us (about 140 degree arc), or really close ones
       if (forward.dot(to) < 0.35 && dist > 1) continue;
-      e.hit(hit.damage, to.x * hit.knockback, to.z * hit.knockback, this.comboStep === 3);
+      e.hit(hit.damage * this.damageMult, to.x * hit.knockback, to.z * hit.knockback, this.comboStep === 3);
+      this.world.onTalonHit?.(e, hit.damage * this.damageMult);
       this.world.effects.spawnSparks(e.position.clone().setY(1.1), this.comboStep === 3 ? 0xffa040 : 0x9ffff5, this.comboStep === 3 ? 12 : 6);
       hitSomething = true;
     }
@@ -259,7 +282,8 @@ export class Player {
         // knock enemies off to the side of the dash path
         const side = new THREE.Vector3(-this.dashDir.z, 0, this.dashDir.x);
         if (side.dot(new THREE.Vector3().subVectors(e.position, this.position)) < 0) side.negate();
-        e.hit(10, side.x * 7, side.z * 7, false);
+        e.hit(10 * this.damageMult, side.x * 7, side.z * 7, false);
+        this.world.onTalonHit?.(e, 10 * this.damageMult);
         this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0x9ffff5, 6);
         this.world.shake(0.12);
         this.world.sfx('hit');
@@ -286,7 +310,7 @@ export class Player {
       const dist = to.length();
       if (dist < 3.2 + e.radius) {
         to.normalize();
-        e.hit(8, to.x * 7, to.z * 7, true);
+        e.hit(8 * this.damageMult, to.x * 7, to.z * 7, true);
         this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0xff8040, 4);
         this.world.sfx('hit');
       }
@@ -307,9 +331,11 @@ export class Player {
 
   // `source` = the enemy, boss or bolt owner that hit us (remembered so the game over
   // screen and the share text can say what killed Sarrow)
-  takeDamage(amount, source = null) {
+  // opts.hazard = lava / lightning (the SHIELD blocks those without using up a charge)
+  takeDamage(amount, source = null, opts = {}) {
     if (this.dead || this.state === 'dash') return false; // blinking = untouchable
     if (this.invulnTimer > 0) return false;              // just revived
+    if (this.world.powerups && this.world.powerups.absorb(opts)) return false; // SHIELD
     if (this.state === 'spin') amount *= 0.5;             // overdrive = tougher
     this.hp -= amount;
     this.hurtTimer = 0.15;
@@ -325,6 +351,7 @@ export class Player {
       this.stateTime = 0;
       this.spinRing.visible = false;
       this.slashArc.material.opacity = 0;
+      this.bubble.visible = false;
     }
     return true;
   }
@@ -382,7 +409,7 @@ export class Player {
       }
       if (t > 0.3 && t < 0.6) {
         this.slashArc.material.opacity = this.comboStep === 3 ? 0.75 : 0.55;
-        this.slashArc.material.color.setHex(this.comboStep === 3 ? 0xffa040 : 0x7ffff2);
+        this.slashArc.material.color.setHex(this.damageMult > 1 ? 0xff3a2a : (this.comboStep === 3 ? 0xffa040 : this.bladeColor));
         this.slashArc.scale.set(this.comboStep === 2 ? -1 : 1, 1, 1).multiplyScalar(this.comboStep === 3 ? 1.2 : 1);
       }
     } else if (this.state === 'dash') {
@@ -412,6 +439,13 @@ export class Player {
     this.model.body.rotation.y = 0;
     this.model.body.position.y = t * 0.25;
     this.setFlash(0x000000);
+  }
+
+  // Talon colour: teal normally, red with FURY, electric blue with ARC TALONS
+  setBladeColor(hex) {
+    if (this.bladeColor === hex) return;
+    this.bladeColor = hex;
+    this.model.blade.color.setHex(hex);
   }
 
   setFlash(hex) {
@@ -520,5 +554,5 @@ function buildHero() {
   const armR = arm(-0.46);
 
   const flashMats = [mats.coat, mats.coatDark, mats.pants, mats.leather, mats.orange, mats.metal];
-  return { root, body, head, core, legL, legR, armL, armR, flashMats };
+  return { root, body, head, core, legL, legR, armL, armR, flashMats, blade: mats.blade };
 }

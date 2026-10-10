@@ -1,8 +1,10 @@
 // boss.js
 // Boss rounds! Every 5th wave one of the Grindchoir's leaders shows up.
-// Bosses rotate (Furnace Deacon -> Choirmother -> Rivetjaw -> Deacon again ...) and
-// come back tougher each time around. Every attack is telegraphed: red strips on the
-// floor for charges, filling red circles for slams, and a glow before summons/volleys.
+// This file has the shared Boss "brain" (chase -> telegraph -> attack -> recover) and the
+// three original bosses. The newer bosses live in boss-vell.js, boss-worm.js, boss-twins.js
+// and boss-hymnworks.js; they extend this class. The full rotation is in bosses.js.
+// Every attack is telegraphed: red strips on the floor for charges, filling red circles
+// for slams, and a glow before summons/volleys.
 import * as THREE from 'three';
 
 const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);
@@ -10,8 +12,8 @@ const VISOR_MAT = new THREE.MeshBasicMaterial({ color: 0xc8ff3a });
 const FURNACE_MAT = new THREE.MeshBasicMaterial({ color: 0xff7a1a });
 const HALO_MAT = new THREE.MeshBasicMaterial({ color: 0xffb020 });
 
-// The boss line-up. `pattern` is the order they cycle through their attacks.
-export const BOSSES = [
+// The original three. `pattern` is the order they cycle through their attacks.
+export const CLASSIC_BOSSES = [
   {
     id: 'deacon', name: 'THE FURNACE DEACON', killerName: 'the Furnace Deacon', subtitle: 'Keeper of the Melt',
     hp: 650, speed: 3.0, scale: 2.0,
@@ -33,9 +35,9 @@ export const BOSSES = [
 ];
 
 export class Boss {
-  // index = which boss (0-2), bossNumber = 1 for the first boss fight, 2 for the second...
-  constructor(scene, index, bossNumber, stats, position, world) {
-    const def = BOSSES[index];
+  // def = the boss description (see CLASSIC_BOSSES), bossNumber = 1 for the first boss fight,
+  // 2 for the second..., tier = how many full trips round the boss rotation we've done
+  constructor(scene, def, bossNumber, tier, stats, position, world) {
     this.scene = scene;
     this.world = world;
     this.def = def;
@@ -43,16 +45,23 @@ export class Boss {
     this.killerName = def.killerName; // for the game over screen / share text
     this.isBoss = true;
     this.bossNumber = bossNumber;
-    this.tier = Math.floor((bossNumber - 1) / BOSSES.length); // how many full loops we've done
+    this.tier = tier;
     // Tougher every boss fight: more health, more damage, quicker attacks
-    this.maxHp = def.hp * (1 + 0.45 * (bossNumber - 1));
+    // (hpShare: twin bosses split one health pool between them)
+    this.maxHp = def.hp * (1 + 0.45 * (bossNumber - 1)) * (def.hpShare || 1);
     this.hp = this.maxHp;
     this.dmgMult = stats.dmgMult;
     this.tempo = Math.max(0.6, 1 - 0.12 * this.tier); // < 1 = shorter wind-ups
     this.speed = def.speed * (1 + 0.08 * this.tier);
     this.scale = def.scale;
-    this.radius = 0.6 * def.scale;
+    this.radius = def.radius || 0.6 * def.scale;
     this.points = 500 * bossNumber;
+    this.chargeSpeed = def.chargeSpeed || 18;   // how fast charges travel
+    this.chargeTime = def.chargeTime || 0.95;   // and for how long
+    this.chargeDamage = def.chargeDamage || 22;
+    this.damageTakenMult = 1;  // < 1 while a twin is shielding this boss
+    this.tempoBoost = 1;       // < 1 = attacks wind up faster (twin buff / enrage)
+    this.hidden = false;       // true while underground (the Gulletworm)
     this.position = position.clone();
     this.knockback = new THREE.Vector3();
     this.chargeDir = new THREE.Vector3();
@@ -67,23 +76,34 @@ export class Boss {
     this.build();
   }
 
-  get canBeHit() { return !this.dead && this.state !== 'intro'; }
+  get canBeHit() { return !this.dead && this.state !== 'intro' && !this.hidden; }
+  get pace() { return this.tempo * this.tempoBoost; } // multiply wind-up times by this
+  isChargeAttack(name) { return name === 'charge' || name === 'triplecharge' || name === 'blinkstrike'; }
 
   // ---------- Taking damage ----------
   hit(damage, knockX, knockZ) {
     if (!this.canBeHit) return;
-    this.hp -= damage;
+    this.hp -= damage * this.damageTakenMult;
     this.flashTimer = 0.08;
-    this.knockback.x += knockX * 0.06; // bosses barely budge
-    this.knockback.z += knockZ * 0.06;
-    if (this.hp <= 0) {
-      this.hp = 0;
-      this.dead = true;
-      this.state = 'dead';
-      this.stateTime = 0;
-      this.world.onBossKilled(this);
+    if (!this.def.stationary) {
+      this.knockback.x += knockX * 0.06; // bosses barely budge
+      this.knockback.z += knockZ * 0.06;
     }
+    if (this.hp <= 0) this.die();
   }
+
+  die() {
+    if (this.dead) return;
+    this.hp = 0;
+    this.dead = true;
+    this.state = 'dead';
+    this.stateTime = 0;
+    this.hidden = false;
+    this.onDeath();
+    this.world.enemies.bossDown(this); // the wave manager decides if the whole fight is won
+  }
+
+  onDeath() {} // hook for bosses that need to clean up (beams, afterimages...)
 
   // ---------- Brain ----------
   update(dt, player) {
@@ -94,7 +114,7 @@ export class Boss {
     if (this.state === 'intro') {
       // rise out of the floor, then roar (shake)
       const t = Math.min(1, this.stateTime / 1.5);
-      this.root.position.set(this.position.x, -4 * (1 - t), this.position.z);
+      this.root.position.set(this.position.x, -(this.def.introDepth || 4) * (1 - t), this.position.z);
       if (t >= 1) { this.state = 'chase'; this.stateTime = 0; this.world.shake(0.4); }
       this.animate(dt);
       return;
@@ -109,27 +129,29 @@ export class Boss {
 
     switch (this.state) {
       case 'chase':
-        this.turnTowards(toPlayer, dt, 4);
-        if (!player.dead && dist > this.radius + 1.6) this.position.addScaledVector(toPlayer, this.speed * dt);
+        if (!this.def.stationary) {
+          this.turnTowards(toPlayer, dt, 4);
+          if (!player.dead && dist > this.radius + 1.6) this.position.addScaledVector(toPlayer, this.speed * dt);
+        }
         this.chaseTime -= dt;
-        if (this.chaseTime <= 0 && !player.dead) this.beginAttack(this.def.pattern[this.patternIndex++ % this.def.pattern.length], player, toPlayer);
+        if (this.chaseTime <= 0 && !player.dead) this.beginAttack(this.nextAttack(), player, toPlayer);
         break;
 
       case 'telegraph':
-        if (this.attack !== 'charge' && this.attack !== 'triplecharge') this.turnTowards(toPlayer, dt, 2);
+        if (!this.isChargeAttack(this.attack) && !this.def.stationary) this.turnTowards(toPlayer, dt, 2);
         if (this.stateTime >= this.telegraphTime) this.doAttack(player, toPlayer, dist);
         break;
 
       case 'charging': {
-        const before = this.position.clone().addScaledVector(this.chargeDir, 18 * dt);
+        const before = this.position.clone().addScaledVector(this.chargeDir, this.chargeSpeed * dt);
         this.position.copy(before);
         this.world.arena.resolve(this.position, this.radius);
         const hitWall = this.position.distanceTo(before) > 0.01;
         if (!this.chargeHit && !player.dead && this.position.distanceTo(player.position) < this.radius + player.radius + 0.2) {
           this.chargeHit = true;
-          player.takeDamage(22 * this.dmgMult, this);
+          player.takeDamage(this.chargeDamage * this.dmgMult, this);
         }
-        if (hitWall || this.stateTime > 0.95) {
+        if (hitWall || this.stateTime > this.chargeTime) {
           if (hitWall) { this.world.shake(0.35); this.world.effects.spawnSparks(this.position.clone().setY(1), 0xffb060, 10); }
           if (this.chargesLeft > 0) this.setupCharge(player, 0.55);
           else this.recover(hitWall ? 1.4 : 0.8); // smashing into a wall dazes it: free hits!
@@ -141,19 +163,23 @@ export class Boss {
         if (this.stateTime >= this.recoverTime) {
           this.state = 'chase';
           this.stateTime = 0;
-          this.chaseTime = (1.0 + Math.random()) * this.tempo;
+          this.chaseTime = (1.0 + Math.random()) * this.pace;
         }
         break;
     }
 
-    // keep the player from walking through the boss
-    const pd = this.position.distanceTo(player.position);
-    if (!player.dead && pd < this.radius + player.radius && pd > 0.001) {
-      const push = new THREE.Vector3().subVectors(player.position, this.position).setY(0).normalize();
-      player.position.addScaledVector(push, this.radius + player.radius - pd);
-    }
+    this.pushPlayer(player);
     this.world.arena.resolve(this.position, this.radius);
     this.animate(dt);
+  }
+
+  // keep the player from walking through the boss
+  pushPlayer(player) {
+    const pd = this.position.distanceTo(player.position);
+    if (this.hidden || player.dead || pd >= this.radius + player.radius) return;
+    const push = pd > 0.001 ? new THREE.Vector3().subVectors(player.position, this.position).setY(0).normalize() : new THREE.Vector3(1, 0, 1).normalize();
+    player.position.addScaledVector(push, this.radius + player.radius - pd);
+    this.world.arena.resolve(player.position, player.radius);
   }
 
   turnTowards(dir, dt, speed) {
@@ -162,13 +188,30 @@ export class Boss {
     this.facing += diff * Math.min(1, speed * dt);
   }
 
+  // Which attack comes next in the pattern (bosses can skip ones that don't make sense right now)
+  nextAttack() {
+    for (let i = 0; i < this.def.pattern.length; i++) {
+      const name = this.def.pattern[this.patternIndex++ % this.def.pattern.length];
+      if (this.canUseAttack(name)) return name;
+    }
+    return this.def.pattern[0];
+  }
+
+  canUseAttack(name) { return true; }
+
   // ---------- Attacks: 1) telegraph ----------
   beginAttack(name, player, toPlayer) {
     this.attack = name;
     this.state = 'telegraph';
     this.stateTime = 0;
-    const fx = this.world.effects;
     if (name !== 'summon') this.world.sfx('bossWarning'); // audio cue for every telegraphed attack
+    this.setupAttack(name, player, toPlayer);
+  }
+
+  // Sets up the warning shapes and wind-up time. Newer bosses add their own attacks
+  // by overriding this and calling super.setupAttack() for the shared ones.
+  setupAttack(name, player, toPlayer) {
+    const fx = this.world.effects;
     switch (name) {
       case 'charge':
         this.chargesLeft = 1;
@@ -180,12 +223,12 @@ export class Boss {
         break;
       case 'slam':
         this.slamRadius = 4.6 + this.tier * 0.4;
-        this.telegraphTime = 1.1 * this.tempo;
+        this.telegraphTime = 1.1 * this.pace;
         fx.spawnWarning(this.position, this.slamRadius, this.telegraphTime);
         break;
       case 'markslam': {
         // three circles: one on the player, two nearby
-        this.telegraphTime = 1.2 * this.tempo;
+        this.telegraphTime = 1.2 * this.pace;
         this.marks = [player.position.clone()];
         for (let i = 0; i < 2 + this.tier; i++) {
           const a = Math.random() * Math.PI * 2;
@@ -199,12 +242,14 @@ export class Boss {
         break;
       case 'burst':
         this.burstsLeft = 2 + this.tier;
-        this.telegraphTime = 0.7 * this.tempo;
+        this.telegraphTime = 0.7 * this.pace;
         break;
       case 'volley':
         this.shotsLeft = 3 + this.tier;
-        this.telegraphTime = 0.6 * this.tempo;
+        this.telegraphTime = 0.6 * this.pace;
         break;
+      default:
+        this.telegraphTime = 0.5;
     }
   }
 
@@ -213,8 +258,8 @@ export class Boss {
     this.stateTime = 0;
     this.chargeDir.subVectors(player.position, this.position).setY(0).normalize();
     this.facing = Math.atan2(this.chargeDir.x, this.chargeDir.z);
-    this.telegraphTime = time * this.tempo;
-    this.world.effects.spawnLine(this.position, this.chargeDir, 17, this.radius * 2, this.telegraphTime);
+    this.telegraphTime = time * this.pace;
+    this.world.effects.spawnLine(this.position, this.chargeDir, Math.min(17, this.chargeSpeed * this.chargeTime), this.radius * 2, this.telegraphTime);
   }
 
   // ---------- Attacks: 2) the hit itself ----------
@@ -223,6 +268,7 @@ export class Boss {
     switch (this.attack) {
       case 'charge':
       case 'triplecharge':
+      case 'blinkstrike':
         this.state = 'charging';
         this.stateTime = 0;
         this.chargeHit = false;
@@ -268,11 +314,11 @@ export class Boss {
         const offset = this.burstsLeft * 0.26;
         for (let i = 0; i < n; i++) {
           const a = (i / n) * Math.PI * 2 + offset;
-          this.world.projectiles.fire(this.position.clone().setY(1.6), new THREE.Vector3(Math.cos(a), 0, Math.sin(a)), 7, 10 * this.dmgMult, 0xffb020, 1.3, this);
+          this.world.projectiles.fire(this.position.clone().setY(1.6), new THREE.Vector3(Math.cos(a), 0, Math.sin(a)), 7, 10 * this.dmgMult, this.def.boltColor || 0xffb020, 1.3, this);
         }
         this.world.sfx('shot');
         this.burstsLeft--;
-        if (this.burstsLeft > 0) { this.stateTime = 0; this.telegraphTime = 0.55 * this.tempo; }
+        if (this.burstsLeft > 0) { this.stateTime = 0; this.telegraphTime = 0.55 * this.pace; }
         else this.recover(0.7);
         return;
       }
@@ -281,14 +327,16 @@ export class Boss {
         // fan of 5 bolts aimed at the player
         for (let i = -2; i <= 2; i++) {
           const a = Math.atan2(toPlayer.z, toPlayer.x) + i * 0.22;
-          this.world.projectiles.fire(this.position.clone().setY(1.4), new THREE.Vector3(Math.cos(a), 0, Math.sin(a)), 9, 10 * this.dmgMult, 0xff8a1e, 1.2, this);
+          this.world.projectiles.fire(this.position.clone().setY(1.4), new THREE.Vector3(Math.cos(a), 0, Math.sin(a)), 9, 10 * this.dmgMult, this.def.boltColor || 0xff8a1e, 1.2, this);
         }
         this.world.sfx('shot');
         this.shotsLeft--;
-        if (this.shotsLeft > 0) { this.stateTime = 0; this.telegraphTime = 0.4 * this.tempo; }
+        if (this.shotsLeft > 0) { this.stateTime = 0; this.telegraphTime = 0.4 * this.pace; }
         else this.recover(0.7);
         return;
       }
+      default:
+        this.recover(0.5);
     }
   }
 
@@ -300,22 +348,32 @@ export class Boss {
 
   // ---------- Looks ----------
   build() {
+    const c = this.def.colors || {};
     this.mats = {
-      main: new THREE.MeshLambertMaterial({ color: 0x7a3418 }),
-      dark: new THREE.MeshLambertMaterial({ color: 0x2a2623 }),
-      mask: new THREE.MeshLambertMaterial({ color: 0xd8cfb8 }),
+      main: new THREE.MeshLambertMaterial({ color: c.main ?? 0x7a3418 }),
+      dark: new THREE.MeshLambertMaterial({ color: c.dark ?? 0x2a2623 }),
+      mask: new THREE.MeshLambertMaterial({ color: c.mask ?? 0xd8cfb8 }),
     };
-    const { main, dark, mask } = this.mats;
     this.root = new THREE.Group();
     this.body = new THREE.Group();
     this.root.add(this.body);
-    const part = (parent, mat, w, h, d, x, y, z, shadow = true) => {
-      const m = new THREE.Mesh(UNIT_BOX, mat);
-      m.scale.set(w, h, d); m.position.set(x, y, z); m.castShadow = shadow;
-      parent.add(m); return m;
-    };
-    const group = (parent, x, y, z) => { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; };
+    this.buildModel(this.mats);
+    this.root.scale.setScalar(this.scale);
+    this.root.position.set(this.position.x, -(this.def.introDepth || 4), this.position.z);
+    this.scene.add(this.root);
+  }
 
+  // Little helpers for building blocky models out of boxes
+  part(parent, mat, w, h, d, x, y, z, shadow = true) {
+    const m = new THREE.Mesh(UNIT_BOX, mat);
+    m.scale.set(w, h, d); m.position.set(x, y, z); m.castShadow = shadow;
+    parent.add(m); return m;
+  }
+  group(parent, x, y, z) { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; }
+
+  buildModel({ main, dark, mask }) {
+    const part = this.part.bind(this);
+    const group = this.group.bind(this);
     if (this.def.id === 'deacon') {
       // hulking furnace-bellied priest with chimney shoulders and hammer fists
       for (const x of [0.3, -0.3]) part(this.body, dark, 0.38, 0.85, 0.42, x, 0.42, 0);
@@ -370,23 +428,28 @@ export class Boss {
         pipe.position.set(x, 1.6, -0.45); pipe.rotation.x = -0.4; this.body.add(pipe);
       }
     }
-
-    this.root.scale.setScalar(this.scale);
-    this.root.position.set(this.position.x, -4, this.position.z);
-    this.scene.add(this.root);
   }
 
   animate(dt) {
     const t = performance.now() / 1000;
     this.body.rotation.set(0, 0, 0);
     this.body.position.y = 0;
+    let glow = this.pose(dt, t);
+    if (this.flashTimer > 0) glow = 0xffffff;
+    this.setEmissive(glow);
+    if (this.state !== 'intro') this.root.position.set(this.position.x, this.rootY || 0, this.position.z);
+    this.root.rotation.y = this.facing;
+  }
+
+  // Body language for each state; returns the glow colour. Newer bosses override this.
+  pose(dt, t) {
     let glow = 0x000000;
 
     if (this.state === 'telegraph') {
       const k = Math.min(1, this.stateTime / this.telegraphTime);
       glow = (Math.floor(k * 10) % 2 === 0) ? 0x662200 : 0x331100; // pulsing warning glow
       if (this.attack === 'slam') this.body.rotation.x = -0.25 * k;  // rear back
-      if (this.attack.includes('charge')) this.body.rotation.x = 0.2 * k; // lean in
+      if (this.isChargeAttack(this.attack)) this.body.rotation.x = 0.2 * k; // lean in
       if (this.armL) { const a = this.attack === 'slam' || this.attack === 'markslam' ? -2.6 * k : -1.2 * k; this.armL.rotation.x = this.armR.rotation.x = a; }
       if (this.jaw) this.jaw.rotation.x = 0.5 * k;
     } else if (this.state === 'charging') {
@@ -406,11 +469,7 @@ export class Boss {
     }
     if (this.def.id === 'choirmother') this.body.position.y += 0.15 + Math.sin(t * 2) * 0.1; // she floats
     if (this.halo) this.halo.rotation.z += dt * 3;
-    if (this.flashTimer > 0) glow = 0xffffff;
-    this.setEmissive(glow);
-
-    if (this.state !== 'intro') this.root.position.set(this.position.x, 0, this.position.z);
-    this.root.rotation.y = this.facing;
+    return glow;
   }
 
   animateDeath(dt) {
@@ -419,7 +478,7 @@ export class Boss {
     this.setEmissive(Math.floor(t * 12) % 2 ? 0xffffff : 0x662200);
     this.root.position.x = this.position.x + (Math.random() - 0.5) * 0.2;
     if (Math.random() < 0.3) this.world.effects.spawnSparks(this.position.clone().setY(1.5 + Math.random() * 2), 0xffb060, 3, 7);
-    if (t > 1.0) this.root.position.y = -(t - 1.0) * 3;
+    if (t > 1.0) this.root.position.y = (this.rootY || 0) - (t - 1.0) * 3;
     if (t > 2.2) this.remove = true;
   }
 

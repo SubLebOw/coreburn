@@ -13,3 +13,5 @@ android/capacitor-cordova-android-plugins/build/
 *.jks
 *.keystore
 keystore.properties
+# Local-only testing helpers (never shipped: also excluded from the build)
+*.local.js

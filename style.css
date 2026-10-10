@@ -210,3 +210,50 @@ body.touch .kb-only { display: none !important; }
 #gameover-stats .killer { color: #ff9a6a; }
 .footer-links { margin-top: 14px; font-size: 12px; opacity: .75; display: flex; gap: 14px; justify-content: center; align-items: center; flex-wrap: wrap; }
 .footer-links a, .link-btn { color: #3ff6e0; background: none; border: none; font: inherit; text-decoration: underline; cursor: pointer; padding: 0; }
+
+/* ---------- Power-ups ---------- */
+#powerups {
+  position: absolute; top: calc(78px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left));
+  display: flex; gap: 8px;
+}
+.pw { width: 42px; text-align: center; }
+.pw-ring {
+  width: 38px; height: 38px; margin: 0 auto; border-radius: 50%; position: relative;
+  background: conic-gradient(var(--c) calc(var(--left, 1) * 360deg), #0009 0);
+  box-shadow: 0 0 10px var(--c), 0 2px 4px #000;
+}
+.pw-ring::after { content: ''; position: absolute; inset: 4px; border-radius: 50%; background: #111a; }
+.pw-sec { position: absolute; inset: 0; z-index: 1; line-height: 38px; font-weight: 900; font-size: 15px; text-shadow: 0 1px 0 #000; }
+.pw-label { font-size: 9px; font-weight: 900; letter-spacing: 1px; color: var(--c); text-shadow: 0 1px 0 #000; margin-top: 2px; }
+.pw.ending .pw-ring { animation: pwblink .25s steps(2) infinite; }
+@keyframes pwblink { 50% { opacity: .35; } }
+@media (max-width: 600px) {
+  #powerups { top: calc(112px + env(safe-area-inset-top)); gap: 6px; } /* below the boss bar */
+  .pw { width: 36px; }
+  .pw-ring { width: 32px; height: 32px; }
+  .pw-sec { line-height: 32px; font-size: 13px; }
+}
+
+#toast { position: absolute; top: 33%; left: 0; right: 0; text-align: center; opacity: 0; }
+#toast b { display: block; font-size: clamp(22px, 5vw, 34px); font-weight: 900; letter-spacing: 3px; color: var(--c); text-shadow: 0 3px 0 #000, 0 0 16px var(--c); }
+#toast span { font-size: 14px; text-shadow: 0 2px 0 #000; }
+#toast.show { animation: toast 1.4s ease forwards; }
+@keyframes toast {
+  0% { opacity: 0; transform: translateY(10px) scale(1.2); }
+  15% { opacity: 1; transform: none; }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-14px); }
+}
+
+/* SLOW-MO: washed-out colours + teal vignette */
+#game canvas { transition: filter .3s; }
+body.slowmo #game canvas { filter: saturate(.35) contrast(1.05) brightness(1.05); }
+#slowmo-tint {
+  position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s;
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(20, 200, 190, .35) 100%);
+  box-shadow: inset 0 0 0 9999px rgba(30, 160, 170, .12);
+}
+body.slowmo #slowmo-tint { opacity: 1; }
+
+/* Arena change: fade to black and back */
+#fade { position: fixed; inset: 0; pointer-events: none; background: #000; opacity: 0; }

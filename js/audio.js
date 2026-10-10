@@ -16,6 +16,8 @@ class SoundEngine {
     this.lastPlayed = {};   // for throttling sounds that can fire many times per frame
     this.intensity = 0;     // music: 0 = menu, 1 = fighting, 2 = boss
     this.musicStarted = false;
+    this.musicPitch = 1;    // < 1 during SLOW-MO: the music drops in pitch and slows down
+    this.musicTempo = 1;
   }
 
   // ---------- Setup ----------
@@ -38,7 +40,11 @@ class SoundEngine {
         this.sfxBus.connect(this.master);
         this.musicBus = ctx.createGain();
         this.musicBus.gain.value = 0.3;
-        this.musicBus.connect(this.master);
+        // music -> lowpass filter (closes during SLOW-MO for a muffled, underwater feel) -> master
+        this.musicFilter = ctx.createBiquadFilter();
+        this.musicFilter.type = 'lowpass';
+        this.musicFilter.frequency.value = 18000;
+        this.musicBus.connect(this.musicFilter).connect(this.master);
         // one second of white noise we can reuse for every noisy sound
         this.noiseBuffer = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
         const data = this.noiseBuffer.getChannelData(0);
@@ -68,6 +74,13 @@ class SoundEngine {
 
   toggleMute() { this.setMuted(!this.muted); return this.muted; }
 
+  // SLOW-MO: drop the music's pitch and tempo and muffle it (and the reverse)
+  setSlowmo(on) {
+    this.musicPitch = on ? 0.7 : 1;
+    this.musicTempo = on ? 0.7 : 1;
+    if (this.ctx) this.musicFilter.frequency.setTargetAtTime(on ? 1100 : 18000, this.ctx.currentTime, 0.15);
+  }
+
   // Play a named sound effect, e.g. sound.play('slash', 2)
   play(name, option) {
     if (!this.ready || this.muted) return;
@@ -86,6 +99,7 @@ class SoundEngine {
   // A pitched tone that slides from f0 to f1 Hz
   tone(t, { type = 'sine', f0 = 440, f1 = f0, dur = 0.2, vol = 0.2, attack = 0.005, bus = this.sfxBus, lowpass = 0 }) {
     const ctx = this.ctx;
+    if (bus === this.musicBus && this.musicPitch !== 1) { f0 *= this.musicPitch; f1 *= this.musicPitch; dur /= this.musicTempo; }
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = type;
@@ -137,7 +151,7 @@ class SoundEngine {
 
   scheduleMusic() {
     if (!this.ready) { if (this.ctx) this.nextStepTime = this.ctx.currentTime + 0.1; return; }
-    const bpm = this.intensity === 2 ? 132 : 116;
+    const bpm = (this.intensity === 2 ? 132 : 116) * this.musicTempo;
     const stepLen = 60 / bpm / 4; // a 16th note
     while (this.nextStepTime < this.ctx.currentTime + 0.12) {
       this.musicStep(this.step, this.nextStepTime, stepLen);
@@ -193,7 +207,7 @@ class SoundEngine {
 }
 
 // How often (seconds) each sound may repeat
-const THROTTLE = { hit: 0.045, shot: 0.06, enemyDeath: 0.05, hurt: 0.12, bossWarning: 0.3 };
+const THROTTLE = { hit: 0.045, shot: 0.06, enemyDeath: 0.05, hurt: 0.12, bossWarning: 0.3, zap: 0.08, sizzle: 0.3, heal: 0.06, shieldBlock: 0.1 };
 
 // ---------- The sound effects ----------
 const SFX = {
@@ -255,6 +269,61 @@ const SFX = {
   waveStart(a, t) {
     a.tone(t, { type: 'triangle', f0: 440, dur: 0.12, vol: 0.14 });
     a.tone(t + 0.12, { type: 'triangle', f0: 659.3, dur: 0.25, vol: 0.14 });
+  },
+  // ---- power-ups ----
+  // grabbing a power-up: sparkly rising arpeggio
+  powerup(a, t) {
+    [523.3, 659.3, 784, 1046.5].forEach((f, i) => a.tone(t + i * 0.05, { type: 'triangle', f0: f, dur: 0.18, vol: 0.14 }));
+  },
+  // SLOW-MO starts: a deep "time stretching" downward sweep with a whoosh
+  slowmoIn(a, t) {
+    a.tone(t, { type: 'sawtooth', f0: 600, f1: 70, dur: 0.9, vol: 0.14, lowpass: 1400 });
+    a.tone(t, { type: 'sine', f0: 300, f1: 40, dur: 1.1, vol: 0.25 });
+    a.noise(t, { dur: 0.9, vol: 0.16, filter: 'bandpass', f0: 3000, f1: 200, q: 3 });
+  },
+  // SLOW-MO ends: time snaps back
+  slowmoOut(a, t) {
+    a.tone(t, { type: 'sawtooth', f0: 80, f1: 700, dur: 0.4, vol: 0.12, lowpass: 2000 });
+    a.noise(t, { dur: 0.35, vol: 0.12, filter: 'bandpass', f0: 300, f1: 4000, q: 3 });
+  },
+  shieldBlock(a, t) {
+    a.tone(t, { type: 'triangle', f0: 1200, f1: 900, dur: 0.15, vol: 0.18 });
+    a.tone(t, { type: 'sine', f0: 600, dur: 0.2, vol: 0.1 });
+  },
+  zap(a, t) {
+    a.noise(t, { dur: 0.08, vol: 0.18, filter: 'highpass', f0: 3000 });
+    a.tone(t, { type: 'square', f0: 1400, f1: 300, dur: 0.07, vol: 0.06, lowpass: 5000 });
+  },
+  heal(a, t) { a.tone(t, { type: 'sine', f0: 880, f1: 1320, dur: 0.1, vol: 0.08 }); },
+  // ---- arena hazards ----
+  thunder(a, t) {
+    a.noise(t, { dur: 0.08, vol: 0.5, filter: 'highpass', f0: 2000 });
+    a.noise(t + 0.03, { dur: 1.4, vol: 0.45, filter: 'lowpass', f0: 900, f1: 60 });
+    a.tone(t, { type: 'sine', f0: 70, f1: 30, dur: 1.0, vol: 0.35 });
+  },
+  sizzle(a, t) { a.noise(t, { dur: 0.25, vol: 0.16, filter: 'highpass', f0: 4000, f1: 2000 }); },
+  // whoosh for the arena change
+  arenaChange(a, t) {
+    a.noise(t, { dur: 0.9, vol: 0.2, filter: 'bandpass', f0: 200, f1: 2500, q: 1.5 });
+    a.tone(t + 0.4, { type: 'triangle', f0: 220, f1: 440, dur: 0.5, vol: 0.12 });
+  },
+  // ---- new bosses ----
+  teleport(a, t) {
+    a.tone(t, { type: 'sine', f0: 1800, f1: 200, dur: 0.18, vol: 0.18 });
+    a.noise(t, { dur: 0.15, vol: 0.12, filter: 'highpass', f0: 5000 });
+  },
+  burrow(a, t) {
+    a.noise(t, { dur: 0.7, vol: 0.35, filter: 'lowpass', f0: 600, f1: 80 });
+    a.tone(t, { type: 'sawtooth', f0: 90, f1: 40, dur: 0.6, vol: 0.12, lowpass: 400 });
+  },
+  erupt(a, t) {
+    a.noise(t, { dur: 0.6, vol: 0.5, filter: 'lowpass', f0: 2000, f1: 100 });
+    a.tone(t, { type: 'square', f0: 120, f1: 35, dur: 0.5, vol: 0.18, lowpass: 900 });
+  },
+  laser(a, t) {
+    a.tone(t, { type: 'sawtooth', f0: 220, f1: 110, dur: 1.2, vol: 0.12, lowpass: 1800 });
+    a.tone(t, { type: 'square', f0: 440, f1: 430, dur: 1.2, vol: 0.05, lowpass: 2500 });
+    a.noise(t, { dur: 0.3, vol: 0.2, filter: 'bandpass', f0: 1500, q: 2 });
   },
   // revived by the rewarded ad
   revive(a, t) {

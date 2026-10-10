@@ -8,5 +8,6 @@ const FILES = ['index.html', 'style.css', 'privacy.html', 'js', 'vendor'];
 
 rmSync('dist', { recursive: true, force: true });
 mkdirSync('dist');
-for (const f of FILES) cpSync(f, `dist/${f}`, { recursive: true });
+// *.local.js = testing helpers that only exist on a developer's computer: never ship them
+for (const f of FILES) cpSync(f, `dist/${f}`, { recursive: true, filter: (src) => !src.endsWith('.local.js') });
 console.log('Built dist/ with:', FILES.join(', '));

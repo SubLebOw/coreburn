@@ -264,12 +264,12 @@ export class Enemy {
 
     // Don't stand inside other enemies: gently push apart
     for (const o of others) {
-      if (o === this || o.dead || o.state === 'spawn' || o.isBoss) continue;
+      if (o === this || o.dead || o.state === 'spawn' || o.hidden) continue;
       const dx = this.position.x - o.position.x, dz = this.position.z - o.position.z;
       const d = Math.hypot(dx, dz);
       const min = this.radius + o.radius;
       if (d < min && d > 0.0001) {
-        const push = ((min - d) / d) * 0.5;
+        const push = ((min - d) / d) * (o.isBoss ? 1 : 0.5); // bosses shove us all the way out
         this.position.x += dx * push;
         this.position.z += dz * push;
       }

@@ -10,10 +10,11 @@
 //   enemy speed       x (1 + min(0.5, 0.025 * (n-1)))  - tops out at +50% so it stays fair
 //   elite chance      = min(50%, 4% per wave after wave 5)
 //   new enemy types unlock: hounds (wave 2), spitters (3), bulwarks (4), splitters (6)
-//   every 5th wave is a BOSS round instead
+//   every 5th wave is a BOSS round instead (7 bosses take turns, see bosses.js;
+//   each time round the rotation they get faster and nastier)
 import * as THREE from 'three';
 import { Enemy } from './enemy.js';
-import { Boss, BOSSES } from './boss.js';
+import { bossForNumber } from './bosses.js';
 
 const SCREEN_CAP = 14;        // regular enemies alive at once (not counting mites/summons)
 const HARD_CAP = 24;          // absolute limit including splitter mites and boss summons
@@ -53,8 +54,26 @@ export class WaveManager {
     this.queue = [];
     this.waveActive = false;
     this.breakTimer = 0;
-    this.boss = null;
+    this.bosses = [];   // usually one boss, two for the Forge Twins
     this.bossTimer = 0;
+  }
+
+  // The boss for the HUD (first one still standing)
+  get boss() { return this.bosses.find((b) => !b.dead) || null; }
+
+  // What the boss health bar shows: twins share one bar
+  get bossBar() {
+    const alive = this.bosses.filter((b) => !b.dead);
+    if (!alive.length || alive.every((b) => b.state === 'intro')) return null;
+    let hp = 0, maxHp = 0;
+    for (const b of this.bosses) { hp += Math.max(0, b.hp); maxHp += b.maxHp; }
+    return { name: this.bossDef.name, hp, maxHp };
+  }
+
+  // Called by a boss when it dies. The fight is won when every part is down.
+  bossDown(boss) {
+    if (this.bosses.every((b) => b.dead)) this.world.onBossKilled(boss, this.bosses);
+    else this.world.onTwinDown?.(boss, this.boss);
   }
 
   get aliveCount() { return this.list.filter((e) => !e.dead).length; }
@@ -65,14 +84,18 @@ export class WaveManager {
     this.queue = [];
     this.waveActive = true;
     this.spawnTimer = 0.8;
+    this.world.onWaveBegin?.(n); // lets main.js switch arenas before anything spawns
 
     if (isBossWave(n)) {
       // Boss round: just the boss (plus whatever it summons)
       const bossNumber = n / 5;
-      this.bossIndex = (bossNumber - 1) % BOSSES.length;
+      const { entry, tier } = bossForNumber(bossNumber);
+      this.bossEntry = entry;
+      this.bossDef = entry.def;
+      this.bossTier = tier;
       this.bossNumber = bossNumber;
       this.bossTimer = 1.8; // short pause so the banner can show first
-      this.world.onBossWave(n, BOSSES[this.bossIndex]);
+      this.world.onBossWave(n, entry.def);
       return;
     }
 
@@ -138,12 +161,19 @@ export class WaveManager {
   }
 
   spawnBoss() {
-    // appear on the far side of the arena from the player
+    // appear on the far side of the arena from the player, on clear ground
     const p = this.world.player.position;
-    const pos = new THREE.Vector3(-Math.sign(p.x || 1) * 7, 0, -Math.sign(p.z || 1) * 7);
-    this.boss = new Boss(this.scene, this.bossIndex, this.bossNumber, this.stats, pos, this.world);
-    this.list.push(this.boss);
-    this.world.effects.spawnRing(pos, 0xff5a20, 5, 1.2);
+    const sx = -Math.sign(p.x || 1), sz = -Math.sign(p.z || 1);
+    const arena = this.world.arena;
+    // spot(x, z): z = how far out on the far side, x = sideways offset (used by the twins)
+    const spot = (x, z) => arena.findClearSpot(new THREE.Vector3(sx * z + x * 0.7, 0, sz * z - x * 0.7 * sx * sz), 2.4);
+    this.bosses = this.bossEntry.spawn({
+      scene: this.scene, world: this.world, bossNumber: this.bossNumber, tier: this.bossTier, stats: this.stats, spot,
+    });
+    for (const b of this.bosses) {
+      this.list.push(b);
+      this.world.effects.spawnRing(b.position, 0xff5a20, 5, 1.2);
+    }
     this.world.shake(0.3);
   }
 

@@ -5,7 +5,7 @@
 
 An original 3D isometric arena brawler that runs in any browser (PC or phone) with nothing to install.
 Play as **Sarrow** and carve through endless waves of the **Grindchoir**, a machine cult of scrap-built drones,
-with a boss fight every 5 waves. How far can you get?
+with a boss fight every 5 waves, power-ups to grab, and a new arena every 10 waves. How far can you get?
 
 **Play it:** https://sublebow.github.io/coreburn/
 
@@ -36,16 +36,60 @@ Clearing a wave heals 25; beating a boss heals 60.
 | Hive Splitter | wave 6 | Bursts into 3 skittering Mites when destroyed. |
 | Elites | wave 6+ | Any type can spawn as an elite: amber crown and eyes, 30% bigger, 2.2x health, 1.35x damage, 3x points. |
 
-### Bosses (every 5th wave, rotating, tougher each time)
+### Bosses (every 5th wave, 7 take turns, tougher each time round)
 
-1. **The Furnace Deacon** (waves 5, 20, 35...): a furnace-bellied brute. Telegraphed **charges** (red strip on the floor;
+Every boss has a name banner and a health bar, and every attack is telegraphed (red strips for charges and beams,
+filling red circles for things that land on you).
+
+1. **The Furnace Deacon** (waves 5, 40, 75...): a furnace-bellied brute. Telegraphed **charges** (red strip on the floor;
    if it smashes into the fence it's dazed), **ground slams** (red circle fills up, then boom), and **summons** acolytes and hounds.
-2. **Choirmother** (waves 10, 25, 40...): a floating bell-masked priestess. **Bolt bursts** in every direction, **marked slams**
+2. **Cantor Vell, the Afterblade** (waves 10, 45, 80...): a tall, fast duelist with a magenta blade. **Blink strikes**
+   (vanishes leaving an afterimage, reappears next to you, shows a strip, lunges), **mirror** (3-5 violet afterimages surround
+   you and dash through one after another), sweeping **blade-wave fans**, and summons hounds.
+3. **Choirmother** (waves 15, 50, 85...): a floating bell-masked priestess. **Bolt bursts** in every direction, **marked slams**
    (circles drop on and around you), summons **mites and spitters**, and the occasional charge.
-3. **Rivetjaw** (waves 15, 30, 45...): a giant scrap crab that's mostly jaw. **Triple charges**, aimed **bolt volleys**,
+4. **The Gulletworm** (waves 20, 55, 90...): a scrap-worm that lives under the floor. **Burrows** (can't be hit), then red
+   circles open under and around you and it **erupts** from the main one; afterwards it's dazed for a moment. Also a **chain**
+   of circles bursting towards you, acid **volleys**, and mite swarms.
+5. **Rivetjaw** (waves 25, 60, 95...): a giant scrap crab that's mostly jaw. **Triple charges**, aimed **bolt volleys**,
    slams, and summons **bulwarks**.
+6. **Brand & Temper, the Forge Twins** (waves 30, 65, 100...): two bosses sharing one health bar. Brand (red-hot, branding
+   iron) charges and slams; Temper (steel-blue, quench tank) fires volleys and marked slams. Either can **link**: a tether
+   beam that makes the other twin take 60% less damage and attack faster. Hit the one that's linking to snap the beam
+   (it's stunned). Kill one and the other **enrages**.
+7. **The Hymnworks** (waves 35, 70, 105...): a pipe-organ fortress that never moves. Fires 2-4 **rotating laser beams**
+   (keep running ahead of them or blink through), a fast single **sweep**, **mortar** shells onto red circles, pipe bolt
+   bursts, and summons spitters and acolytes.
 
-Beating a boss: **+60 health, +500 x boss number points**, and every minion it summoned crumbles.
+Beating a boss: **+60 health, +500 x boss number points**, a guaranteed power-up + heal orbs, and every minion it summoned crumbles.
+
+## Power-ups
+
+Kills sometimes drop a glowing pickup: normal enemies 3% (mites 1%), elites 15%, bosses always.
+Walk over it to grab it. Pickups vanish after 10 seconds (they blink for the last 3). Active power-ups show as
+round badges with a draining timer ring under your health bar (on phones too).
+
+| Power-up | Shape | Lasts | What it does |
+| --- | --- | --- | --- |
+| SLOW-MO | teal diamond | 5 s | Bullet time: enemies, bolts, boss attacks and hazards run at 35% speed while Sarrow moves at full speed. Colours wash out with a teal tint, the music drops in pitch. |
+| FURY | red pyramid | 8 s | Double damage (red talons) |
+| SHIELD | blue ball | 10 s or 3 hits | Blocks hits. Lava and lightning are blocked without using up a charge. |
+| MAGNET | green ring | 10 s | Pulls pickups in from 10 m, and every kill drops a +5 heal orb that flies to you |
+| ARC TALONS | blue crystal | 10 s | Slashes and blinks chain lightning to up to 3 nearby enemies (60% damage) |
+
+## Arenas (a new one every 10 waves)
+
+| Waves | Arena | Hazard |
+| --- | --- | --- |
+| 1-10 | **The Slag Yard**: scrapyard foundry at dusk | none |
+| 11-20 | **The Molten Foundry**: crucibles and anvils | glowing lava cracks burn you (4 damage every half second) |
+| 21-30 | **Frozen Scrap Tundra**: snow, ice blocks, frozen wrecks | ice patches: you slide and turn slowly |
+| 31-40 | **Neon Rust Cathedral**: a ruined cathedral at night, neon pillars | none |
+| 41-50 | **The Storm Rooftop**: AC units, vents, water tanks, rain | lightning: a red circle appears near you, then the bolt lands (16 damage; it hurts enemies too) |
+
+The screen fades to black and back, and the arena's name appears. After wave 50 the arenas loop with a red
+"harder" tint and hazards that hit 25% harder each loop. The middle of every arena is clear (that's where you start),
+obstacles are spaced so there's always room to dodge, and enemies never spawn inside anything.
 
 ### Endless scaling (wave n)
 
@@ -54,8 +98,8 @@ Beating a boss: **+60 health, +500 x boss number points**, and every minion it s
 - Enemy health `x (1 + 0.14(n-1))`, damage `x (1 + 0.07(n-1))`: both grow forever.
 - Enemy speed `x (1 + min(0.5, 0.025(n-1)))`: tops out at +50% so it stays dodgeable.
 - Elite chance: `min(50%, 4% per wave after wave 5)`.
-- Bosses: health `x (1 + 0.45 per previous boss)`; after each full loop of all 3 bosses their wind-ups get 12% faster
-  (down to 60%), slams get bigger, and they fire and summon more.
+- Bosses: health `x (1 + 0.45 per previous boss)`; after each full loop of all 7 bosses their wind-ups get 12% faster
+  (down to 60%), slams get bigger, and they fire, summon and split into more.
 
 Score: points per kill (acolyte 10, hound 15, spitter 20, splitter 20, bulwark 40, mite 3, elites x3), plus `25 x wave`
 per cleared wave, plus the boss bonus. Your best score is saved in the browser.
@@ -80,10 +124,16 @@ style.css          All the styling (HUD, buttons, joystick, cooldown pies, mobil
 js/main.js         Starting point: renderer, camera, lights, game loop, score, start/game over, resizing
 js/player.js       Sarrow: blocky model, movement, talon combo, blink, overdrive, core recharge
 js/enemy.js        Grindchoir enemy types (looks + AI), elites, hit flash, knockback, death
-js/boss.js         The three bosses and their telegraphed attack patterns
+js/boss.js         The shared boss brain (telegraph -> attack -> recover) + the three original bosses
+js/boss-vell.js    Cantor Vell (blink strikes, afterimages)
+js/boss-worm.js    The Gulletworm (burrow + erupt)
+js/boss-twins.js   Brand & Temper (twin bosses with a buff tether)
+js/boss-hymnworks.js The Hymnworks (rotating laser beams)
+js/bosses.js       The boss rotation order
+js/powerups.js     Pickups, heal orbs, and the five power-ups
 js/waves.js        Endless wave manager and all the difficulty scaling numbers
 js/projectiles.js  Slow glowing bolts fired by spitters and bosses
-js/arena.js        The Slag Yard: floor, fence, smokestacks, scrap heaps, barrels, collision
+js/arena.js        The five arenas (looks, obstacles, hazards, particles), arena order, collision
 js/input.js        Keyboard + mouse input, turned into simple "move" and "action" signals
 js/touch.js        Phone controls: floating virtual joystick and on-screen buttons
 js/effects.js      Sparks, rings and red attack warnings (pooled so it stays fast on phones)
@@ -106,8 +156,11 @@ updates/           latest.json + the zipped game the Android app downloads updat
 ### Easy things to tweak first
 - `js/waves.js`: `waveStats()` and `UNLOCKS` set the whole difficulty curve
 - `js/player.js`: `COMBO` damage/range, `MOVE_SPEED`, `DASH_COOLDOWN`, `SPIN_COOLDOWN`
-- `js/enemy.js`: `ENEMY_TYPES`; `js/boss.js`: `BOSSES`
-- Browser console (only when running locally on http://localhost, not on the live site or app): `game.player.hp = 1000` (god mode while testing), `game.skipTo(10)` (jump to a wave)
+- `js/enemy.js`: `ENEMY_TYPES`; `js/boss.js`: `CLASSIC_BOSSES`; `js/bosses.js`: `BOSS_ROTATION`
+- `js/powerups.js`: `POWERUPS` (durations, drop weights); drop chances in `onKill()`
+- `js/arena.js`: `THEMES` (colours, obstacle layouts, hazards), `WAVES_PER_ARENA`
+- Testing helpers: put your own `js/dev.local.js` (exporting `install(ctx)`) next to main.js. It only loads on
+  http://localhost, is git-ignored, and the build skips `*.local.js`, so it can never reach the website or the app.
 
 ## Android app (Google Play)
 

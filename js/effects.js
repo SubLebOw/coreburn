@@ -7,7 +7,8 @@ import * as THREE from 'three';
 
 const SPARK_COUNT = 70;
 const RING_COUNT = 8;
-const WARNING_COUNT = 8;
+const WARNING_COUNT = 24; // enough for the busiest boss attacks + lightning
+const ZAP_COUNT = 8;
 
 export class Effects {
   constructor(scene) {
@@ -49,6 +50,36 @@ export class Effects {
       scene.add(group);
       this.warnings.push({ group, fill, edge, strip, life: 0, maxLife: 1, kind: 'circle', radius: 1 });
     }
+    // Lightning zaps (ARC TALONS): 3 jagged segments between two points
+    this.zaps = [];
+    const zapGeo = new THREE.BoxGeometry(0.08, 1, 0.08);
+    for (let i = 0; i < ZAP_COUNT; i++) {
+      const mat = new THREE.MeshBasicMaterial({ color: 0x9ac4ff, transparent: true, depthWrite: false });
+      const segs = [0, 1, 2].map(() => { const m = new THREE.Mesh(zapGeo, mat); m.visible = false; scene.add(m); return m; });
+      this.zaps.push({ segs, mat, life: 0 });
+    }
+  }
+
+  spawnZap(a, b, color = 0x9ac4ff) {
+    const z = this.zaps.find((x) => x.life <= 0);
+    if (!z) return;
+    z.mat.color.setHex(color);
+    z.life = 0.14;
+    const pts = [a.clone().setY(1.1)];
+    for (let i = 1; i < 3; i++) {
+      const p = a.clone().lerp(b, i / 3).setY(1.1);
+      p.x += (Math.random() - 0.5) * 0.8; p.y += (Math.random() - 0.5) * 0.6; p.z += (Math.random() - 0.5) * 0.8;
+      pts.push(p);
+    }
+    pts.push(b.clone().setY(1.1));
+    const up = new THREE.Vector3(0, 1, 0);
+    z.segs.forEach((m, i) => {
+      const p0 = pts[i], p1 = pts[i + 1];
+      m.position.copy(p0).add(p1).multiplyScalar(0.5);
+      m.scale.y = p0.distanceTo(p1);
+      m.quaternion.setFromUnitVectors(up, p1.clone().sub(p0).normalize());
+      m.visible = true;
+    });
   }
 
   // Red circle on the floor at `pos`. The inside fills up until the attack lands.
@@ -128,6 +159,12 @@ export class Effects {
       w.fill.material.opacity = 0.2 + 0.3 * t + (t > 0.8 ? 0.2 * Math.sin(t * 60) : 0); // flicker just before impact
       if (w.life <= 0) w.group.visible = false;
     }
+    for (const z of this.zaps) {
+      if (z.life <= 0) continue;
+      z.life -= dt;
+      z.mat.opacity = Math.max(0, z.life / 0.14);
+      if (z.life <= 0) for (const m of z.segs) m.visible = false;
+    }
     for (const r of this.rings) {
       if (r.life <= 0) continue;
       r.life -= dt;
@@ -142,5 +179,6 @@ export class Effects {
     for (const s of this.sparks) { s.life = 0; s.mesh.visible = false; }
     for (const r of this.rings) { r.life = 0; r.mesh.visible = false; }
     for (const w of this.warnings) { w.life = 0; w.group.visible = false; }
+    for (const z of this.zaps) { z.life = 0; for (const m of z.segs) m.visible = false; }
   }
 }

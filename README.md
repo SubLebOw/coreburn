@@ -87,37 +87,64 @@ Every talon hit adds +1 to your **combo** and every kill adds +1 more. Land noth
 
 Milestones pop a callout (NICE, SAVAGE, BRUTAL, UNSTOPPABLE, GODLIKE, MELTDOWN, COREBURN!). Your best combo shows on the game over screen and in the share text. The code is in `js/combo.js`.
 
-## Weapon upgrades (after every boss)
+## Heroes
 
-Every boss you beat pauses the game and offers **3 random upgrade cards**. Tap a card, click it, or press **1 / 2 / 3**. Every pick also raises your **weapon tier by 1**. The talons grow longer and glow brighter, and their colour steps teal → cyan → white-gold → violet → crimson.
+Pick a hero before every run (the last one you played is highlighted). They all use the same controls and upgrade cards:
 
-**Even scaling (js/upgrades.js).** Enemy HP grows as `x(1 + 0.14·(wave-1))`, and a boss arrives every 5 waves, so each boss adds 0.70 to enemy HP. Your weapon matches that exactly:
+| Hero | Style | Health | Damage x attack speed | Move speed | Blink | Overdrive |
+|---|---|---|---|---|---|---|
+| **Sarrow** | balanced all-rounder | 100 | 1.00 x 1.00 | 7.0 | 1 charge, normal | whirlwind spin |
+| **Zaleks** | plated bruiser, amber core | 120 | 1.16 x 0.90 | 6.1 | shorter shoulder-charge that knocks enemies back | ground-slam spin, 30% bigger radius |
+| **Iskra** | swift skirmisher, needle-talons | 78 | 0.84 x 1.26 | 7.9 | longer, 2 charges | quick, tighter spin |
+
+They're balanced on one shared budget: **DPS x health x mobility** (mobility = 0.7 x move speed + 0.3 x blink reach per cooldown, both relative to Sarrow). The numbers live in `js/hero-stats.js` and the models in `js/characters.js`.
+
+| | Sarrow | Zaleks | Iskra |
+|---|---|---|---|
+| DPS | 1.00 | 1.04 | 1.06 |
+| Health | 100 | 120 | 78 |
+| Mobility | 1.00 | 0.80 | 1.21 |
+| **Budget** | **100.0** | **100.4** | **100.3** |
+
+## Weapon upgrades (every 2 waves)
+
+After every 2nd wave (2, 4, 6...) the game pauses and offers **3 random upgrade cards**. Tap a card, click it, or press **1 / 2 / 3**. Every pick also raises your **weapon tier by 1**, and the talons grow longer and brighter, cycling through cyan, white-gold, violet and crimson.
+
+**Even scaling (js/upgrades.js).** Enemy health grows as `x(1 + 0.14·(wave-1))`, and you pick every 2 waves, so each pick adds 0.28:
 
 ```
-weaponMult(tier) = 1 + 0.70 · tier        // tier = bosses beaten
-damage = base · weaponMult(tier) · perks  // perks are capped, max ~2x single-target
+weaponMult(tier) = 1 + 0.28 · tier        // tier = picks so far (one every 2 waves)
+damage = base · hero damage · weaponMult(tier) · perks   // perks are capped, max ~2x single-target
 ```
 
-The base tier alone keeps time-to-kill flat across the whole run. Perks are the extra edge, and every perk has a level cap. Once a card is maxed it leaves the pool. When fewer than 3 cards are left, **Reactor Patch** (+5 max HP and a heal) fills the gap.
+The base tier alone keeps time-to-kill flat for the whole run. Perks are the extra edge. They come in small steps with high caps, so they build slowly over the ~50 picks you'd make by wave 100. A maxed card leaves the pool. When fewer than 3 cards are left, **Reactor Patch** (+3 max health and a heal) fills the gap.
 
 | Group | Upgrades (max level) |
 |---|---|
-| Talons | Talon Edge +7% dmg (5), Wide Arc (3), Shockwave Finisher (3), Crit Spark (4), Twin Strike (3), Storm Talons (3), Core Leech (3) |
-| Overdrive | Long Overdrive (3), Overdrive Reach (3), Overdrive Fury (3), Overdrive Siphon (3), Overdrive Coolant (3) |
-| Blink | Blink Edge (3), Long Blink (3), Double Blink (1), Quick Blink (3), Blink Trail (3) |
-| Core | Swift Step (3), Reinforced Core (4), Core Recharge (3) |
+| Talons | Talon Edge +3.5% dmg (10), Wide Arc +6% reach (6), Shockwave Finisher (5), Crit Spark +3.5% (8), Twin Strike +4% (6), Storm Talons +7.5% (6), Core Leech (6) |
+| Overdrive | Long Overdrive +0.2s (6), Overdrive Reach +6% (6), Overdrive Fury +12.5% (6), Overdrive Siphon (6), Overdrive Coolant -5% (6) |
+| Blink | Blink Edge +25% (6), Long Blink +7.5% (6), Extra Blink +1 charge (1), Quick Blink -6% (6), Blink Trail (5) |
+| Core | Swift Step +3% (6), Reinforced Core +7.5% max health (8), Core Recharge +17.5% (6) |
 
-Simulated time-to-kill (`node scripts/sim-ttk.mjs`), single target:
+Simulated time-to-kill, single target, typical mixed build (`node scripts/sim-ttk.mjs`):
 
-| wave | tier | weapon x | base std | base elite | typical build std | typical build elite | max-damage build elite |
-|---|---|---|---|---|---|---|---|
-| 1 | 0 | 1.00 | 0.55s | 1.21s | 0.55s | 1.21s | 1.21s |
-| 10 | 1 | 1.70 | 0.73s | 1.60s | 0.68s | 1.50s | 1.50s |
-| 30 | 5 | 4.50 | 0.62s | 1.36s | 0.51s | 1.11s | 0.99s |
-| 60 | 11 | 8.70 | 0.58s | 1.28s | 0.40s | 0.87s | 0.66s |
-| 100 | 19 | 14.30 | 0.57s | 1.25s | 0.31s | 0.68s | 0.61s |
+| wave | picks | weapon x | base std | base elite | typical perk x | typical std | typical elite | max-damage elite |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 0 | 1.00 | 0.55s | 1.21s | 1.00 | 0.55s | 1.21s | 1.21s |
+| 10 | 4 | 2.12 | 0.58s | 1.29s | 1.11 | 0.53s | 1.16s | 1.12s |
+| 30 | 14 | 4.92 | 0.56s | 1.24s | 1.11 | 0.51s | 1.12s | 0.80s |
+| 60 | 29 | 9.12 | 0.56s | 1.22s | 1.22 | 0.46s | 1.00s | 0.60s |
+| 100 | 49 | 14.72 | 0.55s | 1.22s | 1.38 | 0.40s | 0.88s | 0.59s |
 
-Enemy damage still climbs (about 7.9x by wave 100), so no build makes late waves trivial.
+Per hero (typical build), time-to-kill for standard / elite enemies and how long you survive under steady pressure. Enemy damage grows 7% per wave, so late waves stay deadly:
+
+| wave | Sarrow TTK | Zaleks TTK | Iskra TTK | Sarrow survive | Zaleks survive | Iskra survive |
+|---|---|---|---|---|---|---|
+| 1 | 0.55 / 1.21s | 0.52 / 1.15s | 0.52 / 1.14s | 10.0s | 9.6s | 9.5s |
+| 10 | 0.53 / 1.16s | 0.51 / 1.11s | 0.50 / 1.10s | 6.6s | 6.3s | 6.3s |
+| 30 | 0.51 / 1.12s | 0.49 / 1.07s | 0.48 / 1.06s | 3.6s | 3.4s | 3.4s |
+| 60 | 0.46 / 1.00s | 0.44 / 0.96s | 0.43 / 0.95s | 2.2s | 2.2s | 2.1s |
+| 100 | 0.40 / 0.88s | 0.38 / 0.84s | 0.38 / 0.83s | 1.6s | 1.5s | 1.5s |
 
 ## Arenas (a new one every 10 waves)
 
@@ -160,7 +187,7 @@ Three.js is bundled in `vendor/` (MIT licence), so the game also works offline.
 
 ## File layout
 
-Weapon upgrades: `js/upgrades.js` (upgrade list, caps, scaling formula). TTK simulator: `scripts/sim-ttk.mjs`.
+Weapon upgrades: `js/upgrades.js` (upgrade list, caps, scaling formula). Heroes: `js/hero-stats.js` (numbers) and `js/characters.js` (models). Combo: `js/combo.js`. TTK simulator: `scripts/sim-ttk.mjs`.
 
 ```
 index.html         Page layout: HUD, boss bar, touch buttons, title/game-over screens, Three.js import map

@@ -1,31 +1,36 @@
 // upgrades.js
-// After every boss you CHOOSE one of 3 upgrade cards. Every pick does two things:
+// After every 2nd wave (2, 4, 6, ...) you CHOOSE one of 3 upgrade cards. Same rate in solo and co-op.
+// Every pick does two things:
 //
-//  1. WEAPON TIER +1 (the even scaling). Sarrow's base damage multiplier is
-//         weaponMult(tier) = 1 + 0.70 * tier
-//     Why 0.70? Enemy health grows by 0.14 per wave (waves.js: hpMult = 1 + 0.14(n-1)) and a boss
-//     comes every 5 waves, so 5 x 0.14 = 0.70. After the boss at wave 5t you have tier t, and the
-//     next wave (5t+1) has hpMult = 1 + 0.70t: exactly the same as your weaponMult. So hits-to-kill
-//     at the start of every 5-wave stretch is the SAME as at wave 1, whatever cards you picked.
-//     (Within a stretch enemies get up to 4 x 0.14 tougher before the next boss, then you catch up.)
+//  1. WEAPON TIER +1 (the even scaling). The hero's base damage multiplier is
+//         weaponMult(tier) = 1 + 0.28 * tier
+//     Why 0.28? Enemy health grows by 0.14 per wave (waves.js: hpMult = 1 + 0.14(n-1)) and you
+//     pick every 2 waves, so 2 x 0.14 = 0.28. After wave 2t you have tier t, and the next wave
+//     (2t+1) has hpMult = 1 + 0.28t: exactly your weaponMult. So hits-to-kill at the start of every
+//     2-wave stretch is the SAME as at wave 1, whatever cards you picked or hero you play.
 //
-//  2. The card itself: a small, capped perk on top. Perks are the "extra edge". Caps keep any one
-//     build from running away: all damage perks together top out at about 2x single-target damage,
-//     while enemy damage keeps growing every wave (+7%), so late waves stay dangerous.
+//  2. The card itself: a small, capped perk on top (the "extra edge"). Perk steps are small and
+//     caps are high, so the perks grow slowly over ~50 picks by wave 100. All damage perks together
+//     top out at about 2x single-target damage, while enemy damage keeps growing every wave (+7%),
+//     so late waves stay dangerous.
 //
 // Once a card is maxed it stops appearing; if fewer than 3 cards are left, REACTOR PATCH fills in.
+// Every card works for all three heroes (percent-based, on top of each hero's own numbers).
 // This file has no Three.js in it, so tools (like the time-to-kill simulator) can import it too.
 
-export const WEAPON_TIER_STEP = 0.70; // = 0.14 enemy health per wave x 5 waves per boss
+export const WEAPON_TIER_STEP = 0.28; // = 0.14 enemy health per wave x 2 waves per pick
+export const PICK_EVERY = 2;          // waves between upgrade picks
+export const isPickWave = (n) => n > 0 && n % PICK_EVERY === 0;
 
 export function weaponMult(tier) { return 1 + WEAPON_TIER_STEP * tier; }
 
-// Talon colour by tier: teal -> cyan -> white-gold -> violet -> crimson (every 3 tiers, blended)
+// Talon colour by tier: teal -> cyan -> white-gold -> violet -> crimson (every 6 tiers, blended)
 const TIER_COLOURS = [0x7ffff2, 0x3fc8ff, 0xffe6a0, 0xb070ff, 0xff3048];
-export function tierColor(tier) {
-  const k = Math.min(TIER_COLOURS.length - 1, tier / 3);
+export function tierColor(tier, base = TIER_COLOURS[0]) {
+  const k = Math.min(TIER_COLOURS.length - 1, tier / 6);
   const i = Math.floor(k), f = k - i;
-  const a = TIER_COLOURS[i], b = TIER_COLOURS[Math.min(TIER_COLOURS.length - 1, i + 1)];
+  const col = (j) => (j === 0 ? base : TIER_COLOURS[j]);
+  const a = col(i), b = col(Math.min(TIER_COLOURS.length - 1, i + 1));
   const ch = (s) => Math.round(((a >> s) & 255) * (1 - f) + ((b >> s) & 255) * f);
   return (ch(16) << 16) | (ch(8) << 8) | ch(0);
 }
@@ -33,31 +38,31 @@ export function tierColor(tier) {
 // group: talons / overdrive / blink / core. desc(level) = what the NEXT level gives.
 export const UPGRADES = {
   // ---- talons ----
-  edge:     { name: 'Talon Edge', group: 'talons', icon: '✦', color: 0xff8a3a, max: 5, desc: () => '+7% talon damage' },
-  arc:      { name: 'Wide Arc', group: 'talons', icon: '◠', color: 0x7ffff2, max: 3, desc: () => '+12% slash reach, wider swing' },
-  shock:    { name: 'Shockwave Finisher', group: 'talons', icon: '◎', color: 0xffd040, max: 3, desc: (l) => l === 0 ? 'Combo finisher sends out a shockwave' : 'Bigger, stronger finisher shockwave' },
-  crit:     { name: 'Crit Spark', group: 'talons', icon: '✸', color: 0xfff27a, max: 4, desc: () => '+7% chance for 1.8x critical hits' },
-  twin:     { name: 'Twin Strike', group: 'talons', icon: '⫽', color: 0x9ab8ff, max: 3, desc: () => '+8% chance to hit twice' },
-  storm:    { name: 'Storm Talons', group: 'talons', icon: 'ϟ', color: 0x8ab4ff, max: 3, desc: () => '+15% chance hits chain lightning to 2 foes' },
-  leech:    { name: 'Core Leech', group: 'talons', icon: '♥', color: 0x6aff7a, max: 3, desc: () => 'Heal +0.5 per talon hit (max 6/s)' },
-  // ---- overdrive (spin) ----
-  odTime:   { name: 'Long Overdrive', group: 'overdrive', icon: '⟲', color: 0xff8a3a, max: 3, desc: () => '+0.4s overdrive duration' },
-  odRadius: { name: 'Overdrive Reach', group: 'overdrive', icon: '⭘', color: 0xffb060, max: 3, desc: () => '+12% overdrive radius' },
-  odDamage: { name: 'Overdrive Fury', group: 'overdrive', icon: '✺', color: 0xff5a2a, max: 3, desc: () => '+25% overdrive damage' },
-  odLeech:  { name: 'Overdrive Siphon', group: 'overdrive', icon: '❥', color: 0xff6aa0, max: 3, desc: () => 'Heal +1 per overdrive hit (max 10/s)' },
-  odCool:   { name: 'Overdrive Coolant', group: 'overdrive', icon: '❄', color: 0x9ae4ff, max: 3, desc: () => '-10% overdrive cooldown' },
-  // ---- blink (dash) ----
-  bkDamage: { name: 'Blink Edge', group: 'blink', icon: '➹', color: 0x3ff6e0, max: 3, desc: () => '+50% blink damage' },
-  bkRange:  { name: 'Long Blink', group: 'blink', icon: '⇢', color: 0x6ad8ff, max: 3, desc: () => '+15% blink distance' },
-  bkCharge: { name: 'Double Blink', group: 'blink', icon: '⇉', color: 0xc8a0ff, max: 1, desc: () => '+1 blink charge (blink twice in a row)' },
-  bkCool:   { name: 'Quick Blink', group: 'blink', icon: '⟳', color: 0x7affc8, max: 3, desc: () => '-12% blink cooldown' },
-  bkTrail:  { name: 'Blink Trail', group: 'blink', icon: '≋', color: 0x3fd0ff, max: 3, desc: (l) => l === 0 ? 'Blink leaves a burning trail' : 'Trail burns hotter' },
-  // ---- core (Sarrow himself) ----
-  speed:    { name: 'Swift Step', group: 'core', icon: '»', color: 0xd0ff6a, max: 3, desc: () => '+6% move speed' },
-  maxHp:    { name: 'Reinforced Core', group: 'core', icon: '⬢', color: 0x6aff9a, max: 4, desc: () => '+15 max health' },
-  regen:    { name: 'Core Recharge', group: 'core', icon: '✚', color: 0x3ff6a0, max: 3, desc: () => '+35% health regen' },
+  edge:     { name: 'Talon Edge', group: 'talons', icon: '✦', color: 0xff8a3a, max: 10, desc: () => '+3.5% talon damage' },
+  arc:      { name: 'Wide Arc', group: 'talons', icon: '◠', color: 0x7ffff2, max: 6, desc: () => '+6% slash reach, wider swing' },
+  shock:    { name: 'Shockwave Finisher', group: 'talons', icon: '◎', color: 0xffd040, max: 5, desc: (l) => l === 0 ? 'Combo finisher sends out a shockwave' : 'Bigger, stronger finisher shockwave' },
+  crit:     { name: 'Crit Spark', group: 'talons', icon: '✸', color: 0xfff27a, max: 8, desc: () => '+3.5% chance for 1.8x critical hits' },
+  twin:     { name: 'Twin Strike', group: 'talons', icon: '⫽', color: 0x9ab8ff, max: 6, desc: () => '+4% chance to hit twice' },
+  storm:    { name: 'Storm Talons', group: 'talons', icon: 'ϟ', color: 0x8ab4ff, max: 6, desc: () => '+7.5% chance hits chain lightning to 2 foes' },
+  leech:    { name: 'Core Leech', group: 'talons', icon: '♥', color: 0x6aff7a, max: 6, desc: () => 'Heal +0.25 per talon hit (max 6/s)' },
+  // ---- overdrive (spin / slam) ----
+  odTime:   { name: 'Long Overdrive', group: 'overdrive', icon: '⟲', color: 0xff8a3a, max: 6, desc: () => '+0.2s overdrive duration' },
+  odRadius: { name: 'Overdrive Reach', group: 'overdrive', icon: '⭘', color: 0xffb060, max: 6, desc: () => '+6% overdrive radius' },
+  odDamage: { name: 'Overdrive Fury', group: 'overdrive', icon: '✺', color: 0xff5a2a, max: 6, desc: () => '+12.5% overdrive damage' },
+  odLeech:  { name: 'Overdrive Siphon', group: 'overdrive', icon: '❥', color: 0xff6aa0, max: 6, desc: () => 'Heal +0.5 per overdrive hit (max 10/s)' },
+  odCool:   { name: 'Overdrive Coolant', group: 'overdrive', icon: '❄', color: 0x9ae4ff, max: 6, desc: () => '-5% overdrive cooldown' },
+  // ---- blink (dash / charge) ----
+  bkDamage: { name: 'Blink Edge', group: 'blink', icon: '➹', color: 0x3ff6e0, max: 6, desc: () => '+25% blink damage' },
+  bkRange:  { name: 'Long Blink', group: 'blink', icon: '⇢', color: 0x6ad8ff, max: 6, desc: () => '+7.5% blink distance' },
+  bkCharge: { name: 'Extra Blink', group: 'blink', icon: '⇉', color: 0xc8a0ff, max: 1, desc: () => '+1 blink charge' },
+  bkCool:   { name: 'Quick Blink', group: 'blink', icon: '⟳', color: 0x7affc8, max: 6, desc: () => '-6% blink cooldown' },
+  bkTrail:  { name: 'Blink Trail', group: 'blink', icon: '≋', color: 0x3fd0ff, max: 5, desc: (l) => l === 0 ? 'Blink leaves a burning trail' : 'Trail burns hotter' },
+  // ---- core (the hero) ----
+  speed:    { name: 'Swift Step', group: 'core', icon: '»', color: 0xd0ff6a, max: 6, desc: () => '+3% move speed' },
+  maxHp:    { name: 'Reinforced Core', group: 'core', icon: '⬢', color: 0x6aff9a, max: 8, desc: () => '+7.5% max health' },
+  regen:    { name: 'Core Recharge', group: 'core', icon: '✚', color: 0x3ff6a0, max: 6, desc: () => '+17.5% health regen' },
 };
-export const FALLBACK = { id: 'patch', name: 'Reactor Patch', group: 'core', icon: '⛨', color: 0xc8c8c8, max: Infinity, desc: () => '+5 max health and heal 35%' };
+export const FALLBACK = { id: 'patch', name: 'Reactor Patch', group: 'core', icon: '⛨', color: 0xc8c8c8, max: Infinity, desc: () => '+3 max health and heal 35%' };
 export const GROUP_LABELS = { talons: 'TALONS', overdrive: 'OVERDRIVE', blink: 'BLINK', core: 'CORE' };
 
 export class Loadout {
@@ -96,27 +101,28 @@ export class Loadout {
     const L = (id) => this.level(id);
     this.stats = {
       weapon: weaponMult(this.tier),
-      dmg: weaponMult(this.tier) * (1 + 0.07 * L('edge')),
-      range: 1 + 0.12 * L('arc'),
+      dmg: weaponMult(this.tier) * (1 + 0.035 * L('edge')),
+      range: 1 + 0.06 * L('arc'),
       arcLevel: L('arc'),
-      shock: L('shock'),                          // radius 2.8 + 0.5L, 30% + 15%L of the finisher
-      crit: 0.07 * L('crit'),
-      twin: 0.08 * L('twin'),
-      storm: 0.15 * L('storm'),
-      leech: 0.5 * L('leech'),
-      spinTime: 0.4 * L('odTime'),
-      spinRadius: 1 + 0.12 * L('odRadius'),
-      spinDmg: 1 + 0.25 * L('odDamage'),
-      spinLeech: 1 * L('odLeech'),
-      spinCd: 1 - 0.10 * L('odCool'),
-      dashDmg: 1 + 0.5 * L('bkDamage'),
-      dashTime: 1 + 0.15 * L('bkRange'),
+      shock: L('shock'),                          // radius 2.8 + 0.3L, 30% + 9%L of the finisher
+      crit: 0.035 * L('crit'),
+      twin: 0.04 * L('twin'),
+      storm: 0.075 * L('storm'),
+      leech: 0.25 * L('leech'),
+      spinTime: 0.2 * L('odTime'),
+      spinRadius: 1 + 0.06 * L('odRadius'),
+      spinDmg: 1 + 0.125 * L('odDamage'),
+      spinLeech: 0.5 * L('odLeech'),
+      spinCd: 1 - 0.05 * L('odCool'),
+      dashDmg: 1 + 0.25 * L('bkDamage'),
+      dashTime: 1 + 0.075 * L('bkRange'),
       dashCharges: 1 + L('bkCharge'),
-      dashCd: 1 - 0.12 * L('bkCool'),
-      trail: L('bkTrail'),
-      speed: 1 + 0.06 * L('speed'),
-      maxHpBonus: 15 * L('maxHp') + 5 * this.patches,
-      regen: 1 + 0.35 * L('regen'),
+      dashCd: 1 - 0.06 * L('bkCool'),
+      trail: L('bkTrail') * 0.6,                  // trail tick = (4 + 3 x this) x damage
+      speed: 1 + 0.03 * L('speed'),
+      maxHpPct: 0.075 * L('maxHp'),
+      maxHpFlat: 3 * this.patches,
+      regen: 1 + 0.175 * L('regen'),
     };
   }
 

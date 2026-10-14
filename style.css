@@ -336,3 +336,18 @@ body.touch .ucard .key { display: none; }
   #combo .clabel { display: none; }
   #combo-callout { font-size: 28px; top: 24%; }
 }
+
+/* ---------- Character select (reuses the picker cards) ---------- */
+.ucard.hero.sel { transform: translateY(-4px) scale(1.04); box-shadow: 0 6px 0 #000, 0 0 34px var(--c); background: linear-gradient(color-mix(in srgb, var(--c) 22%, #20262c), #12161a); }
+.ucard.hero .icon { font-size: 34px; }
+.ucard.hero .uname { font-size: 22px; letter-spacing: 3px; }
+.ucard .stats { width: 100%; display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.sbar { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 900; letter-spacing: 1px; }
+.sbar span { width: 52px; text-align: left; opacity: .75; }
+.sbar i { flex: 1; height: 6px; background: #0009; border-radius: 3px; overflow: hidden; }
+.sbar b { display: block; height: 100%; background: var(--c); }
+@media (max-width: 600px) {
+  .ucard.hero .effect { min-height: 0; font-size: 12px; }
+  .ucard.hero .uname { font-size: 18px; }
+  .ucard .stats { margin-top: 2px; gap: 2px; }
+}

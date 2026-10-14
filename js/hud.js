@@ -82,6 +82,9 @@ export class Hud {
   showPicker(cards, loadout, onPick) {
     const hex = (c) => '#' + c.toString(16).padStart(6, '0');
     const tc = hex(tierColor(loadout.tier + 1));
+    $('upgrade-title').textContent = 'CHOOSE AN UPGRADE';
+    $('upgrade-hint').textContent = 'Press 1, 2 or 3 · or click a card';
+    this.upgradeOverlay.classList.remove('select');
     $('upgrade-sub').innerHTML = `Weapon <b style="--c:${tc}">Tier ${loadout.tier} → ${loadout.tier + 1}</b> · base damage x${weaponMult(loadout.tier + 1).toFixed(2)} · plus your pick:`;
     const box = $('upgrade-cards');
     box.innerHTML = '';
@@ -117,6 +120,61 @@ export class Hud {
     box.style.pointerEvents = 'none';
     setTimeout(() => { box.style.pointerEvents = ''; }, 350);
     this.upgradeOverlay.classList.remove('hidden');
+  }
+
+  // Character select (before every run). Same overlay + card style as the upgrade picker.
+  showSelect(chars, current, onPick) {
+    const hex = (c) => '#' + c.toString(16).padStart(6, '0');
+    $('upgrade-title').textContent = 'CHOOSE YOUR HERO';
+    $('upgrade-sub').textContent = 'Same controls and upgrades, three ways to fight. Pick one for this run:';
+    $('upgrade-hint').textContent = 'Press 1, 2 or 3 · ← → and Enter · or click a hero';
+    const box = $('upgrade-cards');
+    box.innerHTML = '';
+    let sel = Math.max(0, chars.findIndex((c) => c.id === current));
+    const bar = (label, v) => `<div class="sbar"><span>${label}</span><i><b style="width:${Math.round(Math.min(1, v) * 100)}%"></b></i></div>`;
+    const els = chars.map((c, i) => {
+      const b = document.createElement('button');
+      b.className = 'ucard hero';
+      b.style.setProperty('--c', hex(c.color));
+      b.innerHTML = `<span class="key">${i + 1}</span><div class="icon">⬢</div><div class="ubody"><div class="group"></div><div class="uname"></div><div class="effect"></div>` +
+        `<div class="stats">${bar('HEALTH', c.hp / 125)}${bar('POWER', (c.dmg * (c.id === 'zaleks' ? 1.15 : 1)) / 1.35)}${bar('SPEED', c.speed / 8.3)}</div></div>`;
+      b.querySelector('.group').textContent = c.title.toUpperCase();
+      b.querySelector('.uname').textContent = c.name;
+      b.querySelector('.effect').textContent = c.blurb;
+      b.addEventListener('pointerdown', (e) => e.stopPropagation());
+      b.addEventListener('click', (e) => { e.stopPropagation(); pick(i); });
+      box.appendChild(b);
+      return b;
+    });
+    const mark = () => els.forEach((b, i) => b.classList.toggle('sel', i === sel));
+    mark();
+    let done = false;
+    const pick = (i) => {
+      if (done) return;
+      done = true;
+      window.removeEventListener('keydown', onKey, true);
+      this.upgradeOverlay.classList.add('hidden');
+      onPick(chars[i].id);
+    };
+    const onKey = (e) => {
+      const n = { Digit1: 0, Digit2: 1, Digit3: 2, Numpad1: 0, Numpad2: 1, Numpad3: 2 }[e.code];
+      if (n !== undefined) { e.preventDefault(); e.stopPropagation(); pick(n); return; }
+      if (['ArrowLeft', 'KeyA', 'ArrowUp', 'KeyW'].includes(e.code)) { sel = (sel + chars.length - 1) % chars.length; mark(); }
+      else if (['ArrowRight', 'KeyD', 'ArrowDown', 'KeyS'].includes(e.code)) { sel = (sel + 1) % chars.length; mark(); }
+      else if (['Enter', 'Space', 'KeyJ', 'NumpadEnter'].includes(e.code)) { pick(sel); }
+      else return;
+      e.preventDefault(); e.stopPropagation();
+    };
+    setTimeout(() => { if (!done) window.addEventListener('keydown', onKey, true); }, 250);
+    box.style.pointerEvents = 'none';
+    setTimeout(() => { box.style.pointerEvents = ''; }, 250);
+    this.upgradeOverlay.classList.add('select');
+    this.upgradeOverlay.classList.remove('hidden');
+  }
+
+  setHeroName(name, color) {
+    document.querySelector('#hud-top-left .name').textContent = name;
+    document.querySelector('.emblem-core').setAttribute('fill', '#' + color.toString(16).padStart(6, '0'));
   }
 
   hidePicker() { this.upgradeOverlay.classList.add('hidden'); }
@@ -191,12 +249,12 @@ export class Hud {
     this.gameoverPanel.classList.add('hidden');
   }
 
-  showGameOver(score, wave, kills, best, newBest, killer = null, place = null, loadout = null, bestCombo = 0) {
+  showGameOver(score, wave, kills, best, newBest, killer = null, place = null, loadout = null, bestCombo = 0, hero = 'Sarrow') {
     const build = loadout && loadout.tier > 0
       ? `<span class="build">Tier ${loadout.tier} talons · ${loadout.picked.map((p) => `${p.name} ${p.level}`).join(', ')}</span><br>` : '';
     $('gameover-score').textContent = `${score.toLocaleString()} pts`;
     $('gameover-stats').innerHTML =
-      `Reached <b>wave ${wave}</b>${place ? ` in ${place}` : ''} · <b>${kills}</b> kills · best combo <b>${bestCombo}</b><br>` +
+      `<b>${hero}</b> reached <b>wave ${wave}</b>${place ? ` in ${place}` : ''} · <b>${kills}</b> kills · best combo <b>${bestCombo}</b><br>` +
       (killer ? `<span class="killer">Killed by ${killer}</span><br>` : '') + build +
       (newBest ? '<b style="color:#3ff6e0">NEW BEST SCORE!</b>' : `Best: ${best.score.toLocaleString()} pts (wave ${best.wave})`);
     this.overlay.classList.remove('hidden');

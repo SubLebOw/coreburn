@@ -21,6 +21,8 @@ import { GAME_VERSION } from './version.js';
 import { shareScore, copyScore } from './share.js';
 import { IS_NATIVE } from './native.js';
 import { Combo } from './combo.js';
+import { CHARACTERS, CHARACTER_ORDER, displayName } from './characters.js';
+import { isPickWave } from './upgrades.js';
 
 const IS_TOUCH = isTouchDevice();
 if (IS_TOUCH) document.body.classList.add('touch'); // shows the touch controls (see style.css)
@@ -61,7 +63,7 @@ const projectiles = new Projectiles(scene);
 const env = { hemi, sun, baseHemi: 1.2 };
 const arena = createArena(scene, env);
 
-let state = 'title'; // 'title' | 'playing' | 'upgrade' (picker open, game paused) | 'gameover'
+let state = 'title'; // 'title' | 'select' (character select) | 'playing' | 'upgrade' (picker open, game paused) | 'gameover'
 let kills = 0;
 let score = 0;
 let hitstopTimer = 0;
@@ -140,7 +142,6 @@ const world = {
     sound.play('bossDefeated');
     sound.setIntensity(1);
     powerups.onKill(boss);
-    upgradeTimer = 1.3; // let the BOSS DOWN moment land, then pause for the upgrade picker
   },
   // One of the Forge Twins fell; the other one gets angry
   onTwinDown(fallen, survivor) {
@@ -154,6 +155,7 @@ const world = {
     hud.showToast(def.name + '!', def.hint, '#' + def.color.toString(16).padStart(6, '0'));
   },
   onWaveCleared(n) {
+    if (isPickWave(n)) upgradeTimer = 1.3; // every 2nd wave: pause for the upgrade picker (after the banner lands)
     const bonus = 25 * n * combo.mult;
     score += bonus;
     if (!isBossWave(n)) {
@@ -216,7 +218,22 @@ function updateTransition(dt) {
 }
 
 // ---------- Starting / ending a run ----------
-function startGame() {
+// Character select comes before EVERY run (the last pick is highlighted)
+let heroId = CHARACTERS[localStorage.getItem('coreburn-hero')] ? localStorage.getItem('coreburn-hero') : 'sarrow';
+function showCharacterSelect() {
+  state = 'select';
+  hud.hideOverlay();
+  hud.showSelect(CHARACTER_ORDER.map((id) => CHARACTERS[id]), heroId, (id) => {
+    heroId = id;
+    localStorage.setItem('coreburn-hero', id);
+    startGame(id);
+  });
+}
+
+function startGame(id = heroId) {
+  if (typeof id !== 'string') id = heroId;
+  player.setCharacter(id);
+  hud.setHeroName(player.char.name, player.char.color);
   kills = 0;
   score = 0;
   combo.reset();
@@ -252,12 +269,12 @@ function gameOver() {
     localStorage.setItem('coreburn-best', JSON.stringify(best));
   }
   const killer = player.killedBy ? player.killedBy.killerName : null; // e.g. "the Furnace Deacon"
-  lastRun = { wave: enemies.wave, score, killer, place: arena.current.place, tier: player.loadout.tier, combo: combo.best };
+  lastRun = { wave: enemies.wave, score, killer, place: arena.current.place, tier: player.loadout.tier, combo: combo.best, hero: displayName(player.char) };
   upgradeTimer = 0;
   powerups.reset();
   setSlowmo(false);
   timeScale = 1;
-  hud.showGameOver(score, enemies.wave, kills, best, newBest, killer, lastRun.place, player.loadout, combo.best);
+  hud.showGameOver(score, enemies.wave, kills, best, newBest, killer, lastRun.place, player.loadout, combo.best, displayName(player.char));
   copyBtn.textContent = 'COPY';
   sound.play('gameOver');
   sound.setIntensity(0);
@@ -278,7 +295,7 @@ async function tryRestart(e) {
   if (reviveOffered && e && e.type !== 'click') return; // with a revive on offer, use the buttons
   restarting = true;
   try { await ads.maybeShowInterstitial(); } finally { restarting = false; }
-  startGame();
+  showCharacterSelect();
 }
 
 // Rewarded ad -> come back with half health, once per run
@@ -328,7 +345,7 @@ copyBtn.addEventListener('click', async (e) => {
 
 window.addEventListener('keydown', tryRestart);
 document.getElementById('overlay').addEventListener('pointerdown', tryRestart);
-document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('start-btn').addEventListener('click', showCharacterSelect);
 document.getElementById('restart-btn').addEventListener('click', tryRestart);
 hud.showTitle(best);
 document.getElementById('version-text').textContent = `v${GAME_VERSION}`;
@@ -432,7 +449,7 @@ function frame() {
     // paused while the player picks an upgrade (nothing moves)
   } else {
     // title screen: Enter or J also starts a run
-    if (state === 'title' && (input.wasPressed('start') || input.wasPressed('attack'))) startGame();
+    if (state === 'title' && (input.wasPressed('start') || input.wasPressed('attack'))) showCharacterSelect();
     if (state === 'gameover') { enemies.update(dt); projectiles.update(dt, player, arena, effects); } // let things settle
     arena.update(dt, player, world, false);
   }

@@ -8,6 +8,7 @@
 //   - power-ups (see powerups.js) can double his damage, shield him or electrify his talons
 import * as THREE from 'three';
 import { Loadout, tierColor } from './upgrades.js';
+import { CHARACTERS } from './characters.js';
 
 // The camera looks at the arena from the +X/+Z corner. These are the floor directions
 // that match "up the screen" and "right on the screen", so W always moves up the screen.
@@ -21,24 +22,24 @@ const COMBO = [
   { damage: 28, knockback: 14, range: 2.9, duration: 0.40 }, // hit 3: big double-talon finisher
 ];
 
-const MOVE_SPEED = 7;
-const DASH_SPEED = 24;
-const DASH_TIME = 0.2;
-const DASH_COOLDOWN = 0.9;
+// Speeds, blink and overdrive numbers are per character (see characters.js)
 const SPIN_TIME = 1.6;
 const SPIN_COOLDOWN = 8;
 
 export class Player {
-  constructor(scene, world) {
+  constructor(scene, world, charId = 'sarrow', tint = null) {
     this.world = world; // gives access to enemies, effects, the arena, etc.
-    this.maxHp = 100;
+    this.scene = scene;
+    this.char = CHARACTERS[charId] || CHARACTERS.sarrow;
+    this.tint = tint;
+    this.maxHp = this.char.hp;
     this.radius = 0.5;
-    this.dashCooldownMax = DASH_COOLDOWN;
+    this.dashCooldownMax = this.char.dashCd;
     this.spinCooldownMax = SPIN_COOLDOWN;
     this.position = new THREE.Vector3();
     this.velocity = new THREE.Vector3();
 
-    this.model = buildHero();
+    this.model = this.char.build(tint);
     scene.add(this.model.root);
 
     // Glowing arc that shows the talon swipe
@@ -48,7 +49,6 @@ export class Player {
     );
     this.slashArc.rotation.x = -Math.PI / 2;
     this.slashArc.position.y = 1.1;
-    this.model.root.add(this.slashArc);
 
     // Energy ring that spins around Sarrow during the overdrive attack
     this.spinRing = new THREE.Mesh(
@@ -58,16 +58,14 @@ export class Player {
     this.spinRing.rotation.x = -Math.PI / 2;
     this.spinRing.position.y = 0.9;
     this.spinRing.visible = false;
-    this.model.root.add(this.spinRing);
 
     // Teal ring on the floor under Sarrow so you can always spot him in a crowd
-    const marker = new THREE.Mesh(
+    const marker = this.marker = new THREE.Mesh(
       new THREE.RingGeometry(0.6, 0.78, 28),
       new THREE.MeshBasicMaterial({ color: 0x3ff6e0, transparent: true, opacity: 0.6, depthWrite: false })
     );
     marker.rotation.x = -Math.PI / 2;
     marker.position.y = 0.03;
-    this.model.root.add(marker);
 
     // SHIELD power-up bubble
     this.bubble = new THREE.Mesh(
@@ -76,7 +74,7 @@ export class Player {
     );
     this.bubble.position.y = 1.1;
     this.bubble.visible = false;
-    this.model.root.add(this.bubble);
+    this.attachExtras();
 
     // Blink Trail upgrade: glowing patches left behind by a blink (pooled)
     this.trail = [];
@@ -95,7 +93,30 @@ export class Player {
     this.reset();
   }
 
-  // Put Sarrow back to full health in the middle of the arena
+  // The arcs, rings and bubble ride on whichever hero model is in use
+  attachExtras() {
+    this.model.root.add(this.slashArc, this.spinRing, this.marker, this.bubble);
+    this.marker.material.color.setHex(this.tint || this.char.color);
+  }
+
+  // Switch hero (character select). tint = co-op duplicate colour, or null.
+  setCharacter(id, tint = null) {
+    const c = CHARACTERS[id] || CHARACTERS.sarrow;
+    if (c === this.char && tint === this.tint) return;
+    this.scene.remove(this.model.root);
+    this.char = c;
+    this.tint = tint;
+    this.model = c.build(tint);
+    this.scene.add(this.model.root);
+    this.attachExtras();
+    this.bladeColor = null;
+    this.currentFlash = null;
+    this.reset();
+  }
+
+  get name() { return this.char.name; }
+
+  // Put the hero back to full health in the middle of the arena
   reset() {
     this.position.set(0, 0, 0);
     this.velocity.set(0, 0, 0);
@@ -119,7 +140,7 @@ export class Player {
     this.loadout.reset();
     this.applyLoadout();
     this.hp = this.maxHp;
-    this.dashCharges = this.stats.dashCharges;
+    this.dashCharges = this.maxCharges;
     this.trailTick = 0;
     this.leechBudget = 0;
     for (const t of this.trail) { t.life = 0; t.mesh.visible = false; }
@@ -142,9 +163,9 @@ export class Player {
 
     // ----- Timers -----
     // blink charges refill one at a time
-    if (this.dashCharges < this.stats.dashCharges) {
+    if (this.dashCharges < this.maxCharges) {
       this.dashCooldown -= dt;
-      if (this.dashCooldown <= 0) { this.dashCharges++; this.dashCooldown = this.dashCharges < this.stats.dashCharges ? this.dashCooldownMax : 0; }
+      if (this.dashCooldown <= 0) { this.dashCharges++; this.dashCooldown = this.dashCharges < this.maxCharges ? this.dashCooldownMax : 0; }
     } else this.dashCooldown = 0;
     this.leechBudget = Math.max(0, this.leechBudget - dt * 6); // Core Leech: at most ~6 hp per second
     this.spinCooldown = Math.max(0, this.spinCooldown - dt);
@@ -182,7 +203,7 @@ export class Player {
     switch (this.state) {
       case 'normal':
         if (moving) {
-          this.velocity.copy(dir).multiplyScalar(MOVE_SPEED * this.stats.speed);
+          this.velocity.copy(dir).multiplyScalar(this.char.speed * this.stats.speed);
           this.turnTowards(Math.atan2(dir.x, dir.z), dt, 20);
         }
         if (this.attackBuffer > 0) {
@@ -192,10 +213,10 @@ export class Player {
 
       case 'attack': {
         const hit = COMBO[this.comboStep - 1];
-        const t = this.stateTime / hit.duration;
+        const t = this.stateTime / (hit.duration / this.char.atkSpeed);
         // small step forward at the start of each swing, and slow steering
         if (t < 0.4) this.velocity.copy(this.facingDir).multiplyScalar(this.comboStep === 3 ? 6 : 4);
-        if (moving) this.velocity.addScaledVector(dir, MOVE_SPEED * 0.25);
+        if (moving) this.velocity.addScaledVector(dir, this.char.speed * 0.25);
         if (!this.hasHit && t >= 0.45) { this.hasHit = true; this.doSlashHit(hit); }
         if (this.attackBuffer > 0 && this.comboStep < 3 && t >= 0.6) {
           this.startAttack(this.comboStep + 1, moving ? dir : null);
@@ -208,16 +229,16 @@ export class Player {
       }
 
       case 'dash':
-        this.velocity.copy(this.dashDir).multiplyScalar(DASH_SPEED);
+        this.velocity.copy(this.dashDir).multiplyScalar(this.char.dashSpeed);
         this.dashHits();
         if (this.stats.trail > 0) this.dropTrail();
-        if (this.stateTime >= DASH_TIME * this.stats.dashTime) this.state = 'normal';
+        if (this.stateTime >= this.char.dashTime * this.stats.dashTime) this.state = 'normal';
         break;
 
       case 'spin':
-        if (moving) this.velocity.copy(dir).multiplyScalar(MOVE_SPEED * 0.75 * this.stats.speed);
+        if (moving) this.velocity.copy(dir).multiplyScalar(this.char.speed * 0.75 * this.stats.speed);
         this.spinTick -= dt;
-        if (this.spinTick <= 0) { this.spinTick = 0.15; this.spinHits(); }
+        if (this.spinTick <= 0) { this.spinTick = this.char.spinTick; this.spinHits(); }
         if (this.stateTime >= SPIN_TIME + this.stats.spinTime) {
           this.state = 'normal';
           this.spinRing.visible = false;
@@ -274,7 +295,7 @@ export class Player {
     const forward = this.facingDir;
     const s = this.stats;
     const range = hit.range * s.range;
-    const arcDot = 0.35 - 0.1 * s.arcLevel; // Wide Arc swings wider
+    const arcDot = 0.35 - 0.05 * s.arcLevel; // Wide Arc swings wider
     let hitSomething = false;
     const struck = new Set();
     for (const e of this.world.enemies.list) {
@@ -293,7 +314,7 @@ export class Player {
     }
     // Shockwave Finisher: the 3rd hit sends out a ring that hits everything around you
     if (this.comboStep === 3 && s.shock > 0) {
-      const radius = 2.8 + 0.5 * s.shock, pct = 0.3 + 0.15 * s.shock;
+      const radius = 2.8 + 0.3 * s.shock, pct = 0.3 + 0.09 * s.shock;
       this.world.effects.spawnRing(this.position, 0xffd040, radius, 0.35);
       for (const e of this.world.enemies.list) {
         if (!e.canBeHit || struck.has(e)) continue;
@@ -327,12 +348,13 @@ export class Player {
   dashHits() {
     for (const e of this.world.enemies.list) {
       if (!e.canBeHit || this.dashHitSet.has(e)) continue;
-      if (e.position.distanceTo(this.position) < 1.3 + e.radius) {
+      if (e.position.distanceTo(this.position) < this.char.dashWidth + e.radius) {
         this.dashHitSet.add(e);
         // knock enemies off to the side of the dash path
         const side = new THREE.Vector3(-this.dashDir.z, 0, this.dashDir.x);
         if (side.dot(new THREE.Vector3().subVectors(e.position, this.position)) < 0) side.negate();
-        this.strike(e, 10 * this.stats.dashDmg, side.x * 7, side.z * 7, false, 'dash');
+        const k = this.char.dashKnock; // Zaleks' shoulder-charge shoves hard
+        this.strike(e, this.char.dashDmg * this.stats.dashDmg, side.x * k, side.z * k, k > 10, 'dash');
         this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0x9ffff5, 6);
         this.world.shake(0.12);
         this.world.sfx('hit');
@@ -345,10 +367,11 @@ export class Player {
     this.stateTime = 0;
     this.spinTick = 0;
     this.spinCooldown = this.spinCooldownMax;
-    this.spinRing.scale.setScalar(this.stats.spinRadius);
+    this.spinRing.scale.setScalar(this.stats.spinRadius * this.char.spinRadius);
     this.spinRing.visible = true;
-    this.world.effects.spawnRing(this.position, 0xe0702a, 4, 0.5);
-    this.world.shake(0.25);
+    const slam = this.char.id === 'zaleks'; // Zaleks slams the ground first
+    this.world.effects.spawnRing(this.position, slam ? 0xffa030 : 0xe0702a, 4 * this.char.spinRadius, slam ? 0.7 : 0.5);
+    this.world.shake(slam ? 0.5 : 0.25);
     this.world.sfx('overdrive');
   }
 
@@ -358,9 +381,10 @@ export class Player {
       const to = new THREE.Vector3().subVectors(e.position, this.position);
       to.y = 0;
       const dist = to.length();
-      if (dist < 3.2 * this.stats.spinRadius + e.radius) {
+      if (dist < 3.2 * this.stats.spinRadius * this.char.spinRadius + e.radius) {
         to.normalize();
-        this.strike(e, 8 * this.stats.spinDmg, to.x * 7, to.z * 7, true, 'spin');
+        const k = this.char.spinKnock;
+        this.strike(e, 8 * this.stats.spinDmg * this.char.spinDmg, to.x * k, to.z * k, true, 'spin');
         this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0xff8040, 4);
         this.world.sfx('hit');
       }
@@ -371,7 +395,7 @@ export class Player {
   // kind: 'slash' | 'dash' | 'spin' | 'shock' | 'trail' | 'chain'
   strike(e, base, kx, kz, heavy, kind) {
     const s = this.stats;
-    let dmg = base * s.dmg * this.damageMult;
+    let dmg = base * s.dmg * this.char.dmg * this.damageMult;
     const crit = kind !== 'trail' && Math.random() < s.crit;
     if (crit) {
       dmg *= 1.8;
@@ -456,26 +480,28 @@ export class Player {
   // Called after an upgrade is picked (and on reset): apply stats + update the talons' look
   applyLoadout() {
     const s = this.stats = this.loadout.stats;
-    const oldMax = this.maxHp || 100;
-    this.maxHp = 100 + s.maxHpBonus;
+    const oldMax = this.maxHp || this.char.hp;
+    this.maxHp = Math.round(this.char.hp * (1 + s.maxHpPct)) + s.maxHpFlat;
+    const charges = s.dashCharges + this.char.dashCharges - 1;
     if (this.hp !== undefined) this.hp = Math.min(this.maxHp, this.hp + Math.max(0, this.maxHp - oldMax));
-    this.dashCooldownMax = DASH_COOLDOWN * s.dashCd;
+    this.dashCooldownMax = this.char.dashCd * s.dashCd;
     this.spinCooldownMax = SPIN_COOLDOWN * s.spinCd;
-    if (this.dashCharges !== undefined) this.dashCharges = Math.min(s.dashCharges, this.dashCharges + (s.dashCharges > this.prevCharges ? 1 : 0));
-    this.prevCharges = s.dashCharges;
+    if (this.dashCharges !== undefined) this.dashCharges = Math.min(charges, this.dashCharges + (charges > this.prevCharges ? 1 : 0));
+    this.prevCharges = this.maxCharges = charges;
     // talons: longer, glowier, and colour-cycle with the tier
     const tier = this.loadout.tier;
-    this.tierColor = tierColor(tier);
-    const len = 1 + Math.min(12, tier) * 0.05;
-    for (const b of this.model.blades) { b.scale.y = 0.72 * len; b.position.y = -0.77 - 0.36 * len; }
+    this.tierColor = tierColor(tier, this.char.blade); // starts at the hero's own talon colour
+    const len = 1 + Math.min(24, tier) * 0.025, m = this.model;
+    for (const b of m.blades) { b.scale.y = m.bladeLen * len; b.position.y = m.bladeBase - m.bladeLen / 2 * len; }
     for (const g of this.model.halos) {
       g.visible = tier > 0;
-      g.scale.set(0.12 + Math.min(10, tier) * 0.008, 0.8 * len, 0.18 + Math.min(10, tier) * 0.008);
-      g.position.y = -0.77 - 0.4 * len;
+      const w = Math.min(20, tier) * 0.004;
+      g.scale.set(0.12 + w, (m.bladeLen + 0.08) * len, 0.18 + w);
+      g.position.y = m.bladeBase - (m.bladeLen + 0.08) / 2 * len;
       g.material.color.setHex(this.tierColor);
-      g.material.opacity = Math.min(0.55, 0.12 + tier * 0.035);
+      g.material.opacity = Math.min(0.55, 0.12 + tier * 0.0175);
     }
-    this.spinRing.material.color.setHex(tier > 0 ? this.tierColor : 0x3ff6e0); // overdrive ring matches the talons
+    this.spinRing.material.color.setHex(tier > 0 ? this.tierColor : (this.char.id === 'sarrow' ? 0x3ff6e0 : this.char.color)); // overdrive ring matches the talons
     this.world.powerups ? this.world.powerups.refreshBlade() : this.setBladeColor(this.tierColor);
   }
 
@@ -531,7 +557,7 @@ export class Player {
     this.stateTime = 0;
     this.hp = this.maxHp * 0.5;
     this.invulnTimer = 2.5;
-    this.dashCharges = this.stats.dashCharges;
+    this.dashCharges = this.maxCharges;
     this.timeSinceHit = 0;
     this.model.body.rotation.set(0, 0, 0);
     this.model.body.position.set(0, 0, 0);
@@ -542,7 +568,7 @@ export class Player {
 
   animate(dt) {
     const m = this.model;
-    const speedRatio = Math.min(1, this.velocity.length() / MOVE_SPEED);
+    const speedRatio = Math.min(1, this.velocity.length() / this.char.speed);
     this.walkPhase += dt * 13 * speedRatio;
     const swing = Math.sin(this.walkPhase);
 
@@ -559,7 +585,7 @@ export class Player {
 
     if (this.state === 'attack') {
       const hit = COMBO[this.comboStep - 1];
-      const t = Math.min(1, this.stateTime / hit.duration);
+      const t = Math.min(1, this.stateTime / (hit.duration / this.char.atkSpeed));
       const e = 1 - Math.pow(1 - t, 3); // ease out
       if (this.comboStep === 1) {
         // left arm sweeps from the outside across the body
@@ -627,104 +653,3 @@ export class Player {
   }
 }
 
-// ---------- Building Sarrow's blocky model ----------
-// Everything is made of boxes. The model faces +Z (forward) when rotation is 0.
-// Look: charcoal hooded long coat, orange scarf/strap accents, a glowing teal
-// reactor core in his chest, and two teal energy talons on each gauntlet.
-function buildHero() {
-  const mats = {
-    coat: new THREE.MeshLambertMaterial({ color: 0x2c3036 }),     // charcoal coat
-    coatDark: new THREE.MeshLambertMaterial({ color: 0x1c1f23 }),
-    pants: new THREE.MeshLambertMaterial({ color: 0x3d3b35 }),
-    leather: new THREE.MeshLambertMaterial({ color: 0x5a3d2a }),
-    orange: new THREE.MeshLambertMaterial({ color: 0xe0702a }),   // accent colour
-    metal: new THREE.MeshLambertMaterial({ color: 0x70757d }),
-    face: new THREE.MeshBasicMaterial({ color: 0x07090b }),       // shadowed face inside the hood
-    glow: new THREE.MeshBasicMaterial({ color: 0x3ff6e0 }),       // teal energy
-    blade: new THREE.MeshBasicMaterial({ color: 0x7ffff2, transparent: true, opacity: 0.9 }),
-  };
-  const unitBox = new THREE.BoxGeometry(1, 1, 1); // one shared box, scaled into each body part
-
-  const root = new THREE.Group(); // moves + turns with the player
-  const body = new THREE.Group(); // used for leaning / spinning animations
-  root.add(body);
-
-  function box(parent, mat, w, h, d, x, y, z, shadow = true) {
-    const mesh = new THREE.Mesh(unitBox, mat);
-    mesh.scale.set(w, h, d);
-    mesh.position.set(x, y, z);
-    mesh.castShadow = shadow;
-    parent.add(mesh);
-    return mesh;
-  }
-
-  // Legs (the group's origin is the hip joint, so rotating it swings the leg)
-  function leg(x) {
-    const g = new THREE.Group();
-    g.position.set(x, 0.85, 0);
-    body.add(g);
-    box(g, mats.pants, 0.28, 0.6, 0.3, 0, -0.3, 0);        // trousers
-    box(g, mats.leather, 0.32, 0.3, 0.4, 0, -0.7, 0.04);   // boot
-    box(g, mats.orange, 0.33, 0.05, 0.41, 0, -0.56, 0.04, false); // boot trim
-    return g;
-  }
-  const legL = leg(0.18);
-  const legR = leg(-0.18);
-
-  // Torso and the long coat
-  box(body, mats.coat, 0.66, 0.66, 0.4, 0, 1.36, 0);                 // coat body
-  const back = box(body, mats.coatDark, 0.7, 0.75, 0.07, 0, 0.78, -0.2); // coat tail at the back
-  back.rotation.x = -0.18;
-  for (const side of [-1, 1]) {
-    const flap = box(body, mats.coat, 0.07, 0.7, 0.38, side * 0.36, 0.8, -0.01); // side panels
-    flap.rotation.z = side * 0.12;
-    const front = box(body, mats.coatDark, 0.24, 0.62, 0.06, side * 0.22, 0.83, 0.2); // open front
-    front.rotation.z = side * 0.1;
-  }
-  box(body, mats.leather, 0.68, 0.08, 0.42, 0, 1.06, 0);              // belt
-  const strap = box(body, mats.orange, 0.08, 0.8, 0.43, 0, 1.36, 0, false); // bandolier strap
-  strap.rotation.z = 0.65;
-  box(body, mats.orange, 0.52, 0.13, 0.46, 0, 1.72, 0);               // scarf
-  box(body, mats.leather, 0.3, 0.2, 0.42, 0.42, 1.66, 0);             // one leather pauldron
-
-  // The reactor core, glowing in the middle of his chest
-  const coreRing = box(body, mats.metal, 0.26, 0.26, 0.05, 0, 1.42, 0.2, false);
-  coreRing.rotation.z = Math.PI / 4;
-  const core = box(body, mats.glow, 0.16, 0.16, 0.06, 0, 1.42, 0.22, false);
-  core.rotation.z = Math.PI / 4;
-
-  // Head: a deep hood with two teal eye glints
-  const head = new THREE.Group();
-  head.position.set(0, 1.98, 0);
-  body.add(head);
-  box(head, mats.coat, 0.48, 0.46, 0.5, 0, 0, 0);
-  box(head, mats.face, 0.32, 0.26, 0.04, 0, -0.04, 0.24, false);
-  box(head, mats.glow, 0.07, 0.04, 0.02, 0.08, -0.01, 0.265, false);
-  box(head, mats.glow, 0.07, 0.04, 0.02, -0.08, -0.01, 0.265, false);
-  const drape = box(head, mats.coatDark, 0.36, 0.12, 0.4, 0, 0.17, -0.2); // hood folds down the back
-  drape.rotation.x = 0.55;
-
-  // Arms with metal gauntlets and two glowing energy talons each (group origin = shoulder)
-  const blades = [], halos = [];
-  function arm(x) {
-    const g = new THREE.Group();
-    g.position.set(x, 1.62, 0);
-    body.add(g);
-    box(g, mats.coat, 0.24, 0.55, 0.26, 0, -0.27, 0);      // sleeve
-    box(g, mats.metal, 0.28, 0.3, 0.3, 0, -0.66, 0);       // gauntlet
-    box(g, mats.orange, 0.29, 0.06, 0.31, 0, -0.55, 0, false); // gauntlet stripe
-    for (const cx of [-0.07, 0.07]) {
-      blades.push(box(g, mats.blade, 0.04, 0.72, 0.1, cx, -1.13, 0.03, false)); // energy talon
-      // soft glow around the talon (grows with the weapon tier)
-      const halo = box(g, new THREE.MeshBasicMaterial({ color: 0x7ffff2, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }), 0.12, 0.8, 0.18, cx, -1.13, 0.03, false);
-      halo.visible = false;
-      halos.push(halo);
-    }
-    return g;
-  }
-  const armL = arm(0.46);
-  const armR = arm(-0.46);
-
-  const flashMats = [mats.coat, mats.coatDark, mats.pants, mats.leather, mats.orange, mats.metal];
-  return { root, body, head, core, legL, legR, armL, armR, flashMats, blade: mats.blade, blades, halos };
-}

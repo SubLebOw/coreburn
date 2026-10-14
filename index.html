@@ -163,7 +163,7 @@
       <div id="sp-tabs"></div>
       <div id="sp-items"></div>
       <div id="sp-note"></div>
-      <button id="sp-close" class="big-btn">DONE</button>
+      <div class="sp-actions"><button id="sp-play" class="big-btn hidden">&#9654; PLAY AGAIN</button><button id="sp-close" class="big-btn">DONE</button></div>
     </div>
   </div>
 
@@ -232,8 +232,14 @@
       </div>
       <button id="double-btn" class="big-btn double hidden">&#9654; DOUBLE SCRAP <small>(watch an ad)</small></button>
       <button id="revive-btn" class="big-btn revive hidden">&#9654; REVIVE <small>(watch an ad)</small></button>
-      <button id="restart-btn" class="big-btn">PLAY AGAIN</button>
-      <div class="small" id="restart-hint"><span class="kb-only">Press any key or click to restart</span><span class="touch-only">Tap anywhere to restart</span></div>
+      <div id="go-actions">
+        <button id="restart-btn" class="big-btn">&#9654; PLAY AGAIN<small id="restart-sub">pick your hero, then go</small></button>
+        <div class="go-row">
+          <button id="go-shop-btn" class="go-btn shop hidden">&#128722; SHOP</button>
+          <button id="go-menu-btn" class="go-btn">&#9776; MENU</button>
+        </div>
+        <div class="small" id="restart-hint"><span class="kb-only">Enter or R: play again</span></div>
+      </div>
     </div>
   </div>
 

@@ -413,6 +413,7 @@ function showTitle() {
   hud.showTitle(best);
   document.getElementById('restart-btn').classList.remove('hidden');
   document.getElementById('restart-hint').innerHTML = RESTART_HINT;
+  document.getElementById('restart-hint').classList.remove('hidden');
 }
 const coop = new Coop({
   THREE, scene, camera, world, input, hud, sound, combo, effects, projectiles, powerups, enemies, arena, allies,
@@ -531,16 +532,41 @@ function gameOver() {
   if (!coop.mode) submitRun();
   doubleBtn.classList.toggle('hidden', !(ads.canRevive && run.lastGain > 0)); // rewarded ad: double it (app only)
   document.getElementById('restart-hint').classList.toggle('hidden', reviveOffered);
+  setGameOverButtons();
+  keysAtDeath = new Set(keysDown); // keys held while dying (attack mashing) never restart
 }
 
-// Restart: any key, click or tap on the game over screen
-// (with a short delay so a button you were mashing doesn't skip it immediately).
+// Game over buttons: PLAY AGAIN (hero select, last hero highlighted) · SHOP · MENU.
+// Co-op host: PLAY AGAIN = back to the lobby, MENU = leave. (Clients: see coop.clientGameOver.)
+function setGameOverButtons() {
+  const $ = (id) => document.getElementById(id);
+  $('restart-btn').classList.remove('hidden');
+  $('restart-sub').textContent = coop.mode === 'host' ? 'back to the lobby · everyone re-picks'
+    : mode === 'daily' ? 'same Daily Challenge · pick your hero'
+    : mode === 'rush' ? 'same Boss Rush · pick your hero' : 'pick your hero, then go';
+  $('go-menu-btn').innerHTML = coop.mode ? '&#10006; LEAVE' : '&#9776; MENU';
+  // the shop shows once this run's scrap is banked (and not while a double-scrap ad is playing)
+  $('go-shop-btn').classList.toggle('hidden', !!coop.mode || restarting);
+}
+const keysDown = new Set();
+let keysAtDeath = new Set();
+window.addEventListener('keydown', (e) => keysDown.add(e.code), true);
+window.addEventListener('keyup', (e) => { keysDown.delete(e.code); keysAtDeath.delete(e.code); }, true);
+window.addEventListener('blur', () => { keysDown.clear(); keysAtDeath.clear(); });
+
+// PLAY AGAIN: the button, or a fresh Enter / R press (not a key held from the fight, not auto-repeat).
+// It always goes through hero select (last hero highlighted: one more tap or Enter starts) in the same mode.
 // Every few deaths an interstitial ad may show first (Android app only, see ads.js).
+function onGameOverKey(e) {
+  if (state !== 'gameover' || shop.isOpen || e.repeat || keysAtDeath.has(e.code)) return;
+  if (!['Enter', 'NumpadEnter', 'KeyR'].includes(e.code)) return;
+  if (reviveOffered) return; // with a revive on offer, use the buttons
+  e.preventDefault();
+  tryRestart();
+}
 async function tryRestart(e) {
+  e?.stopPropagation?.();
   if (state !== 'gameover' || restarting || performance.now() - gameOverTime < 600) return;
-  if (e && e.code === 'KeyM') return;                 // M is the mute key
-  if (e && e.target && e.target.closest && e.target.closest('.share-row')) return; // share/copy buttons
-  if (reviveOffered && e && e.type !== 'click') return; // with a revive on offer, use the buttons
   if (coop.mode) { coop.onRestartTap(); return; } // co-op: the host takes everyone back to the lobby
   restarting = true;
   try { await ads.maybeShowInterstitial(); } finally { restarting = false; }
@@ -583,9 +609,10 @@ doubleBtn.addEventListener('click', async (e) => {
   e.stopPropagation();
   if (state !== 'gameover' || restarting || !run.lastGain) return;
   restarting = true;
-  const rewarded = await ads.showRewarded();
-  restarting = false;
+  document.getElementById('go-shop-btn').classList.add('hidden');
+  const rewarded = await ads.showRewarded().finally(() => { restarting = false; });
   doubleBtn.classList.add('hidden');
+  if (state === 'gameover') setGameOverButtons();
   if (!rewarded) return;
   meta.addScrap(run.lastGain);
   hud.showScrap(run.lastGain * 2, meta.scrap, run.drops, true);
@@ -638,7 +665,7 @@ document.getElementById('lb-name-save').addEventListener('click', saveName);
 nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveName(e); });
 
 // The unlock shop (title screen)
-const shop = new ShopUI(meta, SHOP, { onClose: () => hud.showTitle(best) });
+const shop = new ShopUI(meta, SHOP, { onClose: (fromGameOver) => { if (!fromGameOver) hud.showTitle(best); } });
 hud.refreshScrap = () => shop.refreshTitle();
 document.getElementById('shop-btn').addEventListener('click', (e) => { e.stopPropagation(); if (state === 'title') shop.open(); });
 document.getElementById('shop-btn').addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -660,8 +687,15 @@ copyBtn.addEventListener('click', async (e) => {
   setTimeout(() => { copyBtn.textContent = 'COPY'; }, 2000);
 });
 
-window.addEventListener('keydown', tryRestart);
-document.getElementById('overlay').addEventListener('pointerdown', tryRestart);
+window.addEventListener('keydown', onGameOverKey);
+for (const id of ['restart-btn', 'go-shop-btn', 'go-menu-btn', 'sp-play']) document.getElementById(id).addEventListener('pointerdown', (e) => e.stopPropagation());
+document.getElementById('go-shop-btn').addEventListener('click', (e) => { e.stopPropagation(); if (state === 'gameover' && !restarting) shop.open(true); });
+document.getElementById('sp-play').addEventListener('click', (e) => { e.stopPropagation(); shop.close(true); tryRestart(); });
+document.getElementById('go-menu-btn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (state !== 'gameover' || restarting) return;
+  if (coop.mode) coop.leave(); else showTitle();
+});
 document.getElementById('start-btn').addEventListener('click', showCharacterSelect);
 document.getElementById('restart-btn').addEventListener('click', tryRestart);
 hud.showTitle(best);

@@ -52,7 +52,7 @@ export const UPGRADES = {
   maxHp:    { name: 'Reinforced Core', group: 'core', icon: '⬢', color: 0x6aff9a, max: 8, desc: () => '+7.5% max health' },
   regen:    { name: 'Core Recharge', group: 'core', icon: '✚', color: 0x3ff6a0, max: 6, desc: () => '+17.5% health regen' },
   // ---- SARROW ----
-  arc:      { name: 'Wide Arc', heroes: S, group: 'attack', icon: '◠', color: 0x7ffff2, max: 6, desc: () => '+6% slash reach, wider swing' },
+  arc:      { name: 'Wide Arc', heroes: S, group: 'attack', icon: '◠', color: 0x7ffff2, max: 6, desc: () => '+6% slash reach and +5% slash damage, wider swing' },
   shock:    { name: 'Shockwave Finisher', heroes: S, group: 'attack', icon: '◎', color: 0xffd040, max: 5, desc: (l) => l === 0 ? 'Combo finisher sends out a shockwave' : 'Bigger, stronger finisher shockwave' },
   bkDamage: { name: 'Blink Edge', heroes: S, group: 'mobility', icon: '➹', color: 0x3ff6e0, max: 6, desc: () => '+25% blink damage' },
   bkRange:  { name: 'Long Blink', heroes: S, group: 'mobility', icon: '⇢', color: 0x6ad8ff, max: 6, desc: () => '+7.5% blink distance' },
@@ -63,7 +63,7 @@ export const UPGRADES = {
   odLeech:  { name: 'Overdrive Siphon', heroes: S, group: 'ultimate', icon: '❥', color: 0xff6aa0, max: 6, desc: () => 'Heal +0.5 per overdrive hit (max 10/s)' },
   // ---- ZALEKS ----
   zGuard:   { name: 'Tower Guard', heroes: Z, group: 'attack', icon: '⛊', color: 0xffc060, max: 2, desc: () => 'Frontal block +6% while attacking' },
-  zHammer:  { name: 'Heavy Hammer', heroes: Z, group: 'attack', icon: '⚒', color: 0xff9a40, max: 6, desc: () => '+6% bash damage and reach, +10% knockback' },
+  zHammer:  { name: 'Heavy Hammer', heroes: Z, group: 'attack', icon: '⚒', color: 0xff9a40, max: 6, desc: () => '+9% bash damage, +6% reach, +10% knockback' },
   zStun:    { name: 'Concussive Charge', heroes: Z, group: 'mobility', icon: '✱', color: 0xffe080, max: 3, desc: () => 'Charge stun +0.5s' },
   zCharge:  { name: 'Long Charge', heroes: Z, group: 'mobility', icon: '⇛', color: 0xffb860, max: 5, desc: () => '+12% charge distance, +20% charge damage' },
   zQuake:   { name: 'Aftershock', heroes: Z, group: 'ultimate', icon: '◎', color: 0xffa030, max: 5, desc: () => '+8% slam radius, +10% slam damage' },
@@ -157,7 +157,7 @@ export class Loadout {
       weapon: weaponMult(this.tier),
       dmg: weaponMult(this.tier) * (1 + 0.035 * L('edge')),
       range: 1 + 0.06 * L('arc'),
-      arcLevel: L('arc'),
+      arcLevel: L('arc'), arcDmg: 1 + 0.05 * L('arc'),
       shock: L('shock'),                          // radius 2.8 + 0.3L, 30% + 9%L of the finisher
       crit: 0.035 * L('crit'),
       twin: 0.04 * L('twin'),
@@ -180,7 +180,7 @@ export class Loadout {
       scoreMult: L('greed') ? 1.5 : 1,
       // Zaleks
       block: 0.06 * L('zGuard'),
-      bash: 1 + 0.06 * L('zHammer'), bashDmg: 1 + 0.06 * L('zHammer'), slamDmg: 1 + 0.1 * L('zQuake'), bashKnock: 1 + 0.1 * L('zHammer'),
+      bash: 1 + 0.06 * L('zHammer'), bashDmg: 1 + 0.09 * L('zHammer'), slamDmg: 1 + 0.1 * L('zQuake'), bashKnock: 1 + 0.1 * L('zHammer'),
       chargeStun: 0.5 * L('zStun'), chargeDist: 1 + 0.12 * L('zCharge'), chargeDmg: 1 + 0.2 * L('zCharge'),
       slamRadius: 1 + 0.08 * L('zQuake'), shield: 1 + 0.1 * L('zShield'), taunt: L('zTaunt'),
       // Iskra

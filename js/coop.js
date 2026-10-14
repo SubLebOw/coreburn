@@ -647,6 +647,8 @@ export class Coop {
     $('restart-hint').classList.remove('hidden');
     $('restart-hint').innerHTML = 'Waiting for the host to start the next run…';
     $('restart-btn').classList.add('hidden');
+    $('go-shop-btn').classList.add('hidden');
+    $('go-menu-btn').innerHTML = '&#10006; LEAVE';
   }
 
   // ---------- Client: apply a snapshot (targets for smoothing; things that appear/vanish) ----------

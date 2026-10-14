@@ -446,7 +446,7 @@ export class Player {
       to.normalize();
       // only hit enemies in front of us, or really close ones
       if (forward.dot(to) < arcDot && dist > 1) continue;
-      this.strike(e, hit.damage * (zal ? s.bashDmg : 1), to.x * knock, to.z * knock, fin, 'slash');
+      this.strike(e, hit.damage * (zal ? s.bashDmg : s.arcDmg), to.x * knock, to.z * knock, fin, 'slash');
       this.world.effects.spawnSparks(e.position.clone().setY(1.1), fin ? 0xffa040 : (zal ? 0xffd090 : 0x9ffff5), fin ? 12 : 6);
       struck.add(e);
       hitSomething = true;

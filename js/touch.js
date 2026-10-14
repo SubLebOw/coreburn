@@ -16,7 +16,11 @@ export function setupTouchControls(input) {
   window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
 
   // Block browser gestures (pinch zoom, double-tap zoom, pull-to-refresh) during play
-  document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+  // (but menus/panels must still scroll, e.g. a tall game over screen on a small phone)
+  document.addEventListener('touchmove', (e) => {
+    if (e.target.closest && e.target.closest('.panel, .sp-box, .cp-box, #upgrade-overlay')) return;
+    e.preventDefault();
+  }, { passive: false });
   document.addEventListener('gesturestart', (e) => e.preventDefault()); // iOS Safari pinch
   document.addEventListener('dblclick', (e) => e.preventDefault());
 

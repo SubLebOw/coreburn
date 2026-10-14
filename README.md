@@ -18,7 +18,7 @@ with a boss fight every 5 waves, power-ups to grab, and a new arena every 10 wav
 | **Mobility** (blink / shoulder charge / phase hop / magnet grapple) | K or Space | lower small button |
 | **Ultimate** (overdrive / seismic slam / needle storm / hymn engine) | L | upper small button |
 | Start | Enter / J / START | START button |
-| Restart after game over | any key or click | tap anywhere |
+| Game over | **PLAY AGAIN** button, or a fresh Enter / R (opens hero select, last hero highlighted: Enter starts) · SHOP · MENU | tap PLAY AGAIN / SHOP / MENU |
 | Mute / unmute sound | M or the speaker button | speaker button (top right) |
 | Share your score | SHARE SCORE / COPY on the game over screen | same |
 
@@ -95,10 +95,10 @@ The HUD buttons, the select screen and the upgrade cards all use the hero's own 
 
 | Hero | Playstyle | HP | Attack (J) | Mobility (K / Space) | Ultimate (L) |
 |---|---|---|---|---|---|
-| **Sarrow** | DUELIST (melee) | 135 | **Talon Combo**: 3-hit combo, heavy finisher | **Blink**: untouchable dash that cuts through enemies (0.9 s) | **Overdrive**: 1.6 s whirlwind, half damage taken (8 s) |
-| **Zaleks** | TANK | 145 | **Shield Bash**: bash + hammer-fist, huge knockback, blocks 40% of frontal damage while swinging | **Shoulder Charge**: stuns everything it hits for 1 s, stops at walls (4.5 s) | **Seismic Slam**: 5.5 m AoE slam + stun, **taunts** nearby enemies (and bosses) for 5 s, shield = 20% max HP (12 s) |
+| **Sarrow** | DUELIST (melee) | 180 | **Talon Combo**: 3-hit combo, heavy finisher | **Blink**: untouchable dash that cuts through enemies (0.9 s) | **Overdrive**: 1.6 s whirlwind (11 per hit), half damage taken (8 s) |
+| **Zaleks** | TANK | 190 | **Shield Bash**: bash + hammer-fist, huge knockback, blocks 40% of frontal damage while swinging | **Shoulder Charge**: stuns everything it hits for 1 s, stops at walls (4.5 s) | **Seismic Slam**: 5.5 m AoE slam (60 dmg) + stun, **taunts** nearby enemies (and bosses) for 5 s, shield = 20% max HP (12 s) |
 | **Iskra** | KITER (ranged) | 70 | **Needles**: rapid needles (pierce 1) auto-aimed at the nearest enemy in your move direction, fire while moving | **Phase Hop**: 5.5 m teleport, 2 charges, leaves a **decoy** enemies chase (3 s / 4 hits) (3.2 s) | **Needle Storm**: 3.5 s of 5-needle fan volleys, move freely (11 s) |
-| **Orin** (secret) | CONTROL / summoner | 125 | **Arc Tether**: 5.5 m beam that pins its target and chains to 2 more | **Magnet Grapple**: yanks an enemy to you (stunned), or pulls you to a pillar / boss / heavy enemy, else a short reel (3.5 s) | **Hymn Engine**: 3 s vortex that drags enemies in + 2 scrap drones that fight for 10 s (14 s) |
+| **Orin** (secret) | CONTROL / summoner | 165 | **Arc Tether**: 5.5 m beam that pins its target and chains to 2 more (80% damage) | **Magnet Grapple**: yanks an enemy to you (stunned), or pulls you to a pillar / boss / heavy enemy, else a short reel (3.5 s) | **Hymn Engine**: 3 s vortex that drags enemies in + 2 scrap drones that fight for 10 s (14 s) |
 
 All kit numbers live in `js/hero-stats.js`; the kits are in `js/player.js` (per-hero handlers on the same 3 slots)
 and the needles, decoys, drones and vortex in `js/allies.js`. In co-op the host runs all of them and friends see
@@ -110,26 +110,28 @@ The simulator reads the real kit and card numbers and models each hero's **singl
 ultimate and mobility damage over their cooldowns, x uptime), **AoE / crowd clear** (cones, pierce, chains, rings),
 **effective HP** (armour, frontal block, slam shield, regen, siphon) and **mobility / escape** (range kept, i-frames,
 decoys, stuns, pins). It runs a standard wave, an elite-heavy wave and a boss at waves 10 / 30 / 60 / 100 with a typical
-build for each hero (universal + that hero's cards). % = difference from the 4-hero average (target about 10%):
+build for each hero (universal + that hero's cards). Since 1.11 the yardstick is **Iskra**: she felt strongest in play,
+so the model now credits her kiting more (exposure 0.5, uptime 0.97) and the other three were **buffed up** to her level
+(she was not nerfed). % = difference from Iskra (target about 10%; `--avg` compares with the 4-hero average instead):
 
 | scenario | Sarrow clear | Sarrow survive | Zaleks clear | Zaleks survive | Iskra clear | Iskra survive | Orin clear | Orin survive |
 |---|---|---|---|---|---|---|---|---|
-| standard w10 | 5.4s ( -9.6%) | 14.3s (-10.3%) | 5.4s ( -9.9%) | 17.3s (  8.4%) | 6.5s (  8.5%) | 15.5s ( -2.9%) | 6.7s ( 11.1%) | 16.7s (  4.8%) |
-| standard w30 | 11.5s ( -4.3%) | 9.2s ( -7.0%) | 11.6s ( -3.1%) | 10.3s (  5.1%) | 12.5s (  4.0%) | 9.8s ( -0.1%) | 12.4s (  3.5%) | 10.0s (  2.0%) |
-| standard w60 | 9.5s ( -0.5%) | 6.8s ( -3.0%) | 9.2s ( -3.8%) | 7.2s (  2.4%) | 9.5s ( -0.4%) | 7.2s (  1.4%) | 10.0s (  4.7%) | 7.0s ( -0.8%) |
-| standard w100 | 6.8s (  0.6%) | 5.3s ( -7.0%) | 6.6s ( -1.3%) | 5.9s (  4.3%) | 6.5s ( -3.2%) | 5.7s (  1.2%) | 7.0s (  3.9%) | 5.8s (  1.5%) |
-| elite-heavy w10 | 8.6s ( -6.7%) | 9.2s (-11.5%) | 8.6s ( -6.5%) | 11.5s ( 10.7%) | 9.8s (  6.6%) | 10.3s ( -0.8%) | 9.8s (  6.6%) | 10.6s (  1.6%) |
-| elite-heavy w30 | 18.3s ( -2.0%) | 5.9s ( -7.9%) | 18.7s (  0.1%) | 6.9s (  7.2%) | 18.8s (  0.6%) | 6.6s (  1.8%) | 18.9s (  1.2%) | 6.4s ( -1.1%) |
-| elite-heavy w60 | 15.2s (  1.8%) | 4.3s ( -6.0%) | 15.0s (  0.4%) | 4.8s (  5.1%) | 14.3s ( -3.9%) | 4.8s (  4.0%) | 15.2s (  1.7%) | 4.4s ( -3.1%) |
-| elite-heavy w100 | 11.0s (  3.5%) | 3.3s ( -9.8%) | 11.0s (  2.9%) | 3.9s (  6.9%) | 9.8s ( -8.2%) | 3.8s (  3.7%) | 10.8s (  1.7%) | 3.7s ( -0.8%) |
-| boss w10 | 7.3s ( -1.4%) | 10.2s (  0.8%) | 7.5s (  0.6%) | 10.8s (  6.7%) | 8.0s (  7.9%) | 9.5s ( -6.1%) | 6.9s ( -7.2%) | 9.9s ( -1.4%) |
-| boss w30 | 10.4s (  1.9%) | 6.6s (  5.8%) | 11.0s (  7.0%) | 6.4s (  2.3%) | 10.1s ( -1.1%) | 6.0s ( -4.1%) | 9.4s ( -7.9%) | 6.0s ( -4.0%) |
-| boss w60 | 13.6s (  2.4%) | 4.6s (  8.6%) | 14.4s (  8.2%) | 4.2s ( -0.6%) | 13.3s ( -0.1%) | 4.0s ( -5.0%) | 11.9s (-10.5%) | 4.1s ( -3.0%) |
-| boss w100 | 15.8s (  4.3%) | 3.5s (  7.0%) | 16.5s (  8.8%) | 3.2s ( -2.6%) | 14.9s ( -1.9%) | 3.2s ( -4.0%) | 13.5s (-11.2%) | 3.3s ( -0.4%) |
+| standard w10 | 5.2s (-16.6%) | 18.2s ( -4.9%) | 5.2s (-16.9%) | 21.9s ( 14.1%) | 6.3s (  0.0%) | 19.2s (  0.0%) | 6.2s ( -1.7%) | 21.0s (  9.5%) |
+| standard w30 | 10.7s (-11.2%) | 11.5s ( -5.3%) | 11.2s ( -7.4%) | 13.0s (  6.9%) | 12.1s (  0.0%) | 12.2s (  0.0%) | 11.3s ( -6.0%) | 12.5s (  2.7%) |
+| standard w60 | 8.9s ( -4.3%) | 8.4s ( -5.3%) | 8.7s ( -6.4%) | 9.1s (  2.3%) | 9.3s (  0.0%) | 8.9s (  0.0%) | 9.2s ( -0.4%) | 8.7s ( -1.7%) |
+| standard w100 | 6.1s ( -3.2%) | 6.4s ( -9.5%) | 6.1s ( -3.4%) | 7.4s (  4.4%) | 6.3s (  0.0%) | 7.1s (  0.0%) | 6.4s (  0.3%) | 7.1s (  0.3%) |
+| elite-heavy w10 | 8.3s (-12.3%) | 11.8s ( -8.1%) | 8.3s (-12.0%) | 14.6s ( 14.1%) | 9.4s (  0.0%) | 12.8s (  0.0%) | 9.3s ( -1.9%) | 13.3s (  4.1%) |
+| elite-heavy w30 | 17.1s ( -6.0%) | 7.5s ( -8.0%) | 18.0s ( -0.9%) | 8.7s (  6.9%) | 18.2s (  0.0%) | 8.1s (  0.0%) | 17.7s ( -2.7%) | 7.9s ( -2.4%) |
+| elite-heavy w60 | 14.1s (  1.5%) | 5.3s (-10.0%) | 14.1s (  1.4%) | 6.1s (  2.3%) | 13.9s (  0.0%) | 5.9s (  0.0%) | 14.3s (  2.4%) | 5.5s ( -6.4%) |
+| elite-heavy w100 | 10.0s (  4.9%) | 4.1s (-13.9%) | 10.1s (  6.4%) | 5.0s (  4.4%) | 9.5s (  0.0%) | 4.7s (  0.0%) | 10.1s (  6.0%) | 4.5s ( -4.3%) |
+| boss w10 | 7.1s ( -7.6%) | 13.0s ( 10.6%) | 7.3s ( -5.5%) | 13.6s ( 16.2%) | 7.7s (  0.0%) | 11.7s (  0.0%) | 6.9s (-10.6%) | 12.5s (  6.6%) |
+| boss w30 | 9.7s ( -0.2%) | 8.3s ( 12.2%) | 10.7s (  9.2%) | 8.0s (  8.3%) | 9.8s (  0.0%) | 7.4s (  0.0%) | 9.4s ( -3.4%) | 7.5s (  0.6%) |
+| boss w60 | 12.7s ( -0.9%) | 5.7s ( 14.9%) | 13.6s (  6.5%) | 5.3s (  6.0%) | 12.8s (  0.0%) | 5.0s (  0.0%) | 11.9s ( -7.2%) | 5.1s (  2.6%) |
+| boss w100 | 14.3s ( -0.8%) | 4.4s ( 11.2%) | 15.4s (  6.7%) | 4.1s (  2.6%) | 14.4s (  0.0%) | 4.0s (  0.0%) | 13.5s ( -6.5%) | 4.1s (  3.7%) |
 
-Worst cell: 11.5%. 42 of the 48 cells are within 10%; the 6 slightly over are all at wave 10 (Sarrow's early
-survival a bit low, Zaleks' a bit high, Orin's first clears a bit slow, as his drones need cards) or Orin's late boss
-kills (drones scale well). `--check` makes the script fail above 10%.
+Worst cell: 16.9%. The cells over 10% are mostly the melee heroes clearing wave-10 crowds *faster* than Iskra
+(their swings hit whole groups before her needles ramp up; not nerfed on purpose), Zaleks being a bit tankier early
+(he's the tank), and Sarrow's Overdrive (half damage taken) against bosses. `--check` fails above 10%.
 
 ## Weapon upgrades (every 2 waves)
 
@@ -150,8 +152,8 @@ your hero's ability name (e.g. PHASE HOP, SEISMIC SLAM).
 | Who | Upgrades (max level) |
 |---|---|
 | Everyone | Core Edge +3.5% dmg (10), Crit Spark +3.5% (8), Twin Strike +4% (6), Storm Core +7.5% chain (6), Core Leech (6), Ultimate Fury +12.5% (6), Ultimate Coolant -5% (6), Quick Recovery -6% mobility cd (6), Swift Step +3% (6), Reinforced Core +7.5% HP (8), Core Recharge +17.5% (6) |
-| Sarrow | Wide Arc (6), Shockwave Finisher (5), Blink Edge (6), Long Blink (6), Extra Blink +1 charge (1), Blink Trail (5), Long Overdrive (6), Overdrive Reach (6), Overdrive Siphon (6) |
-| Zaleks | Tower Guard +6% block (2), Heavy Hammer +6% dmg/reach (6), Concussive Charge stun +0.5 s (3), Long Charge (5), Aftershock +8% slam radius (5), Bulwark Shield +10% (5), War Cry taunt +1 s (3) |
+| Sarrow | Wide Arc +6% reach, +5% slash dmg (6), Shockwave Finisher (5), Blink Edge (6), Long Blink (6), Extra Blink +1 charge (1), Blink Trail (5), Long Overdrive (6), Overdrive Reach (6), Overdrive Siphon (6) |
+| Zaleks | Tower Guard +6% block (2), Heavy Hammer +9% dmg, +6% reach (6), Concussive Charge stun +0.5 s (3), Long Charge (5), Aftershock +8% slam radius (5), Bulwark Shield +10% (5), War Cry taunt +1 s (3) |
 | Iskra | Piercing Needles +1 (1), Split Needles (1), Extra Hop +1 charge (1), Long Hop +12% (4), Stubborn Decoy +1 s/+2 hits (4), Long Storm +0.5 s (5), Dense Storm +1 needle (2) |
 | Orin | Choir Chain +1 (3), Long Tether +10% (4), Magnet Shock stun +0.3 s (4), Extra Drone +1 (1), Drone Armament +10% (5), Drone Lifespan +1 s (3), Hymn Shell -6% damage while drones fly (4), Deep Vortex +10% (5) |
 

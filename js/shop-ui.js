@@ -26,8 +26,13 @@ export class ShopUI {
 
   refreshTitle() { $('shop-scrap').textContent = `${this.meta.scrap.toLocaleString()} scrap`; }
 
-  open() { this.isOpen = true; this.panel.classList.remove('hidden'); this.render(); }
-  close() { this.isOpen = false; this.panel.classList.add('hidden'); this.refreshTitle(); this.onClose?.(); }
+  // fromGameOver: show PLAY AGAIN in the shop and come back to the results on BACK
+  open(fromGameOver = false) {
+    this.fromGameOver = fromGameOver;
+    $('sp-play').classList.toggle('hidden', !fromGameOver);
+    $('sp-close').textContent = fromGameOver ? 'BACK' : 'DONE';
+    this.isOpen = true; this.panel.classList.remove('hidden'); this.render(); }
+  close(silent = false) { this.isOpen = false; this.panel.classList.add('hidden'); this.refreshTitle(); if (!silent) this.onClose?.(this.fromGameOver); }
 
   renderMilestones(box) {
     const { meta } = this, s = meta.data.stats;

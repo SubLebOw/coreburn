@@ -13,7 +13,7 @@
 // target that hits hard), each at that wave's enemy health/damage scaling and the weapon tier you'd have.
 //   wave-clear time = total enemy hp / (single-target dps x crowd factor)
 //   survival time   = (effective hp + 10 s of regen/shield) / (incoming dps x exposure x (1 - avoided))
-// Absolute seconds are a model; what matters is that every hero lands within ~10% of the average.
+// Absolute seconds are a model; what matters is that every hero lands within ~10% of Iskra (the reference kit).
 import { Loadout, weaponMult, PICK_EVERY } from '../js/upgrades.js';
 import { HERO_STATS, CHARACTER_ORDER } from '../js/hero-stats.js';
 
@@ -60,7 +60,7 @@ function kit(id, l, scen) {
   switch (id) {
     case 'sarrow': {
       const cb = c.combo, cycle = 0.6 * (cb[0].duration + cb[1].duration) + cb[2].duration;
-      st = (cb[0].damage + cb[1].damage + cb[2].damage) / cycle;
+      st = (cb[0].damage + cb[1].damage + cb[2].damage) / cycle * s.arcDmg;
       const shock = s.shock ? (0.24 + 0.07 * s.shock) * cb[2].damage / cycle * 3 * crowd : 0;
       clear = st * aoe(1.9 + 0.08 * s.arcLevel) + shock;
       const spin = (c.spinTime + s.spinTime) / c.spinTick * c.spinHit * s.spinDmg;
@@ -97,8 +97,8 @@ function kit(id, l, scen) {
       const vol = (c.stormTime + s.stormTime) / c.stormRate, per = c.stormCount + s.stormCount;
       ult = vol * c.stormDmg * s.spinDmg * Math.min(per, 2.2) / ultCd;
       ultClear = vol * c.stormDmg * s.spinDmg * per * 0.6 * (1 + crowd) / ultCd;
-      uptime = 0.92;
-      exposure = 0.62; // keeps her distance
+      uptime = 0.97;   // v1.11 recalibrated from playtests: she fires on the move almost all the time
+      exposure = 0.5;  // ...and kiting keeps most of the crowd off her (was 0.62, under-rated her)
       const decoy = Math.min(0.5, (c.decoyTime + s.decoy) * charges / (mobCd * charges + 1) * 0.35) * (scen === 'boss' ? 0 : 1); // bosses ignore decoys
       avoid = decoy + c.hopGuard / mobCd * charges;
       break;
@@ -148,13 +148,15 @@ console.log('\nCOREBURN kit balance: wave-clear time (lower = faster) and surviv
 console.log('Typical build per hero at that wave (universal + hero cards), weapon tier = picks so far.\n');
 const pct = (v, avg) => ((v / avg - 1) * 100).toFixed(1).padStart(5) + '%';
 let worst = 0;
+const REF = process.argv.includes('--avg') ? null : 'iskra'; // --avg: compare against the 4-hero average instead
 const summary = [];
 const dev = Object.fromEntries(CHARACTER_ORDER.map((id) => [id, { c: [], s: [] }]));
 for (const scen of Object.keys(SCEN)) {
   for (const n of WAVES) {
     const r = Object.fromEntries(CHARACTER_ORDER.map((id) => [id, scenario(id, n, scen)]));
-    const avgC = CHARACTER_ORDER.reduce((a, id) => a + r[id].clearTime, 0) / 4;
-    const avgS = CHARACTER_ORDER.reduce((a, id) => a + r[id].survive, 0) / 4;
+    // v1.11: the yardstick is Iskra (the strongest kit in play); everyone is tuned up to her level
+    const avgC = REF ? r[REF].clearTime : CHARACTER_ORDER.reduce((a, id) => a + r[id].clearTime, 0) / 4;
+    const avgS = REF ? r[REF].survive : CHARACTER_ORDER.reduce((a, id) => a + r[id].survive, 0) / 4;
     const row = { scenario: `${SCEN[scen].label} w${n}` };
     for (const id of CHARACTER_ORDER) {
       row[`${id} clear`] = `${r[id].clearTime.toFixed(1)}s (${pct(r[id].clearTime, avgC)})`;
@@ -179,5 +181,5 @@ console.table(CHARACTER_ORDER.map((id) => {
   return { hero: id, 'single-target dps': kb.dpsST.toFixed(0), 'crowd dps': k.dpsClear.toFixed(0), 'max hp': k.maxHp, 'effective hp': k.ehp.toFixed(0),
     'exposure': k.exposure.toFixed(2), 'avoided': (k.avoid * 100).toFixed(0) + '%', 'move x': k.mobility.toFixed(2) };
 }));
-console.log(`\nWorst deviation from the average, any hero / scenario / wave: ${(worst * 100).toFixed(1)}% (target <= 10%)`);
+console.log(`\nWorst deviation from the average, any hero / scenario / wave: ${(worst * 100).toFixed(1)}% (target <= 10%) vs ${REF || 'the average'}`);
 if (process.argv.includes('--check') && worst > 0.1) process.exit(1);

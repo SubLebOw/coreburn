@@ -160,7 +160,7 @@ export class Hud {
       const kit = c.abilities ? ['attack', 'mobility', 'ultimate'].map((k, j) =>
         `<div class="kslot"><b>${c.abilities[k].icon} ${c.abilities[k].name}</b> <span>${['J', 'K', 'L'][j]}</span><i>${c.abilities[k].desc}</i></div>`).join('') : '';
       b.innerHTML = `<span class="key">${i + 1}</span><div class="icon">⬢</div><div class="ubody"><div class="group"></div><div class="uname"></div><div class="effect"></div>` +
-        `<div class="kit">${kit}</div><div class="stats">${bar('HEALTH', c.hp / 150)}${bar('SPEED', c.speed / 8.3)}${bar('RANGE', range)}</div></div>`;
+        `<div class="kit">${kit}</div><div class="stats">${bar('HEALTH', c.hp / 200)}${bar('SPEED', c.speed / 8.3)}${bar('RANGE', range)}</div></div>`;
       b.querySelector('.group').innerHTML = `<span class="ptag">${c.tag}</span> ${c.title.toUpperCase()}`;
       b.querySelector('.uname').textContent = c.name;
       b.querySelector('.effect').textContent = c.blurb;
@@ -180,6 +180,7 @@ export class Hud {
       onPick(chars[i].id);
     };
     const onKey = (e) => {
+      if (e.repeat) return; // a key held down from the last run must not pick a hero
       const n = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3 }[e.code];
       if (n !== undefined) { e.preventDefault(); e.stopPropagation(); pick(n); return; }
       const open = chars.map((c, i) => i).filter((i) => !chars[i].locked);

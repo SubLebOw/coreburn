@@ -546,3 +546,26 @@ body.touch .kslot span { display: none; }
   .ucard .stats { gap: 2px; margin-top: 2px; }
 }
 @media (max-width: 600px) { #upgrade-sub { padding: 0 46px; } }
+
+/* ---------- Game over actions (v1.11) ---------- */
+#go-actions { position: sticky; bottom: -1px; padding: 8px 0 4px; background: linear-gradient(#0000, #0b0f13ee 18%); }
+#restart-btn { display: block; width: min(100%, 340px); margin: 6px auto 0; padding: 12px 20px; }
+#restart-btn.hidden { display: none; }
+#restart-btn small { display: block; font-size: 11px; letter-spacing: 1px; font-weight: 700; opacity: .75; }
+.go-row { display: flex; gap: 10px; justify-content: center; margin: 10px auto 4px; width: min(100%, 340px); }
+.go-btn { flex: 1; min-height: 48px; font-size: 17px; font-weight: 900; letter-spacing: 2px; color: #3ff6e0; background: #1d2a33; border: 2px solid #3ff6e0; border-radius: 10px; cursor: pointer; touch-action: manipulation; }
+.go-btn.shop { color: #ffc23a; border-color: #ffc23a; background: #2a2416; }
+.go-btn.hidden { display: none; }
+.go-btn:active { transform: translateY(2px); }
+#gameover-panel .big-btn.double, #gameover-panel .big-btn.revive { width: min(100%, 340px); padding-left: 12px; padding-right: 12px; }
+.sp-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.sp-actions .big-btn.hidden { display: none; }
+@media (max-height: 520px) { #gameover-panel h1 { font-size: 28px; } #gameover-score { font-size: 24px; } #gameover-panel p { margin: 4px 0; font-size: 13px; } #restart-btn { padding: 8px 16px; font-size: 19px; } .go-row { margin-top: 6px; } .go-btn { min-height: 44px; } }
+/* short landscape phones: results on the left, the buttons on the right (nothing hides behind them) */
+@media (max-height: 520px) and (orientation: landscape) {
+  #gameover-panel { max-width: 860px; display: grid; grid-template-columns: 1fr 290px; column-gap: 18px; align-items: center; grid-auto-flow: row dense; }
+  #gameover-panel > * { grid-column: 1; }
+  #gameover-panel > #go-actions, #gameover-panel > #double-btn, #gameover-panel > #revive-btn { grid-column: 2; }
+  #gameover-panel > #go-actions { grid-row: 1 / span 8; position: static; background: none; align-self: center; }
+  #gameover-panel #lb-name-row { font-size: 12px; }
+}

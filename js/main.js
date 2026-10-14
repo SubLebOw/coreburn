@@ -30,6 +30,11 @@ import { GOLD_TIME } from './golden.js';
 import { ShopUI } from './shop-ui.js';
 import { Twitch } from './twitch.js';
 import { checkAchievements, rewardText } from './achievements.js';
+import { rngFor, dailyKey, weekKey, rushOrder, RUSH_BOSSES, rushTierBefore, rushScore, rushLabel, formatTime, dailyStartCard } from './modes.js';
+import { BOSS_ROTATION } from './bosses.js';
+import { Leaderboard } from './leaderboard.js';
+import { UPGRADES } from './upgrades.js';
+import { RanksUI } from './ranks-ui.js';
 
 const IS_TOUCH = isTouchDevice();
 if (IS_TOUCH) document.body.classList.add('touch'); // shows the touch controls (see style.css)
@@ -88,6 +93,9 @@ let upgradeTimer = 0;       // counts down after a boss dies, then the upgrade p
 const fadeEl = document.getElementById('fade');
 // per-run extras (Part C): scrap sources, near-miss slow-mo, volatile bursts
 let run = { bosses: 0, mutators: 0, jackpot: 0, awarded: 0, drops: [] };
+// run mode: 'endless' | 'daily' (seeded, daily board) | 'rush' (weekly boss rush). Solo only.
+let mode = 'endless', modeKey = '', runTime = 0;
+const leaderboard = new Leaderboard();
 let closeCall = 0, closeCallCd = 0; // CLOSE CALL slow-mo (real seconds) and its cooldown
 const bursts = [];                  // VOLATILE mutator: { pos, t }
 const best = JSON.parse(localStorage.getItem('coreburn-best') || '{"score":0,"wave":0}');
@@ -132,8 +140,8 @@ const world = {
   // A new wave is about to start: every 10 waves we move to the next arena
   onWaveBegin(n) {
     const st = meta.data.stats;
-    st.bestWave = Math.max(st.bestWave, n);
-    if (n >= 10 && !coop.mode && !st.heroWave10.includes(player.char.id)) st.heroWave10.push(player.char.id);
+    if (mode !== 'rush') st.bestWave = Math.max(st.bestWave, n); // rush waves jump by 5: they don't count
+    if (n >= 10 && mode !== 'rush' && !coop.mode && !st.heroWave10.includes(player.char.id)) st.heroWave10.push(player.char.id);
     milestones();
     const next = arenaForWave(n), cur = arena.current;
     if (next.index !== cur.index || next.loop !== cur.loop) {
@@ -158,7 +166,7 @@ const world = {
     sound.setIntensity(1);
   },
   onBossWave(n, def) {
-    hud.showBanner(def.name, `Wave ${n} · ${def.subtitle}`);
+    hud.showBanner(def.name, mode === 'rush' ? `Boss ${n / 5} of ${RUSH_BOSSES} · ${def.subtitle}` : `Wave ${n} · ${def.subtitle}`);
     sound.play('bossWarning');
     sound.setIntensity(2); // boss music: faster and busier
   },
@@ -192,6 +200,11 @@ const world = {
     hud.showToast(def.name + '!', def.hint, '#' + def.color.toString(16).padStart(6, '0'));
   },
   onWaveCleared(n) {
+    if (mode === 'rush') { // BOSS RUSH: a pick after every boss; after the 7th, you've won
+      if (n / 5 >= RUSH_BOSSES) { world.runOver = true; rushWon = true; deathTimer = 0; setTimeout(() => { if (state === 'playing') gameOver(); }, 1600); }
+      else upgradeTimer = 1.3;
+      return;
+    }
     if (enemies.mutator) { run.mutators++; meta.data.stats.mutators++; hud.setMutator(null); }
     milestones();
     if (isPickWave(n)) upgradeTimer = 1.3; // every 2nd wave: pause for the upgrade picker (after the banner lands)
@@ -204,11 +217,15 @@ const world = {
   },
   mutatorFor(n) {
     if (!isMutatorWave(n)) return null;
-    const id = world.forceMutator || rollMutator();
+    const id = world.forceMutator || rollMutator(mode === 'daily' ? rngFor(`daily:${modeKey}:mut:${n}`) : Math.random);
     return { id, ...MUTATORS[id] };
   },
   onMilestoneStat(key) { meta.data.stats[key]++; milestones(); },
-  goldenRoll() { return world.forceGolden || Math.random() < 1 / 20; },
+  goldenRoll() { return mode === 'endless' && (world.forceGolden || Math.random() < 1 / 20); }, // never in ranked modes
+  waveRng(n) { return mode === 'daily' ? rngFor(`daily:${modeKey}:wave:${n}`) : null; },
+  rushEntry(k) { return mode === 'rush' ? { entry: BOSS_ROTATION[rushOrder(modeKey)[k - 1]], tier: 0 } : null; },
+  waveStep: 1,
+  runOver: false,
   // a bolt just whizzed past (projectiles.js): CLOSE CALL slow-mo, solo only, with a cooldown
   onNearMiss(hero) {
     if (coop.mode || hero !== player || closeCallCd > 0 || player.dead || state !== 'playing') return;
@@ -247,11 +264,13 @@ function openUpgradePicker() {
   const loadout = player.loadout;
   if (coop.mode === 'host') coop.beginPicks(); // every friend picks their own card too
   hostPicking = true;
-  const hand = loadout.maybeCurse(loadout.roll(3), enemies.wave);
+  const cardRng = mode === 'daily' ? rngFor(`daily:${modeKey}:cards:${loadout.tier}`) : Math.random;
+  const hand = loadout.maybeCurse(loadout.roll(3, cardRng), enemies.wave, cardRng);
   const picker = hud.showPicker(hand, loadout, (id) => {
     twitch.endVote();
     hostPicking = false;
     loadout.apply(id);
+    if (mode === 'rush') { loadout.tier = Math.max(loadout.tier, rushTierBefore(enemies.wave / 5 + 1)); loadout.recompute(); } // matched to a normal run
     player.applyLoadout();
     if (id === 'patch') player.heal(player.maxHp * 0.35);
     const def = loadout.def(id);
@@ -302,12 +321,20 @@ function showCharacterSelect() {
   });
 }
 
+let rushWon = false;
 function startGame(id = heroId) {
   if (typeof id !== 'string') id = heroId;
+  if (coop.mode) mode = 'endless'; // ranked modes are solo
+  modeKey = mode === 'daily' ? dailyKey() : mode === 'rush' ? weekKey() : '';
+  world.waveStep = mode === 'rush' ? 5 : 1;
+  world.runOver = false;
+  rushWon = false;
+  runTime = 0;
   // shop unlocks: skin, talon colour, starting perk (solo runs; co-op keeps everyone's looks even)
   const solo = !coop.mode;
   player.talonBase = solo ? meta.talonColor : null;
-  player.startCard = solo ? meta.perkCard : null;
+  player.startCard = solo && mode === 'endless' ? meta.perkCard : null; // shop perks: normal runs only (fair boards)
+  if (mode === 'daily') player.startCard = dailyStartCard(modeKey, Object.keys(UPGRADES).filter((u) => UPGRADES[u].max > 1)); // same for everyone
   player.setCharacter(id, solo ? meta.skinColor : null);
   if (coop.mode === 'host') coop.setupHostGame(); // friends' heroes + co-op scaling (before wave 1)
   hud.setHeroName(player.netName ? player.netName.toUpperCase() : player.char.name, player.tint || player.char.color);
@@ -336,7 +363,9 @@ function startGame(id = heroId) {
   closeCall = 0; closeCallCd = 0; bursts.length = 0;
   document.body.classList.remove('closecall');
   hud.setMutator(null);
-  enemies.startWave(1);
+  hud.setModeTag(mode === 'daily' ? `DAILY ${modeKey}` : mode === 'rush' ? `BOSS RUSH ${modeKey}` : '');
+  if (mode === 'rush') { player.loadout.tier = rushTierBefore(1); player.loadout.version++; player.loadout.recompute(); player.applyLoadout(); player.hp = player.maxHp; }
+  enemies.startWave(mode === 'rush' ? 5 : 1);
 }
 
 // ---------- Co-op hooks (see coop.js) ----------
@@ -357,6 +386,7 @@ function resetWorld() {
   player.position.set(0, 0, 0);
 }
 function startClientGame(char, tint, name = char) {
+  mode = 'endless'; world.waveStep = 1; world.runOver = false; hud.setModeTag('');
   resetWorld();
   kills = 0;
   score = 0;
@@ -431,6 +461,20 @@ function showNextMilestone() {
   setTimeout(showNextMilestone, 2600);
 }
 
+// Leaderboards: local always, online once set up (see leaderboard-config.js)
+async function submitRun() {
+  const r = mode === 'rush'
+    ? { mode, hero: player.char.id, score: rushScore(run.bosses, runTime), wave: enemies.wave, kills, seconds: runTime, week: modeKey }
+    : { mode, hero: player.char.id, score, wave: enemies.wave, kills, seconds: runTime, day: modeKey };
+  r.tainted = LOCAL_DEV; // never submit online from a local test build
+  if (mode === 'daily') { meta.data.stats.dailies++; } else if (mode === 'rush') { meta.data.stats.rushes++; if (rushWon) meta.data.stats.rushClears = (meta.data.stats.rushClears || 0) + 1; }
+  milestones();
+  pendingRun = r;
+  const res = await leaderboard.submit(r);
+  hud.showRanks(res, r, leaderboard.name, mode === 'rush' ? rushLabel : null);
+}
+let pendingRun = null;
+
 // Scrap for this run so far (only the part not yet paid out, so an ad revive doesn't pay twice)
 function awardScrap(r) {
   const total = Math.round(scrapForRun(r) * (r.greed ? 1.5 : 1));
@@ -450,7 +494,7 @@ function awardScrap(r) {
 function gameOver() {
   state = 'gameover';
   gameOverTime = performance.now();
-  const newBest = score > best.score;
+  const newBest = mode === 'endless' && score > best.score; // ranked modes have their own boards
   if (newBest) {
     best.score = score;
     best.wave = enemies.wave;
@@ -466,6 +510,8 @@ function gameOver() {
   setSlowmo(false);
   timeScale = 1;
   hud.showGameOver(score, enemies.wave, kills, best, newBest, killer, lastRun.place, player.loadout, combo.best, displayName(player.char));
+  if (mode === 'rush') hud.showRushResult(rushWon, run.bosses, runTime, modeKey);
+  if (mode === 'daily') hud.showDailyResult(modeKey);
   copyBtn.textContent = 'COPY';
   sound.play('gameOver');
   sound.setIntensity(0);
@@ -475,6 +521,7 @@ function gameOver() {
   if (coop.mode === 'host') coop.onGameOver(lastRun);
   reviveBtn.classList.toggle('hidden', !reviveOffered);
   awardScrap(lastRun);
+  if (!coop.mode) submitRun();
   doubleBtn.classList.toggle('hidden', !(ads.canRevive && run.lastGain > 0)); // rewarded ad: double it (app only)
   document.getElementById('restart-hint').classList.toggle('hidden', reviveOffered);
 }
@@ -558,6 +605,29 @@ document.getElementById('tw-toggle').addEventListener('click', (e) => {
 });
 const twTimer = setInterval(() => { if (!twPanel.classList.contains('hidden')) twRender(); }, 500);
 document.getElementById('tw-close').addEventListener('click', (e) => { e.stopPropagation(); twPanel.classList.add('hidden'); });
+
+// Ranked modes + leaderboards (title screen)
+const ranks = new RanksUI(leaderboard, { rushLabel });
+for (const [btn, m] of [['daily-btn', 'daily'], ['rush-btn', 'rush']]) {
+  const el = document.getElementById(btn);
+  el.addEventListener('pointerdown', (e) => e.stopPropagation());
+  el.addEventListener('click', (e) => { e.stopPropagation(); if (state === 'title' || state === 'gameover') { mode = m; showCharacterSelect(); } });
+}
+document.getElementById('start-btn').addEventListener('click', () => { mode = 'endless'; }, true);
+document.getElementById('ranks-btn').addEventListener('pointerdown', (e) => e.stopPropagation());
+document.getElementById('ranks-btn').addEventListener('click', (e) => { e.stopPropagation(); if (state === 'title') ranks.open(); });
+// game over: name entry (only shown until you've picked one)
+const nameInput = document.getElementById('lb-name');
+for (const ev of ['pointerdown', 'keydown']) nameInput.addEventListener(ev, (e) => e.stopPropagation());
+document.getElementById('lb-name-save').addEventListener('pointerdown', (e) => e.stopPropagation());
+const saveName = async (e) => {
+  e?.stopPropagation();
+  const r = leaderboard.setName(nameInput.value);
+  document.getElementById('lb-name-msg').textContent = r.ok ? 'Saved!' : r.error;
+  if (r.ok && pendingRun && leaderboard.online) { const res = await leaderboard.submit(pendingRun); hud.showRanks(res, pendingRun, leaderboard.name, pendingRun.mode === 'rush' ? rushLabel : null); }
+};
+document.getElementById('lb-name-save').addEventListener('click', saveName);
+nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveName(e); });
 
 // The unlock shop (title screen)
 const shop = new ShopUI(meta, SHOP, { onClose: () => hud.showTitle(best) });
@@ -697,6 +767,7 @@ function frame() {
       arena.update(worldDt, player, world, true);
       powerups.update(dt);
       updateBursts(worldDt);
+      if (!coop.mode && !world.runOver) runTime += dt;
       if (coop.mode === 'host') coop.hostSim(dt);
       combo.update(worldDt);
       if (upgradeTimer > 0) {
@@ -713,7 +784,7 @@ function frame() {
     twitch.update(dt);
   } else {
     // title screen: Enter or J also starts a run
-    if (state === 'title' && !shop.isOpen && twPanel.classList.contains('hidden') && (input.wasPressed('start') || input.wasPressed('attack'))) showCharacterSelect();
+    if (state === 'title' && !shop.isOpen && !ranks.isOpen && twPanel.classList.contains('hidden') && (input.wasPressed('start') || input.wasPressed('attack'))) { mode = 'endless'; showCharacterSelect(); }
     if (state === 'gameover') { enemies.update(dt); projectiles.update(dt, player, arena, effects); } // let things settle
     arena.update(dt, player, world, false);
   }

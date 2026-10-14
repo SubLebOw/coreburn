@@ -55,6 +55,7 @@
       <div id="combo"><div class="row"><span id="combo-count">0</span><span id="combo-mult">x1</span></div><div class="cbar"><div id="combo-fill"></div></div><div class="clabel">COMBO</div></div>
       <div id="combo-callout"></div>
       <div id="mutator-tag" class="hidden"></div>
+      <div id="mode-tag" class="hidden"></div>
     </div>
 
     <!-- Active power-ups with timers (filled in by hud.js) -->
@@ -143,6 +144,18 @@
     </div>
   </div>
 
+  <!-- Leaderboards (see leaderboard.js / ranks-ui.js) -->
+  <div id="ranks-panel" class="hidden">
+    <div class="sp-box">
+      <div class="sp-head"><div class="cp-title">RANKS</div><div id="rk-source"></div></div>
+      <div id="rk-tabs" class="sp-tabs-row"></div>
+      <div id="rk-sub" class="sp-tabs-row"></div>
+      <div id="rk-list"></div>
+      <div class="rk-name"><span>Your name:</span><input id="rk-name" maxlength="16" autocomplete="off" spellcheck="false" placeholder="your name"><button id="rk-name-save" class="share-btn">SAVE</button><small id="rk-name-msg"></small></div>
+      <button id="rk-close" class="big-btn">DONE</button>
+    </div>
+  </div>
+
   <!-- Unlock shop: skins, talon colours, starting perks (see meta.js / shop-ui.js) -->
   <div id="shop-panel" class="hidden">
     <div class="sp-box">
@@ -189,6 +202,11 @@
       <p class="small">Endless waves · 7 bosses · power-ups · a new arena every 10 waves · how far can you go?</p>
       <button id="start-btn" class="big-btn">START</button>
       <button id="coop-btn" class="big-btn coop">CO-OP <small>online, 2-4 players</small></button>
+      <div class="mode-row">
+        <button id="daily-btn" class="mode-btn">DAILY<small>challenge</small></button>
+        <button id="rush-btn" class="mode-btn">BOSS RUSH<small>weekly</small></button>
+        <button id="ranks-btn" class="mode-btn">RANKS<small>leaderboards</small></button>
+      </div>
       <button id="shop-btn" class="big-btn shop">SHOP <small id="shop-scrap">0 scrap</small></button>
       <div class="best" id="best-text"></div>
       <div class="footer-links">
@@ -201,9 +219,12 @@
 
     <div class="panel hidden" id="gameover-panel">
       <h1>CORE OFFLINE</h1>
+      <div id="gameover-mode" class="hidden"></div>
       <div id="gameover-score"></div>
       <p id="gameover-stats"></p>
       <div id="gameover-scrap" class="hidden"></div>
+      <div id="lb-result" class="hidden"></div>
+      <div id="lb-name-row" class="hidden"><span>Name for leaderboards:</span><input id="lb-name" maxlength="16" autocomplete="off" spellcheck="false" placeholder="your name"><button id="lb-name-save" class="share-btn">SAVE</button><small id="lb-name-msg"></small></div>
       <div class="share-row">
         <button id="share-btn" class="share-btn">&#128228; SHARE SCORE</button>
         <button id="copy-btn" class="share-btn secondary">COPY</button>

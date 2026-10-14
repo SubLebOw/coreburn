@@ -332,3 +332,10 @@ Title screen → **Streamer mode** → channel (default **CalebGCameron**) → *
 | Hero | HP | Speed | Damage | Attack speed | Budget |
 |---|---|---|---|---|---|
 | ORIN | 100 | 6.8 | 1.05 | 0.98 | 99.6 |
+
+## Daily challenge, weekly boss rush, leaderboards (v1.9.0)
+
+- **DAILY** (title screen): one seeded run per UTC day, the same for everyone: the same enemy mix and elites every wave, the same mutator waves, the same upgrade cards offered and the same starting card. No shop perks and no golden bosses. Unlimited attempts; your best counts.
+- **BOSS RUSH** (weekly): all 7 bosses back to back, in an order that reshuffles every Monday 00:00 UTC. An upgrade pick after each boss, with weapon tiers matched to a normal run. Ranked by bosses beaten, then fastest time.
+- **RANKS**: GLOBAL, per HERO, DAILY and BOSS RUSH boards. Name entry has a profanity filter (also catches l33t and s.p.a.c.i.n.g). Anti-cheat sanity checks run in the game AND on the server: a score must fit what the kills/waves/time could earn, waves need a minimum time, rush bosses need at least 12 s each, daily/weekly boards only take today's / this week's runs, max one submission per 15 s, and builds run on localhost never submit.
+- **Online leaderboards are OFF until a free Supabase project is connected** (until then, the boards show your best runs on this device). Setup (about 5 minutes, free tier, no card): create a project at supabase.com, run `supabase/leaderboard.sql` in its SQL Editor, then put the Project URL and the *anon public* key into `js/leaderboard-config.js` and set `enabled: true`. Free Supabase projects pause after a week with no traffic; un-pause them from the dashboard.

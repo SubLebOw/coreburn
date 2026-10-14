@@ -53,6 +53,7 @@ export class WaveManager {
     this.list = [];
     this.wave = 0;
     this.queue = [];
+    this.eliteQueue = [];
     this.waveActive = false;
     this.breakTimer = 0;
     this.bosses = [];   // usually one boss, two for the Forge Twins
@@ -102,7 +103,7 @@ export class WaveManager {
     if (isBossWave(n)) {
       // Boss round: just the boss (plus whatever it summons)
       const bossNumber = n / 5;
-      const { entry, tier } = bossForNumber(bossNumber);
+      const { entry, tier } = this.world.rushEntry?.(bossNumber) || bossForNumber(bossNumber); // boss rush: weekly order
       this.bossEntry = entry;
       this.bossDef = entry.def;
       this.bossTier = tier;
@@ -115,10 +116,13 @@ export class WaveManager {
     const total = Math.round((4 + 2 * n) * (this.world.coopCount || 1) * (mut?.count || 1)); // co-op / SWARM: more enemies
     const pool = UNLOCKS.filter((u) => n >= u.wave);
     const totalWeight = pool.reduce((s, u) => s + u.weight, 0);
+    const rng = this.world.waveRng?.(n) || Math.random; // daily challenge: the same mix + elites for everyone
+    this.eliteQueue = [];
     for (let i = 0; i < total; i++) {
-      let r = Math.random() * totalWeight;
+      let r = rng() * totalWeight;
       const pick = pool.find((u) => (r -= u.weight) <= 0) || pool[0];
       this.queue.push(pick.type);
+      this.eliteQueue.push(rng() < this.stats.eliteChance);
     }
     this.maxAlive = Math.min(Math.round((6 + n) * Math.min(1.5, this.world.coopCount || 1)), this.world.coopCount > 1 ? 20 : SCREEN_CAP);
     this.world.onWaveStart(n);
@@ -136,7 +140,7 @@ export class WaveManager {
       const regularAlive = this.list.filter((e) => !e.dead && !e.summoned && !e.isBoss).length;
       if (this.queue.length > 0 && this.spawnTimer <= 0 && regularAlive < this.maxAlive) {
         const pos = this.world.arena.randomSpawnPoint(player.position, 9);
-        this.spawnAt(this.queue.shift(), pos, false);
+        this.spawnAt(this.queue.shift(), pos, false, this.eliteQueue.shift());
         this.spawnTimer = Math.max(0.2, 0.7 - this.wave * 0.02) + Math.random() * 0.3;
       }
       if (this.queue.length === 0 && this.bossTimer <= 0 && this.aliveCount === 0) {
@@ -146,7 +150,7 @@ export class WaveManager {
       }
     } else if (this.wave > 0 && !player.dead) {
       this.breakTimer -= dt;
-      if (this.breakTimer <= 0) this.startWave(this.wave + 1);
+      if (this.breakTimer <= 0 && !this.world.runOver) this.startWave(this.wave + (this.world.waveStep || 1)); // boss rush: 5, 10, 15...
     }
 
     // co-op: each enemy goes for its own target (see main.js targetFor); solo: always the player
@@ -162,11 +166,11 @@ export class WaveManager {
   }
 
   // Spawn one regular enemy. `summoned` = created by a boss or a splitter (doesn't use the wave cap)
-  spawnAt(typeName, pos, summoned = true) {
+  spawnAt(typeName, pos, summoned = true, eliteRoll = null) {
     if (this.aliveCount >= (this.world.coopCount > 1 ? 30 : HARD_CAP)) return null;
     const p = pos.clone();
     this.world.arena.resolve(p, 0.6);
-    const elite = typeName !== 'mite' && Math.random() < this.stats.eliteChance;
+    const elite = typeName !== 'mite' && (eliteRoll ?? Math.random() < this.stats.eliteChance);
     const e = new Enemy(this.scene, typeName, p, { ...this.stats, elite }, this.world);
     e.summoned = summoned;
     e.nid = ++this.nextNid; // network id (co-op)

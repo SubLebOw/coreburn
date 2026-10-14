@@ -22,10 +22,12 @@ export const ACHIEVEMENTS = [
   { id: 'heroes', name: 'Polymath', desc: 'Reach wave 10 with Sarrow, Zaleks and Iskra', goal: (s) => [['sarrow', 'zaleks', 'iskra'].filter((h) => s.heroWave10.includes(h)).length, 3], reward: { scrap: 120 } },
   { id: 'coop', name: 'Squad Up', desc: 'Finish a co-op run', goal: (s) => [s.coopRuns, 1], reward: { scrap: 50 } },
   { id: 'revive', name: 'Medic', desc: 'Revive a teammate in co-op', goal: (s) => [s.revives, 1], reward: { scrap: 50 } },
+  { id: 'daily', name: 'Daily Grind', desc: 'Play a daily challenge', goal: (s) => [s.dailies, 1], reward: { scrap: 40 } },
+  { id: 'rush', name: 'Rush Hour', desc: 'Clear the weekly boss rush (all 7)', goal: (s) => [s.rushClears || 0, 1], reward: { scrap: 150 } },
 ];
 
 export function defaultStats() {
-  return { runs: 0, kills: 0, bestWave: 0, bestCombo: 0, bosses: [], goldens: 0, closeCalls: 0, mutators: 0, heroWave10: [], coopRuns: 0, revives: 0, dailies: 0, rushes: 0 };
+  return { runs: 0, kills: 0, bestWave: 0, bestCombo: 0, bosses: [], goldens: 0, closeCalls: 0, mutators: 0, heroWave10: [], coopRuns: 0, revives: 0, dailies: 0, rushes: 0, rushClears: 0 };
 }
 
 // Returns the milestones that were just completed (and pays their rewards)

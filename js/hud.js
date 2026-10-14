@@ -6,6 +6,7 @@
 import { UPGRADES, FALLBACK, GROUP_LABELS, weaponMult, tierColor } from './upgrades.js';
 
 const $ = (id) => document.getElementById(id);
+const formatSecs = (sec) => { const m = Math.floor(sec / 60), s = sec - m * 60; return `${m}:${s.toFixed(1).padStart(4, '0')}`; };
 // the locked secret hero's silhouette (a hooded machine with hooked talons and pipes)
 const SILHOUETTE = '<svg viewBox="0 0 60 60" width="46" height="46"><g fill="#000"><rect x="19" y="4" width="22" height="18" rx="3"/><rect x="15" y="18" width="30" height="4"/><rect x="17" y="23" width="26" height="20" rx="2"/><rect x="12" y="23" width="6" height="16"/><rect x="42" y="23" width="6" height="16"/><path d="M11 39 q-5 8 2 14 l1-3 q-4-5 0-10z"/><path d="M49 39 q5 8 -2 14 l-1-3 q4-5 0-10z"/><rect x="20" y="43" width="8" height="14"/><rect x="32" y="43" width="8" height="14"/><rect x="22" y="0" width="3" height="10"/><rect x="28" y="0" width="3" height="8"/><rect x="34" y="1" width="3" height="9"/></g><rect x="31" y="10" width="4" height="3" fill="#ff4a5a"/></svg>';
 
@@ -278,6 +279,40 @@ export class Hud {
     el.classList.remove('hidden');
   }
 
+  // Ranked mode tag under the wave counter ('' = hide)
+  setModeTag(text) {
+    const el = $('mode-tag');
+    el.textContent = text;
+    el.classList.toggle('hidden', !text);
+  }
+
+  showRushResult(won, bosses, seconds, week) {
+    $('gameover-stats').innerHTML = $('gameover-stats').innerHTML.replace(/(<br>)?(<b[^>]*>NEW BEST SCORE!<\/b>|Best: [^<]*)$/, ''); // endless best isn't relevant here
+    $('gameover-score').textContent = won ? `CLEARED in ${formatSecs(seconds)}` : `${bosses}/7 bosses · ${formatSecs(seconds)}`;
+    document.querySelector('#gameover-panel h1').textContent = won ? 'RUSH CLEARED!' : 'CORE OFFLINE';
+    $('gameover-mode').textContent = `WEEKLY BOSS RUSH · ${week}`;
+    $('gameover-mode').classList.remove('hidden');
+  }
+
+  showDailyResult(day) {
+    $('gameover-stats').innerHTML = $('gameover-stats').innerHTML.replace(/(<br>)?(<b[^>]*>NEW BEST SCORE!<\/b>|Best: [^<]*)$/, ''); // endless best isn't relevant here
+    $('gameover-mode').textContent = `DAILY CHALLENGE · ${day}`;
+    $('gameover-mode').classList.remove('hidden');
+  }
+
+  // Leaderboard result on the game over screen (+ name entry until you have a name)
+  showRanks(res, run, name, rushLabel) {
+    const board = { daily: 'today\'s daily', rush: 'this week\'s boss rush' }[run.mode] || 'all heroes';
+    const main = res.local[0];
+    let text = main && main.rank ? `#${main.rank} on this device (${board})` : '';
+    if (res.local[1] && res.local[1].rank) text += ` · #${res.local[1].rank} with this hero`;
+    const on = res.online === 'ok' ? ' · sent to the online leaderboard' : res.online === 'off' ? ''
+      : /^rejected/.test(res.online) ? 'Not ranked: this run failed the sanity check' : ` · online: ${res.online}`;
+    $('lb-result').textContent = text + on;
+    $('lb-result').classList.toggle('hidden', !text && !on);
+    $('lb-name-row').classList.toggle('hidden', !!name);
+  }
+
   // CLOSE CALL: its own callout, low and centred so it never fights the wave banner
   closeCall(sub) {
     const el = $('closecall');
@@ -308,6 +343,10 @@ export class Hud {
       (killer ? `<span class="killer">Killed by ${killer}</span><br>` : '') + build +
       (newBest ? '<b style="color:#3ff6e0">NEW BEST SCORE!</b>' : `Best: ${best.score.toLocaleString()} pts (wave ${best.wave})`);
     $('gameover-scrap').classList.add('hidden');
+    $('gameover-mode').classList.add('hidden');
+    $('lb-result').classList.add('hidden');
+    $('lb-name-row').classList.add('hidden');
+    document.querySelector('#gameover-panel h1').textContent = 'CORE OFFLINE';
     this.setMutator(null);
     this.overlay.classList.remove('hidden');
     this.titlePanel.classList.add('hidden');

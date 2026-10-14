@@ -1,6 +1,6 @@
 {
   "name": "coreburn",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "private": true,
   "description": "COREBURN - endless arena brawler (web + Android via Capacitor)",
   "type": "module",

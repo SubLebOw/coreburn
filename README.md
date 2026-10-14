@@ -319,3 +319,7 @@ Tap **CO-OP** → **HOST** to get a 4-letter room code; friends tap **JOIN** and
 - **Cursed cards**: from wave 10, about 1 pick in 3 offers a cursed card. Each gives a big boon with a real drawback (e.g. Blood Pact: +25% damage, -20% max health) and can only be taken once.
 - **CLOSE CALL**: when a bolt only just misses you, the world slows to 30% for 0.4 s (+2 combo, bonus points). It has a 7 s cooldown and is solo only.
 - **Golden bosses**: about 1 boss in 20 is golden, with a gold shader, 1.5x health and 3x points. It pays a scrap jackpot (150 + 50 per boss number) and has a 40% chance to drop a rare cosmetic (Gilded skin / Aurum talons) that can't be bought.
+
+## Streamer Mode (v1.7.0)
+
+Title screen → **Streamer mode** → channel (default **CalebGCameron**) → **TURN ON**. When the upgrade picker opens, chat votes with `!1`, `!2` or `!3`; tally bars fill on the cards and after 15 s the top card is picked (you can still pick yourself at any time; no votes = you pick). Chat is read **anonymously** with tmi.js (a read-only guest, no login or token), nothing is ever posted, and chat text is never shown on screen. The setting is saved on the device.

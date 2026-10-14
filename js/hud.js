@@ -121,6 +121,7 @@ export class Hud {
     box.style.pointerEvents = 'none';
     setTimeout(() => { box.style.pointerEvents = ''; }, 350);
     this.upgradeOverlay.classList.remove('hidden');
+    return { pickIndex: (i) => cards[i] && pick(cards[i]) }; // Streamer Mode: chat's winning card
   }
 
   // Character select (before every run). Same overlay + card style as the upgrade picker.

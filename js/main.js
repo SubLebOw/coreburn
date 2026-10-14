@@ -28,6 +28,7 @@ import { meta, scrapForRun, RARE_DROPS, SHOP } from './meta.js';
 import { MUTATORS, isMutatorWave, rollMutator } from './mutators.js';
 import { GOLD_TIME } from './golden.js';
 import { ShopUI } from './shop-ui.js';
+import { Twitch } from './twitch.js';
 
 const IS_TOUCH = isTouchDevice();
 if (IS_TOUCH) document.body.classList.add('touch'); // shows the touch controls (see style.css)
@@ -233,7 +234,9 @@ function openUpgradePicker() {
   const loadout = player.loadout;
   if (coop.mode === 'host') coop.beginPicks(); // every friend picks their own card too
   hostPicking = true;
-  hud.showPicker(loadout.maybeCurse(loadout.roll(3), enemies.wave), loadout, (id) => {
+  const hand = loadout.maybeCurse(loadout.roll(3), enemies.wave);
+  const picker = hud.showPicker(hand, loadout, (id) => {
+    twitch.endVote();
     hostPicking = false;
     loadout.apply(id);
     player.applyLoadout();
@@ -245,6 +248,7 @@ function openUpgradePicker() {
     state = 'playing';
     if (coop.mode === 'host' && coop.picksPending) { state = 'upgrade'; coop.checkPicksDone(); }
   });
+  twitch.startVote(hand.length, (i) => picker.pickIndex(i)); // Streamer Mode: chat votes !1 !2 !3
 }
 
 // Arena change: fade to black, swap the arena while it's dark, fade back in
@@ -497,6 +501,28 @@ doubleBtn.addEventListener('click', async (e) => {
   run.lastGain = 0;
 });
 
+// Streamer Mode panel (title screen)
+const twitch = new Twitch();
+world.twitch = twitch;
+const twPanel = document.getElementById('tw-panel');
+const twRender = () => {
+  document.getElementById('tw-toggle').textContent = twitch.enabled ? 'TURN OFF' : 'TURN ON';
+  document.getElementById('tw-status').textContent = !twitch.enabled ? 'Off' : { live: 'Connected: chat votes are on', connecting: 'Connecting…', error: 'Could not reach Twitch chat (check the channel name / connection)' }[twitch.status] || '';
+};
+twPanel.addEventListener('pointerdown', (e) => e.stopPropagation());
+document.getElementById('tw-btn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  document.getElementById('tw-channel').value = twitch.channel;
+  twPanel.classList.remove('hidden'); twRender();
+});
+document.getElementById('tw-toggle').addEventListener('click', (e) => {
+  e.stopPropagation();
+  twitch.setEnabled(!twitch.enabled, document.getElementById('tw-channel').value);
+  twRender();
+});
+const twTimer = setInterval(() => { if (!twPanel.classList.contains('hidden')) twRender(); }, 500);
+document.getElementById('tw-close').addEventListener('click', (e) => { e.stopPropagation(); twPanel.classList.add('hidden'); });
+
 // The unlock shop (title screen)
 const shop = new ShopUI(meta, SHOP, { onClose: () => hud.showTitle(best) });
 hud.refreshScrap = () => shop.refreshTitle();
@@ -648,9 +674,10 @@ function frame() {
     }
   } else if (state === 'upgrade') {
     // paused while the player picks an upgrade (nothing moves)
+    twitch.update(dt);
   } else {
     // title screen: Enter or J also starts a run
-    if (state === 'title' && !shop.isOpen && (input.wasPressed('start') || input.wasPressed('attack'))) showCharacterSelect();
+    if (state === 'title' && !shop.isOpen && twPanel.classList.contains('hidden') && (input.wasPressed('start') || input.wasPressed('attack'))) showCharacterSelect();
     if (state === 'gameover') { enemies.update(dt); projectiles.update(dt, player, arena, effects); } // let things settle
     arena.update(dt, player, world, false);
   }
@@ -678,6 +705,6 @@ frame();
 const LOCAL_DEV = !IS_NATIVE && ['localhost', '127.0.0.1'].includes(location.hostname);
 if (LOCAL_DEV) {
   import('./dev.local.js')
-    .then((m) => m.install({ player, enemies, world, arena, powerups, projectiles, effects, hud, sound, ads, startGame, snapCamera: () => updateCamera(0, true), getScore: () => score, combo, meta }))
+    .then((m) => m.install({ player, enemies, world, arena, powerups, projectiles, effects, hud, sound, ads, startGame, snapCamera: () => updateCamera(0, true), getScore: () => score, combo, meta, twitch }))
     .catch(() => {}); // no dev file = no helpers, that's fine
 }

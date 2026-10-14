@@ -44,6 +44,7 @@
         <div class="bar"><div id="health-fill"></div><span id="health-text">100</span></div>
         <div class="regen">Core recharge active</div>
         <div id="weapon-line"></div>
+        <div id="tw-chip" class="hidden"></div>
       </div>
     </div>
 
@@ -107,6 +108,7 @@
     <div id="upgrade-box">
       <div id="upgrade-title">CHOOSE AN UPGRADE</div>
       <div id="upgrade-sub"></div>
+      <div id="tw-vote" class="hidden"></div>
       <div id="upgrade-cards"></div>
       <div id="upgrade-hint" class="kb-only">Press 1, 2 or 3 · or click a card</div>
     </div>
@@ -151,6 +153,19 @@
     </div>
   </div>
 
+  <!-- Streamer Mode: Twitch chat votes on upgrade cards (read-only, anonymous; see twitch.js) -->
+  <div id="tw-panel" class="hidden">
+    <div class="cp-box">
+      <div class="cp-title">STREAMER MODE</div>
+      <p class="tw-help">Your Twitch chat votes on upgrade cards: viewers type <b>!1</b>, <b>!2</b> or <b>!3</b>. After 15 seconds the top card is picked, or pick one yourself any time. The game reads chat anonymously: no login, nothing is posted, and chat messages are never shown on screen.</p>
+      <div class="cp-codelabel">CHANNEL</div>
+      <div class="cp-join"><input id="tw-channel" maxlength="25" autocomplete="off" spellcheck="false" placeholder="channel"></div>
+      <button id="tw-toggle" class="big-btn">TURN ON</button>
+      <div id="tw-status"></div>
+      <button id="tw-close" class="link-btn">Back</button>
+    </div>
+  </div>
+
   <!-- Title screen + game over screen -->
   <div id="overlay">
     <div class="panel" id="title-panel">
@@ -177,6 +192,7 @@
       <div class="best" id="best-text"></div>
       <div class="footer-links">
         <a href="https://sublebow.github.io/coreburn/privacy.html" target="_blank" rel="noopener">Privacy policy</a>
+        <button id="tw-btn" class="link-btn">Streamer mode</button>
         <button id="privacy-options-btn" class="link-btn hidden">Ad privacy choices</button>
         <span id="version-text"></span>
       </div>

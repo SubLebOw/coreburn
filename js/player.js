@@ -378,6 +378,7 @@ export class Player {
       this.world.effects.spawnSparks(e.position.clone().setY(1.4), 0xfff27a, 5, 8);
     }
     e.hit(dmg, kx, kz, heavy);
+    this.world.onComboHit?.(); // COMBO +1 per hit
     if (kind === 'slash' && Math.random() < s.twin) {
       e.hit(dmg, 0, 0, false); // Twin Strike
       this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0x9ab8ff, 4);

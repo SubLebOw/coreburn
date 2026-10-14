@@ -77,6 +77,16 @@ round badges with a draining timer ring under your health bar (on phones too).
 | MAGNET | green ring | 10 s | Pulls pickups in from 10 m, and every kill drops a +5 heal orb that flies to you |
 | ARC TALONS | blue crystal | 10 s | Slashes and blinks chain lightning to up to 3 nearby enemies (60% damage) |
 
+## Combo multiplier
+
+Every talon hit adds +1 to your **combo** and every kill adds +1 more. Land nothing for 3 seconds and the combo drops to 0. Getting hurt halves it. Your score multiplier steps up with the combo and applies to kill, boss and wave-clear points:
+
+| combo | 0 | 10 | 25 | 50 | 100 | 175 | 275 | 400 |
+|---|---|---|---|---|---|---|---|---|
+| score | x1 | x2 | x3 | x4 | x5 | x6 | x7 | x8 |
+
+Milestones pop a callout (NICE, SAVAGE, BRUTAL, UNSTOPPABLE, GODLIKE, MELTDOWN, COREBURN!). Your best combo shows on the game over screen and in the share text. The code is in `js/combo.js`.
+
 ## Weapon upgrades (after every boss)
 
 Every boss you beat pauses the game and offers **3 random upgrade cards**. Tap a card, click it, or press **1 / 2 / 3**. Every pick also raises your **weapon tier by 1**. The talons grow longer and glow brighter, and their colour steps teal → cyan → white-gold → violet → crimson.

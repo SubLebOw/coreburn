@@ -20,6 +20,7 @@ import { checkForUpdates } from './updater.js';
 import { GAME_VERSION } from './version.js';
 import { shareScore, copyScore } from './share.js';
 import { IS_NATIVE } from './native.js';
+import { Combo } from './combo.js';
 
 const IS_TOUCH = isTouchDevice();
 if (IS_TOUCH) document.body.classList.add('touch'); // shows the touch controls (see style.css)
@@ -73,6 +74,7 @@ let timeScale = 1;          // 0.35 during SLOW-MO (eases in and out)
 let slowmoOn = false;
 let transition = null;      // arena change in progress { t, index, loop, wave, swapped }
 const TRANSITION_TIME = 0.9;
+const combo = new Combo();  // hit streak -> score multiplier (see combo.js)
 let upgradeTimer = 0;       // counts down after a boss dies, then the upgrade picker opens
 const fadeEl = document.getElementById('fade');
 const best = JSON.parse(localStorage.getItem('coreburn-best') || '{"score":0,"wave":0}');
@@ -90,11 +92,13 @@ const world = {
   shake(amount) { shakeAmount = Math.max(shakeAmount, amount); },
   sfx(name, option) { sound.play(name, option); },
   hitstop(seconds) { hitstopTimer = Math.max(hitstopTimer, seconds); }, // tiny freeze = punchy hits
-  onPlayerHurt() { hud.flashDamage(); world.shake(0.2); },
+  onPlayerHurt() { hud.flashDamage(); world.shake(0.2); combo.hurt(); },
+  onComboHit() { combo.add(1); },
   onEnemyKilled(e) {
     kills++;
     sound.play('enemyDeath');
-    score += e.points;
+    combo.add(1);
+    score += e.points * combo.mult;
     powerups.onKill(e);
     // Hive splitters burst into mites (unless they're crumbling because the boss died)
     if (e.type.splits && !e.crumble) {
@@ -127,12 +131,12 @@ const world = {
   },
   onBossKilled(boss, parts = [boss]) {
     // Reward: big heal + score bonus, a power-up, and its minions crumble
-    score += boss.points;
+    score += boss.points * combo.mult;
     kills += parts.length;
     world.player.heal(60);
     enemies.killAllAdds();
     world.shake(0.6);
-    hud.showBanner('BOSS DOWN!', `+${boss.points} pts · +60 health`);
+    hud.showBanner('BOSS DOWN!', `+${boss.points * combo.mult} pts · +60 health`);
     sound.play('bossDefeated');
     sound.setIntensity(1);
     powerups.onKill(boss);
@@ -150,7 +154,7 @@ const world = {
     hud.showToast(def.name + '!', def.hint, '#' + def.color.toString(16).padStart(6, '0'));
   },
   onWaveCleared(n) {
-    const bonus = 25 * n;
+    const bonus = 25 * n * combo.mult;
     score += bonus;
     if (!isBossWave(n)) {
       world.player.heal(25);
@@ -215,6 +219,7 @@ function updateTransition(dt) {
 function startGame() {
   kills = 0;
   score = 0;
+  combo.reset();
   deathTimer = 0;
   effects.reset();
   projectiles.reset();
@@ -247,12 +252,12 @@ function gameOver() {
     localStorage.setItem('coreburn-best', JSON.stringify(best));
   }
   const killer = player.killedBy ? player.killedBy.killerName : null; // e.g. "the Furnace Deacon"
-  lastRun = { wave: enemies.wave, score, killer, place: arena.current.place, tier: player.loadout.tier };
+  lastRun = { wave: enemies.wave, score, killer, place: arena.current.place, tier: player.loadout.tier, combo: combo.best };
   upgradeTimer = 0;
   powerups.reset();
   setSlowmo(false);
   timeScale = 1;
-  hud.showGameOver(score, enemies.wave, kills, best, newBest, killer, lastRun.place, player.loadout);
+  hud.showGameOver(score, enemies.wave, kills, best, newBest, killer, lastRun.place, player.loadout, combo.best);
   copyBtn.textContent = 'COPY';
   sound.play('gameOver');
   sound.setIntensity(0);
@@ -413,6 +418,7 @@ function frame() {
       projectiles.update(worldDt, player, arena, effects);
       arena.update(worldDt, player, world, true);
       powerups.update(dt);
+      combo.update(worldDt);
       if (upgradeTimer > 0) {
         upgradeTimer -= dt;
         if (upgradeTimer <= 0 && !player.dead) openUpgradePicker();
@@ -433,6 +439,7 @@ function frame() {
 
   if (state !== 'upgrade') effects.update(worldDt);
   updateCamera(dt);
+  hud.updateCombo(combo, state === 'playing');
   hud.update(player, Math.max(1, enemies.wave), kills, score, state === 'playing' ? enemies.bossBar : null, powerups.hudList);
   input.endFrame();
   renderer.render(scene, camera);
@@ -445,6 +452,6 @@ frame();
 const LOCAL_DEV = !IS_NATIVE && ['localhost', '127.0.0.1'].includes(location.hostname);
 if (LOCAL_DEV) {
   import('./dev.local.js')
-    .then((m) => m.install({ player, enemies, world, arena, powerups, projectiles, effects, hud, sound, ads, startGame, snapCamera: () => updateCamera(0, true), getScore: () => score }))
+    .then((m) => m.install({ player, enemies, world, arena, powerups, projectiles, effects, hud, sound, ads, startGame, snapCamera: () => updateCamera(0, true), getScore: () => score, combo }))
     .catch(() => {}); // no dev file = no helpers, that's fine
 }

@@ -191,12 +191,12 @@ export class Hud {
     this.gameoverPanel.classList.add('hidden');
   }
 
-  showGameOver(score, wave, kills, best, newBest, killer = null, place = null, loadout = null) {
+  showGameOver(score, wave, kills, best, newBest, killer = null, place = null, loadout = null, bestCombo = 0) {
     const build = loadout && loadout.tier > 0
       ? `<span class="build">Tier ${loadout.tier} talons · ${loadout.picked.map((p) => `${p.name} ${p.level}`).join(', ')}</span><br>` : '';
     $('gameover-score').textContent = `${score.toLocaleString()} pts`;
     $('gameover-stats').innerHTML =
-      `Reached <b>wave ${wave}</b>${place ? ` in ${place}` : ''} · <b>${kills}</b> kills<br>` +
+      `Reached <b>wave ${wave}</b>${place ? ` in ${place}` : ''} · <b>${kills}</b> kills · best combo <b>${bestCombo}</b><br>` +
       (killer ? `<span class="killer">Killed by ${killer}</span><br>` : '') + build +
       (newBest ? '<b style="color:#3ff6e0">NEW BEST SCORE!</b>' : `Best: ${best.score.toLocaleString()} pts (wave ${best.wave})`);
     this.overlay.classList.remove('hidden');
@@ -204,6 +204,33 @@ export class Hud {
     this.gameoverPanel.classList.remove('hidden');
     this.bossBar.classList.add('hidden');
     this.last.showBoss = false;
+  }
+
+  // COMBO counter: big number + multiplier, a draining timer bar, a pop on tier-up, colour per tier
+  updateCombo(combo, playing) {
+    if (!this.combo) {
+      this.combo = $('combo'); this.comboCount = $('combo-count'); this.comboMult = $('combo-mult');
+      this.comboFill = $('combo-fill'); this.comboCall = $('combo-callout'); this.comboLast = {};
+    }
+    const L = this.comboLast;
+    for (const ev of combo.events) {
+      if (ev.type === 'tierUp') { this.combo.classList.remove('pop'); void this.combo.offsetWidth; this.combo.classList.add('pop'); }
+      if (ev.type === 'callout') {
+        this.comboCall.textContent = ev.text;
+        this.comboCall.classList.remove('show'); void this.comboCall.offsetWidth; this.comboCall.classList.add('show');
+      }
+    }
+    combo.events.length = 0;
+    const show = playing && combo.count > 0;
+    if (L.show !== show) { L.show = show; this.combo.classList.toggle('visible', show); }
+    if (L.count !== combo.count) { L.count = combo.count; this.comboCount.textContent = combo.count; }
+    if (L.mult !== combo.mult) {
+      L.mult = combo.mult;
+      this.comboMult.textContent = 'x' + combo.mult;
+      this.combo.style.setProperty('--combo-hue', String([175, 190, 50, 30, 300, 350, 0, 0][combo.mult - 1] ?? 0));
+      this.combo.dataset.mult = combo.mult;
+    }
+    this.comboFill.style.transform = `scaleX(${combo.fraction.toFixed(3)})`;
   }
 
   hideOverlay() { this.overlay.classList.add('hidden'); }

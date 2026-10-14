@@ -141,7 +141,7 @@ export class PowerUps {
 
   refreshBlade() {
     const player = this.world.player;
-    player.setBladeColor(this.has('fury') ? 0xff4a3a : this.has('arc') ? 0x9ac4ff : 0x7ffff2);
+    player.setBladeColor(this.has('fury') ? 0xff4a3a : this.has('arc') ? 0x9ac4ff : player.tierColor);
   }
 
   // SHIELD: returns true if the hit was blocked

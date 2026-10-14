@@ -4,8 +4,10 @@
 //   - blink dash: untouchable, and hurts enemies you pass through (K / Space / BLINK)
 //   - overdrive spin attack with a cooldown (L / OVERDRIVE)
 //   - core recharge: health slowly comes back by itself
+//   - weapon tier + upgrade cards picked after each boss (see upgrades.js)
 //   - power-ups (see powerups.js) can double his damage, shield him or electrify his talons
 import * as THREE from 'three';
+import { Loadout, tierColor } from './upgrades.js';
 
 // The camera looks at the arena from the +X/+Z corner. These are the floor directions
 // that match "up the screen" and "right on the screen", so W always moves up the screen.
@@ -76,6 +78,20 @@ export class Player {
     this.bubble.visible = false;
     this.model.root.add(this.bubble);
 
+    // Blink Trail upgrade: glowing patches left behind by a blink (pooled)
+    this.trail = [];
+    const trailMat = new THREE.MeshBasicMaterial({ color: 0x3fd0ff, transparent: true, opacity: 0.6, depthWrite: false });
+    const trailGeo = new THREE.CircleGeometry(0.75, 12);
+    for (let i = 0; i < 14; i++) {
+      const m = new THREE.Mesh(trailGeo, trailMat);
+      m.rotation.x = -Math.PI / 2;
+      m.visible = false;
+      scene.add(m);
+      this.trail.push({ mesh: m, life: 0 });
+    }
+    this.trailMat = trailMat;
+
+    this.loadout = new Loadout();
     this.reset();
   }
 
@@ -100,9 +116,16 @@ export class Player {
     this.lastHitBy = null;
     this.killedBy = null;
     this.damageMult = 1;              // 2 while FURY is active
+    this.loadout.reset();
+    this.applyLoadout();
+    this.hp = this.maxHp;
+    this.dashCharges = this.stats.dashCharges;
+    this.trailTick = 0;
+    this.leechBudget = 0;
+    for (const t of this.trail) { t.life = 0; t.mesh.visible = false; }
     this.slide = new THREE.Vector3(); // momentum on ice
     this.bubble.visible = false;
-    this.setBladeColor(0x7ffff2);
+    this.setBladeColor(this.tierColor);
     this.model.body.rotation.set(0, 0, 0);
     this.model.body.position.set(0, 0, 0);
     this.spinRing.visible = false;
@@ -118,7 +141,12 @@ export class Player {
     if (this.dead) { this.animateDeath(dt); return; }
 
     // ----- Timers -----
-    this.dashCooldown = Math.max(0, this.dashCooldown - dt);
+    // blink charges refill one at a time
+    if (this.dashCharges < this.stats.dashCharges) {
+      this.dashCooldown -= dt;
+      if (this.dashCooldown <= 0) { this.dashCharges++; this.dashCooldown = this.dashCharges < this.stats.dashCharges ? this.dashCooldownMax : 0; }
+    } else this.dashCooldown = 0;
+    this.leechBudget = Math.max(0, this.leechBudget - dt * 6); // Core Leech: at most ~6 hp per second
     this.spinCooldown = Math.max(0, this.spinCooldown - dt);
     this.comboGrace -= dt;
     this.attackBuffer -= dt;
@@ -127,7 +155,7 @@ export class Player {
     this.timeSinceHit += dt;
 
     // ----- Core recharge: slow regen, faster if you avoid getting hit for 3 seconds -----
-    const regen = this.timeSinceHit > 3 ? 5 : 1.5;
+    const regen = (this.timeSinceHit > 3 ? 5 : 1.5) * this.stats.regen;
     this.hp = Math.min(this.maxHp, this.hp + regen * dt);
 
     // ----- Turn joystick/keys into a direction on the floor -----
@@ -141,7 +169,7 @@ export class Player {
     if (input.attackHeld) this.attackBuffer = Math.max(this.attackBuffer, 0.05);
 
     // Dash and spin can interrupt normal movement or attacks
-    if (input.wasPressed('dash') && this.dashCooldown <= 0 && (this.state === 'normal' || this.state === 'attack')) {
+    if (input.wasPressed('dash') && this.dashCharges > 0 && (this.state === 'normal' || this.state === 'attack')) {
       this.startDash(moving ? dir.clone().normalize() : this.facingDir);
     }
     if (input.wasPressed('spin') && this.spinCooldown <= 0 && this.state !== 'dash' && this.state !== 'spin') {
@@ -154,7 +182,7 @@ export class Player {
     switch (this.state) {
       case 'normal':
         if (moving) {
-          this.velocity.copy(dir).multiplyScalar(MOVE_SPEED);
+          this.velocity.copy(dir).multiplyScalar(MOVE_SPEED * this.stats.speed);
           this.turnTowards(Math.atan2(dir.x, dir.z), dt, 20);
         }
         if (this.attackBuffer > 0) {
@@ -182,20 +210,23 @@ export class Player {
       case 'dash':
         this.velocity.copy(this.dashDir).multiplyScalar(DASH_SPEED);
         this.dashHits();
-        if (this.stateTime >= DASH_TIME) this.state = 'normal';
+        if (this.stats.trail > 0) this.dropTrail();
+        if (this.stateTime >= DASH_TIME * this.stats.dashTime) this.state = 'normal';
         break;
 
       case 'spin':
-        if (moving) this.velocity.copy(dir).multiplyScalar(MOVE_SPEED * 0.75);
+        if (moving) this.velocity.copy(dir).multiplyScalar(MOVE_SPEED * 0.75 * this.stats.speed);
         this.spinTick -= dt;
         if (this.spinTick <= 0) { this.spinTick = 0.15; this.spinHits(); }
-        if (this.stateTime >= SPIN_TIME) {
+        if (this.stateTime >= SPIN_TIME + this.stats.spinTime) {
           this.state = 'normal';
           this.spinRing.visible = false;
           this.model.body.rotation.y = 0;
         }
         break;
     }
+
+    this.updateTrail(dt);
 
     // ----- Ice: you keep sliding and turn slowly (not while blinking) -----
     if (this.state !== 'dash' && this.world.arena.surfaceAt(this.position.x, this.position.z) === 'ice') {
@@ -241,20 +272,38 @@ export class Player {
 
   doSlashHit(hit) {
     const forward = this.facingDir;
+    const s = this.stats;
+    const range = hit.range * s.range;
+    const arcDot = 0.35 - 0.1 * s.arcLevel; // Wide Arc swings wider
     let hitSomething = false;
+    const struck = new Set();
     for (const e of this.world.enemies.list) {
       if (!e.canBeHit) continue;
       const to = new THREE.Vector3().subVectors(e.position, this.position);
       to.y = 0;
       const dist = to.length();
-      if (dist > hit.range + e.radius) continue;
+      if (dist > range + e.radius) continue;
       to.normalize();
-      // only hit enemies in front of us (about 140 degree arc), or really close ones
-      if (forward.dot(to) < 0.35 && dist > 1) continue;
-      e.hit(hit.damage * this.damageMult, to.x * hit.knockback, to.z * hit.knockback, this.comboStep === 3);
-      this.world.onTalonHit?.(e, hit.damage * this.damageMult);
+      // only hit enemies in front of us (about 140 degree arc, wider with Wide Arc), or really close ones
+      if (forward.dot(to) < arcDot && dist > 1) continue;
+      this.strike(e, hit.damage, to.x * hit.knockback, to.z * hit.knockback, this.comboStep === 3, 'slash');
       this.world.effects.spawnSparks(e.position.clone().setY(1.1), this.comboStep === 3 ? 0xffa040 : 0x9ffff5, this.comboStep === 3 ? 12 : 6);
+      struck.add(e);
       hitSomething = true;
+    }
+    // Shockwave Finisher: the 3rd hit sends out a ring that hits everything around you
+    if (this.comboStep === 3 && s.shock > 0) {
+      const radius = 2.8 + 0.5 * s.shock, pct = 0.3 + 0.15 * s.shock;
+      this.world.effects.spawnRing(this.position, 0xffd040, radius, 0.35);
+      for (const e of this.world.enemies.list) {
+        if (!e.canBeHit || struck.has(e)) continue;
+        const to = new THREE.Vector3().subVectors(e.position, this.position).setY(0);
+        const d = to.length();
+        if (d > radius + e.radius) continue;
+        to.normalize();
+        this.strike(e, hit.damage * pct, to.x * 8, to.z * 8, false, 'shock');
+        hitSomething = true;
+      }
     }
     if (hitSomething) {
       this.world.sfx('hit');
@@ -268,7 +317,8 @@ export class Player {
     this.stateTime = 0;
     this.dashDir = direction.clone();
     this.facing = Math.atan2(direction.x, direction.z);
-    this.dashCooldown = DASH_COOLDOWN;
+    this.dashCharges--;
+    if (this.dashCooldown <= 0) this.dashCooldown = this.dashCooldownMax;
     this.dashHitSet = new Set();
     this.world.effects.spawnRing(this.position, 0x3ff6e0, 1.5, 0.3);
     this.world.sfx('blink');
@@ -282,8 +332,7 @@ export class Player {
         // knock enemies off to the side of the dash path
         const side = new THREE.Vector3(-this.dashDir.z, 0, this.dashDir.x);
         if (side.dot(new THREE.Vector3().subVectors(e.position, this.position)) < 0) side.negate();
-        e.hit(10 * this.damageMult, side.x * 7, side.z * 7, false);
-        this.world.onTalonHit?.(e, 10 * this.damageMult);
+        this.strike(e, 10 * this.stats.dashDmg, side.x * 7, side.z * 7, false, 'dash');
         this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0x9ffff5, 6);
         this.world.shake(0.12);
         this.world.sfx('hit');
@@ -295,7 +344,8 @@ export class Player {
     this.state = 'spin';
     this.stateTime = 0;
     this.spinTick = 0;
-    this.spinCooldown = SPIN_COOLDOWN;
+    this.spinCooldown = this.spinCooldownMax;
+    this.spinRing.scale.setScalar(this.stats.spinRadius);
     this.spinRing.visible = true;
     this.world.effects.spawnRing(this.position, 0xe0702a, 4, 0.5);
     this.world.shake(0.25);
@@ -308,14 +358,128 @@ export class Player {
       const to = new THREE.Vector3().subVectors(e.position, this.position);
       to.y = 0;
       const dist = to.length();
-      if (dist < 3.2 + e.radius) {
+      if (dist < 3.2 * this.stats.spinRadius + e.radius) {
         to.normalize();
-        e.hit(8 * this.damageMult, to.x * 7, to.z * 7, true);
+        this.strike(e, 8 * this.stats.spinDmg, to.x * 7, to.z * 7, true, 'spin');
         this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0xff8040, 4);
         this.world.sfx('hit');
       }
     }
   }
+
+  // Every hit Sarrow lands goes through here: weapon tier, perks, FURY, crits, double hits, leech, chains.
+  // kind: 'slash' | 'dash' | 'spin' | 'shock' | 'trail' | 'chain'
+  strike(e, base, kx, kz, heavy, kind) {
+    const s = this.stats;
+    let dmg = base * s.dmg * this.damageMult;
+    const crit = kind !== 'trail' && Math.random() < s.crit;
+    if (crit) {
+      dmg *= 1.8;
+      this.world.effects.spawnSparks(e.position.clone().setY(1.4), 0xfff27a, 5, 8);
+    }
+    e.hit(dmg, kx, kz, heavy);
+    if (kind === 'slash' && Math.random() < s.twin) {
+      e.hit(dmg, 0, 0, false); // Twin Strike
+      this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0x9ab8ff, 4);
+    }
+    // healing (capped per second so it can't make you unkillable)
+    if ((kind === 'slash' || kind === 'dash') && s.leech > 0) this.leechHeal(s.leech, 6);
+    if (kind === 'spin' && s.spinLeech > 0) this.leechHeal(s.spinLeech, 10);
+    if (kind === 'slash' || kind === 'dash') {
+      this.world.onTalonHit?.(e, dmg); // ARC TALONS power-up
+      if (Math.random() < s.storm) this.stormChain(e, dmg * 0.35);
+    }
+  }
+
+  leechHeal(amount, perSecond) {
+    const room = perSecond - this.leechBudget;
+    if (room <= 0) return;
+    const h = Math.min(amount, room);
+    this.leechBudget += h;
+    this.heal(h);
+  }
+
+  // Storm Talons: a small chain of lightning to the 2 nearest other enemies
+  stormChain(from, dmg) {
+    let src = from;
+    const done = new Set([from]);
+    for (let i = 0; i < 2; i++) {
+      let best = null, bestD = 5;
+      for (const e of this.world.enemies.list) {
+        if (!e.canBeHit || done.has(e)) continue;
+        const d = e.position.distanceTo(src.position);
+        if (d < bestD) { best = e; bestD = d; }
+      }
+      if (!best) break;
+      done.add(best);
+      this.world.effects.spawnZap(src.position, best.position, 0x8ab4ff);
+      best.hit(dmg, 0, 0, false);
+      src = best;
+    }
+    if (done.size > 1) this.world.sfx('zap');
+  }
+
+  // Blink Trail: drop a burning patch every few centimetres while blinking
+  dropTrail() {
+    const last = this.lastTrailPos;
+    if (last && last.distanceTo(this.position) < 0.9) return;
+    const t = this.trail.find((x) => x.life <= 0) || this.trail[0];
+    t.life = 1.6;
+    t.mesh.position.set(this.position.x, 0.06, this.position.z);
+    t.mesh.visible = true;
+    this.lastTrailPos = this.position.clone();
+  }
+
+  updateTrail(dt) {
+    let any = false;
+    for (const t of this.trail) {
+      if (t.life <= 0) continue;
+      t.life -= dt;
+      any = true;
+      if (t.life <= 0) t.mesh.visible = false;
+    }
+    if (!any) { this.lastTrailPos = null; return; }
+    this.trailMat.opacity = 0.45 + 0.15 * Math.sin(performance.now() / 60);
+    this.trailTick -= dt;
+    if (this.trailTick > 0) return;
+    this.trailTick = 0.3;
+    const dmg = 4 + 3 * this.stats.trail; // per tick, before weapon tier
+    for (const e of this.world.enemies.list) {
+      if (!e.canBeHit) continue;
+      if (this.trail.some((t) => t.life > 0 && Math.hypot(t.mesh.position.x - e.position.x, t.mesh.position.z - e.position.z) < 0.75 + e.radius)) {
+        this.strike(e, dmg, 0, 0, false, 'trail');
+      }
+    }
+  }
+
+  // Called after an upgrade is picked (and on reset): apply stats + update the talons' look
+  applyLoadout() {
+    const s = this.stats = this.loadout.stats;
+    const oldMax = this.maxHp || 100;
+    this.maxHp = 100 + s.maxHpBonus;
+    if (this.hp !== undefined) this.hp = Math.min(this.maxHp, this.hp + Math.max(0, this.maxHp - oldMax));
+    this.dashCooldownMax = DASH_COOLDOWN * s.dashCd;
+    this.spinCooldownMax = SPIN_COOLDOWN * s.spinCd;
+    if (this.dashCharges !== undefined) this.dashCharges = Math.min(s.dashCharges, this.dashCharges + (s.dashCharges > this.prevCharges ? 1 : 0));
+    this.prevCharges = s.dashCharges;
+    // talons: longer, glowier, and colour-cycle with the tier
+    const tier = this.loadout.tier;
+    this.tierColor = tierColor(tier);
+    const len = 1 + Math.min(12, tier) * 0.05;
+    for (const b of this.model.blades) { b.scale.y = 0.72 * len; b.position.y = -0.77 - 0.36 * len; }
+    for (const g of this.model.halos) {
+      g.visible = tier > 0;
+      g.scale.set(0.12 + Math.min(10, tier) * 0.008, 0.8 * len, 0.18 + Math.min(10, tier) * 0.008);
+      g.position.y = -0.77 - 0.4 * len;
+      g.material.color.setHex(this.tierColor);
+      g.material.opacity = Math.min(0.55, 0.12 + tier * 0.035);
+    }
+    this.spinRing.material.color.setHex(tier > 0 ? this.tierColor : 0x3ff6e0); // overdrive ring matches the talons
+    this.world.powerups ? this.world.powerups.refreshBlade() : this.setBladeColor(this.tierColor);
+  }
+
+  // What the HUD shows on the BLINK button: ready while you have a charge
+  get dashCooldownShown() { return this.dashCharges > 0 ? 0 : this.dashCooldown; }
 
   findNearestEnemy(maxDist) {
     let best = null, bestDist = maxDist;
@@ -366,6 +530,7 @@ export class Player {
     this.stateTime = 0;
     this.hp = this.maxHp * 0.5;
     this.invulnTimer = 2.5;
+    this.dashCharges = this.stats.dashCharges;
     this.timeSinceHit = 0;
     this.model.body.rotation.set(0, 0, 0);
     this.model.body.position.set(0, 0, 0);
@@ -409,8 +574,9 @@ export class Player {
       }
       if (t > 0.3 && t < 0.6) {
         this.slashArc.material.opacity = this.comboStep === 3 ? 0.75 : 0.55;
-        this.slashArc.material.color.setHex(this.damageMult > 1 ? 0xff3a2a : (this.comboStep === 3 ? 0xffa040 : this.bladeColor));
-        this.slashArc.scale.set(this.comboStep === 2 ? -1 : 1, 1, 1).multiplyScalar(this.comboStep === 3 ? 1.2 : 1);
+        // finisher is orange at first; from weapon tier 3 every swing glows in the talons' tier colour
+        this.slashArc.material.color.setHex(this.damageMult > 1 ? 0xff3a2a : (this.comboStep === 3 && this.loadout.tier < 3 ? 0xffa040 : this.bladeColor));
+        this.slashArc.scale.set(this.comboStep === 2 ? -1 : 1, 1, 1).multiplyScalar((this.comboStep === 3 ? 1.2 : 1) * this.stats.range);
       }
     } else if (this.state === 'dash') {
       m.body.rotation.x = 0.5; // lean forward
@@ -538,6 +704,7 @@ function buildHero() {
   drape.rotation.x = 0.55;
 
   // Arms with metal gauntlets and two glowing energy talons each (group origin = shoulder)
+  const blades = [], halos = [];
   function arm(x) {
     const g = new THREE.Group();
     g.position.set(x, 1.62, 0);
@@ -546,7 +713,11 @@ function buildHero() {
     box(g, mats.metal, 0.28, 0.3, 0.3, 0, -0.66, 0);       // gauntlet
     box(g, mats.orange, 0.29, 0.06, 0.31, 0, -0.55, 0, false); // gauntlet stripe
     for (const cx of [-0.07, 0.07]) {
-      box(g, mats.blade, 0.04, 0.72, 0.1, cx, -1.13, 0.03, false); // energy talon
+      blades.push(box(g, mats.blade, 0.04, 0.72, 0.1, cx, -1.13, 0.03, false)); // energy talon
+      // soft glow around the talon (grows with the weapon tier)
+      const halo = box(g, new THREE.MeshBasicMaterial({ color: 0x7ffff2, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }), 0.12, 0.8, 0.18, cx, -1.13, 0.03, false);
+      halo.visible = false;
+      halos.push(halo);
     }
     return g;
   }
@@ -554,5 +725,5 @@ function buildHero() {
   const armR = arm(-0.46);
 
   const flashMats = [mats.coat, mats.coatDark, mats.pants, mats.leather, mats.orange, mats.metal];
-  return { root, body, head, core, legL, legR, armL, armR, flashMats, blade: mats.blade };
+  return { root, body, head, core, legL, legR, armL, armR, flashMats, blade: mats.blade, blades, halos };
 }

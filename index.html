@@ -43,6 +43,7 @@
         <div class="name">SARROW</div>
         <div class="bar"><div id="health-fill"></div><span id="health-text">100</span></div>
         <div class="regen">Core recharge active</div>
+        <div id="weapon-line"></div>
       </div>
     </div>
 
@@ -93,6 +94,16 @@
       <button id="btn-slash" class="tbtn">SLASH</button>
       <button id="btn-dash" class="tbtn ready"><span class="cd-text"></span><span class="lbl">BLINK</span></button>
       <button id="btn-spin" class="tbtn ready"><span class="cd-text"></span><span class="lbl">OVER<br>DRIVE</span></button>
+    </div>
+  </div>
+
+  <!-- Upgrade picker: shown after every boss (filled in by hud.js) -->
+  <div id="upgrade-overlay" class="hidden">
+    <div id="upgrade-box">
+      <div id="upgrade-title">CHOOSE AN UPGRADE</div>
+      <div id="upgrade-sub"></div>
+      <div id="upgrade-cards"></div>
+      <div id="upgrade-hint" class="kb-only">Press 1, 2 or 3 · or click a card</div>
     </div>
   </div>
 

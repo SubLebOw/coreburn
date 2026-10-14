@@ -60,7 +60,7 @@ const projectiles = new Projectiles(scene);
 const env = { hemi, sun, baseHemi: 1.2 };
 const arena = createArena(scene, env);
 
-let state = 'title'; // 'title' | 'playing' | 'gameover'
+let state = 'title'; // 'title' | 'playing' | 'upgrade' (picker open, game paused) | 'gameover'
 let kills = 0;
 let score = 0;
 let hitstopTimer = 0;
@@ -73,6 +73,7 @@ let timeScale = 1;          // 0.35 during SLOW-MO (eases in and out)
 let slowmoOn = false;
 let transition = null;      // arena change in progress { t, index, loop, wave, swapped }
 const TRANSITION_TIME = 0.9;
+let upgradeTimer = 0;       // counts down after a boss dies, then the upgrade picker opens
 const fadeEl = document.getElementById('fade');
 const best = JSON.parse(localStorage.getItem('coreburn-best') || '{"score":0,"wave":0}');
 
@@ -135,6 +136,7 @@ const world = {
     sound.play('bossDefeated');
     sound.setIntensity(1);
     powerups.onKill(boss);
+    upgradeTimer = 1.3; // let the BOSS DOWN moment land, then pause for the upgrade picker
   },
   // One of the Forge Twins fell; the other one gets angry
   onTwinDown(fallen, survivor) {
@@ -172,6 +174,22 @@ function setSlowmo(on) {
   if (state === 'playing') sound.play(on ? 'slowmoIn' : 'slowmoOut');
 }
 
+// Upgrade picker: pause, show 3 cards, apply the pick (weapon tier +1 and the card's perk)
+function openUpgradePicker() {
+  state = 'upgrade';
+  const loadout = player.loadout;
+  hud.showPicker(loadout.roll(3), loadout, (id) => {
+    loadout.apply(id);
+    player.applyLoadout();
+    if (id === 'patch') player.heal(player.maxHp * 0.35);
+    const def = loadout.def(id);
+    hud.showToast(`TIER ${loadout.tier} TALONS`, `${def.name}${id === 'patch' ? '' : ' Lv ' + loadout.level(id)}`, '#' + def.color.toString(16).padStart(6, '0'));
+    world.effects.spawnRing(player.position, player.tierColor, 3, 0.5);
+    sound.play('powerup');
+    state = 'playing';
+  });
+}
+
 // Arena change: fade to black, swap the arena while it's dark, fade back in
 function updateTransition(dt) {
   transition.t += dt;
@@ -203,6 +221,8 @@ function startGame() {
   enemies.reset();
   player.reset();
   powerups.reset();
+  hud.hidePicker();
+  upgradeTimer = 0;
   transition = null;
   fadeEl.style.opacity = 0;
   timeScale = 1;
@@ -215,7 +235,7 @@ function startGame() {
   enemies.startWave(1);
 }
 
-let lastRun = { wave: 1, score: 0, killer: null, place: null }; // what the share buttons talk about
+let lastRun = { wave: 1, score: 0, killer: null, place: null, tier: 0 }; // what the share buttons talk about
 
 function gameOver() {
   state = 'gameover';
@@ -227,11 +247,12 @@ function gameOver() {
     localStorage.setItem('coreburn-best', JSON.stringify(best));
   }
   const killer = player.killedBy ? player.killedBy.killerName : null; // e.g. "the Furnace Deacon"
-  lastRun = { wave: enemies.wave, score, killer, place: arena.current.place };
+  lastRun = { wave: enemies.wave, score, killer, place: arena.current.place, tier: player.loadout.tier };
+  upgradeTimer = 0;
   powerups.reset();
   setSlowmo(false);
   timeScale = 1;
-  hud.showGameOver(score, enemies.wave, kills, best, newBest, killer, lastRun.place);
+  hud.showGameOver(score, enemies.wave, kills, best, newBest, killer, lastRun.place, player.loadout);
   copyBtn.textContent = 'COPY';
   sound.play('gameOver');
   sound.setIntensity(0);
@@ -392,11 +413,17 @@ function frame() {
       projectiles.update(worldDt, player, arena, effects);
       arena.update(worldDt, player, world, true);
       powerups.update(dt);
+      if (upgradeTimer > 0) {
+        upgradeTimer -= dt;
+        if (upgradeTimer <= 0 && !player.dead) openUpgradePicker();
+      }
     }
     if (player.dead) {
       deathTimer += dt;
       if (deathTimer > 1.6) gameOver();
     }
+  } else if (state === 'upgrade') {
+    // paused while the player picks an upgrade (nothing moves)
   } else {
     // title screen: Enter or J also starts a run
     if (state === 'title' && (input.wasPressed('start') || input.wasPressed('attack'))) startGame();
@@ -404,7 +431,7 @@ function frame() {
     arena.update(dt, player, world, false);
   }
 
-  effects.update(worldDt);
+  if (state !== 'upgrade') effects.update(worldDt);
   updateCamera(dt);
   hud.update(player, Math.max(1, enemies.wave), kills, score, state === 'playing' ? enemies.bossBar : null, powerups.hudList);
   input.endFrame();

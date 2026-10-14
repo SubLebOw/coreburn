@@ -77,6 +77,38 @@ round badges with a draining timer ring under your health bar (on phones too).
 | MAGNET | green ring | 10 s | Pulls pickups in from 10 m, and every kill drops a +5 heal orb that flies to you |
 | ARC TALONS | blue crystal | 10 s | Slashes and blinks chain lightning to up to 3 nearby enemies (60% damage) |
 
+## Weapon upgrades (after every boss)
+
+Every boss you beat pauses the game and offers **3 random upgrade cards**. Tap a card, click it, or press **1 / 2 / 3**. Every pick also raises your **weapon tier by 1**. The talons grow longer and glow brighter, and their colour steps teal → cyan → white-gold → violet → crimson.
+
+**Even scaling (js/upgrades.js).** Enemy HP grows as `x(1 + 0.14·(wave-1))`, and a boss arrives every 5 waves, so each boss adds 0.70 to enemy HP. Your weapon matches that exactly:
+
+```
+weaponMult(tier) = 1 + 0.70 · tier        // tier = bosses beaten
+damage = base · weaponMult(tier) · perks  // perks are capped, max ~2x single-target
+```
+
+The base tier alone keeps time-to-kill flat across the whole run. Perks are the extra edge, and every perk has a level cap. Once a card is maxed it leaves the pool. When fewer than 3 cards are left, **Reactor Patch** (+5 max HP and a heal) fills the gap.
+
+| Group | Upgrades (max level) |
+|---|---|
+| Talons | Talon Edge +7% dmg (5), Wide Arc (3), Shockwave Finisher (3), Crit Spark (4), Twin Strike (3), Storm Talons (3), Core Leech (3) |
+| Overdrive | Long Overdrive (3), Overdrive Reach (3), Overdrive Fury (3), Overdrive Siphon (3), Overdrive Coolant (3) |
+| Blink | Blink Edge (3), Long Blink (3), Double Blink (1), Quick Blink (3), Blink Trail (3) |
+| Core | Swift Step (3), Reinforced Core (4), Core Recharge (3) |
+
+Simulated time-to-kill (`node scripts/sim-ttk.mjs`), single target:
+
+| wave | tier | weapon x | base std | base elite | typical build std | typical build elite | max-damage build elite |
+|---|---|---|---|---|---|---|---|
+| 1 | 0 | 1.00 | 0.55s | 1.21s | 0.55s | 1.21s | 1.21s |
+| 10 | 1 | 1.70 | 0.73s | 1.60s | 0.68s | 1.50s | 1.50s |
+| 30 | 5 | 4.50 | 0.62s | 1.36s | 0.51s | 1.11s | 0.99s |
+| 60 | 11 | 8.70 | 0.58s | 1.28s | 0.40s | 0.87s | 0.66s |
+| 100 | 19 | 14.30 | 0.57s | 1.25s | 0.31s | 0.68s | 0.61s |
+
+Enemy damage still climbs (about 7.9x by wave 100), so no build makes late waves trivial.
+
 ## Arenas (a new one every 10 waves)
 
 | Waves | Arena | Hazard |
@@ -117,6 +149,8 @@ Then open http://localhost:8000. Edit a file, save, refresh the page. That's the
 Three.js is bundled in `vendor/` (MIT licence), so the game also works offline.
 
 ## File layout
+
+Weapon upgrades: `js/upgrades.js` (upgrade list, caps, scaling formula). TTK simulator: `scripts/sim-ttk.mjs`.
 
 ```
 index.html         Page layout: HUD, boss bar, touch buttons, title/game-over screens, Three.js import map

@@ -6,6 +6,8 @@
 import { UPGRADES, FALLBACK, GROUP_LABELS, weaponMult, tierColor } from './upgrades.js';
 
 const $ = (id) => document.getElementById(id);
+// the locked secret hero's silhouette (a hooded machine with hooked talons and pipes)
+const SILHOUETTE = '<svg viewBox="0 0 60 60" width="46" height="46"><g fill="#000"><rect x="19" y="4" width="22" height="18" rx="3"/><rect x="15" y="18" width="30" height="4"/><rect x="17" y="23" width="26" height="20" rx="2"/><rect x="12" y="23" width="6" height="16"/><rect x="42" y="23" width="6" height="16"/><path d="M11 39 q-5 8 2 14 l1-3 q-4-5 0-10z"/><path d="M49 39 q5 8 -2 14 l-1-3 q4-5 0-10z"/><rect x="20" y="43" width="8" height="14"/><rect x="32" y="43" width="8" height="14"/><rect x="22" y="0" width="3" height="10"/><rect x="28" y="0" width="3" height="8"/><rect x="34" y="1" width="3" height="9"/></g><rect x="31" y="10" width="4" height="3" fill="#ff4a5a"/></svg>';
 
 export class Hud {
   constructor() {
@@ -128,14 +130,22 @@ export class Hud {
   showSelect(chars, current, onPick) {
     const hex = (c) => '#' + c.toString(16).padStart(6, '0');
     $('upgrade-title').textContent = 'CHOOSE YOUR HERO';
-    $('upgrade-sub').textContent = 'Same controls and upgrades, three ways to fight. Pick one for this run:';
-    $('upgrade-hint').textContent = 'Press 1, 2 or 3 · ← → and Enter · or click a hero';
+    $('upgrade-sub').textContent = 'Same controls and upgrades, different ways to fight. Pick one for this run:';
+    $('upgrade-hint').textContent = `Press 1-${chars.length} · ← → and Enter · or click a hero`;
     const box = $('upgrade-cards');
     box.innerHTML = '';
     let sel = Math.max(0, chars.findIndex((c) => c.id === current));
     const bar = (label, v) => `<div class="sbar"><span>${label}</span><i><b style="width:${Math.round(Math.min(1, v) * 100)}%"></b></i></div>`;
     const els = chars.map((c, i) => {
       const b = document.createElement('button');
+      if (c.locked) { // the secret hero: a dark silhouette until it's unlocked
+        b.className = 'ucard hero locked';
+        b.innerHTML = `<span class="key">${i + 1}</span><div class="icon sil">${SILHOUETTE}</div><div class="ubody"><div class="group">SECRET HERO</div><div class="uname">???</div><div class="effect">🔒 ${c.unlockHint}</div></div>`;
+        b.addEventListener('pointerdown', (e) => e.stopPropagation());
+        b.addEventListener('click', (e) => { e.stopPropagation(); b.classList.remove('nope'); void b.offsetWidth; b.classList.add('nope'); });
+        box.appendChild(b);
+        return b;
+      }
       b.className = 'ucard hero';
       b.style.setProperty('--c', hex(c.color));
       b.innerHTML = `<span class="key">${i + 1}</span><div class="icon">⬢</div><div class="ubody"><div class="group"></div><div class="uname"></div><div class="effect"></div>` +
@@ -152,17 +162,19 @@ export class Hud {
     mark();
     let done = false;
     const pick = (i) => {
-      if (done) return;
+      if (done || !chars[i] || chars[i].locked) return;
       done = true;
       window.removeEventListener('keydown', onKey, true);
       this.upgradeOverlay.classList.add('hidden');
       onPick(chars[i].id);
     };
     const onKey = (e) => {
-      const n = { Digit1: 0, Digit2: 1, Digit3: 2, Numpad1: 0, Numpad2: 1, Numpad3: 2 }[e.code];
+      const n = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3 }[e.code];
       if (n !== undefined) { e.preventDefault(); e.stopPropagation(); pick(n); return; }
-      if (['ArrowLeft', 'KeyA', 'ArrowUp', 'KeyW'].includes(e.code)) { sel = (sel + chars.length - 1) % chars.length; mark(); }
-      else if (['ArrowRight', 'KeyD', 'ArrowDown', 'KeyS'].includes(e.code)) { sel = (sel + 1) % chars.length; mark(); }
+      const open = chars.map((c, i) => i).filter((i) => !chars[i].locked);
+      const step = (d) => { sel = open[(open.indexOf(sel) + d + open.length) % open.length]; mark(); };
+      if (['ArrowLeft', 'KeyA', 'ArrowUp', 'KeyW'].includes(e.code)) step(-1);
+      else if (['ArrowRight', 'KeyD', 'ArrowDown', 'KeyS'].includes(e.code)) step(1);
       else if (['Enter', 'Space', 'KeyJ', 'NumpadEnter'].includes(e.code)) { pick(sel); }
       else return;
       e.preventDefault(); e.stopPropagation();
@@ -172,6 +184,16 @@ export class Hud {
     setTimeout(() => { box.style.pointerEvents = ''; }, 250);
     this.upgradeOverlay.classList.add('select');
     this.upgradeOverlay.classList.remove('hidden');
+  }
+
+  // MILESTONE popup (bottom centre). big = the secret hero unlock
+  showMilestone(name, reward, big = false) {
+    const el = $('milestone');
+    el.innerHTML = '<small>MILESTONE</small><b></b><span></span>';
+    el.querySelector('b').textContent = name;
+    el.querySelector('span').textContent = reward;
+    el.classList.toggle('big', big);
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
   }
 
   setHeroName(name, color) {

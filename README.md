@@ -323,3 +323,12 @@ Tap **CO-OP** → **HOST** to get a 4-letter room code; friends tap **JOIN** and
 ## Streamer Mode (v1.7.0)
 
 Title screen → **Streamer mode** → channel (default **CalebGCameron**) → **TURN ON**. When the upgrade picker opens, chat votes with `!1`, `!2` or `!3`; tally bars fill on the cards and after 15 s the top card is picked (you can still pick yourself at any time; no votes = you pick). Chat is read **anonymously** with tmi.js (a read-only guest, no login or token), nothing is ever posted, and chat text is never shown on screen. The setting is saved on the device.
+
+## Milestones and the secret hero (v1.8.0)
+
+- **Milestones** (shop → MILESTONES tab): 16 long-term goals saved on this device, each paying out once. Rewards are scrap, milestone-only cosmetics (Veteran / Inferno skins, Hymnbreaker / Hex talons) and the secret hero. Examples: reach wave 10/25/50, beat all 7 bosses, hit a 100/400 combo, beat a golden boss, 10 close calls, 3 cursed cards in one run, wave 10 with each hero, finish a co-op run, revive a teammate.
+- **ORIN, the secret 4th hero**: shown as a locked silhouette on the select screen until you reach **wave 50** (any hero, solo or co-op). He's a rogue Grindchoir unit with the same balance budget as the others (99.6 vs 100). Steady stats; his Overdrive *pulls* enemies in towards his hooked talons instead of throwing them out. Once unlocked, he's also available in the co-op lobby.
+
+| Hero | HP | Speed | Damage | Attack speed | Budget |
+|---|---|---|---|---|---|
+| ORIN | 100 | 6.8 | 1.05 | 0.98 | 99.6 |

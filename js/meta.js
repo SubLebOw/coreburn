@@ -5,6 +5,8 @@
 //   * rare drops (golden bosses) and later achievements / unlocks
 // Nothing here is needed to play: the shop is purely optional extras.
 
+import { defaultStats } from './achievements.js';
+
 const KEY = 'coreburn-save';
 
 // ---- Shop catalogue ----
@@ -19,6 +21,8 @@ export const SHOP = {
     { id: 'obsidian', name: 'Obsidian', color: 0x3a3550, cost: 250 },
     { id: 'rose', name: 'Rosequartz', color: 0xff8ac8, cost: 250 },
     { id: 'gilded', name: 'Gilded', color: 0xffc23a, cost: 0, rare: 'Golden boss drop' },
+    { id: 'veteran', name: 'Veteran', color: 0x8a9a6a, cost: 0, rare: 'Milestone: reach wave 25' },
+    { id: 'inferno', name: 'Inferno', color: 0xff2a10, cost: 0, rare: 'Milestone: 400 combo' },
   ],
   talon: [
     { id: 'crimson', name: 'Crimson', color: 0xff3a4a, cost: 100 },
@@ -26,6 +30,8 @@ export const SHOP = {
     { id: 'solar', name: 'Solar', color: 0xffd23a, cost: 120 },
     { id: 'void', name: 'Void', color: 0x8a5aff, cost: 150 },
     { id: 'aurum', name: 'Aurum', color: 0xfff0a0, cost: 0, rare: 'Golden boss drop' },
+    { id: 'hymn', name: 'Hymnbreaker', color: 0x5affd0, cost: 0, rare: 'Milestone: beat all 7 bosses' },
+    { id: 'hex', name: 'Hex', color: 0xd02a8a, cost: 0, rare: 'Milestone: 3 curses in one run' },
   ],
   // perk.card = the upgrade card you start the run with at Lv 1 (no weapon tier)
   perk: [
@@ -45,7 +51,7 @@ function load() {
     totalScrap: s.totalScrap || 0,
     owned: Array.isArray(s.owned) ? s.owned : [],
     equip: { skin: null, talon: null, perk: null, ...(s.equip || {}) },
-    stats: { runs: 0, bestWave: 0, goldens: 0, ...(s.stats || {}) },
+    stats: { ...defaultStats(), ...(s.stats || {}) },
     ach: s.ach || {},
     unlocked: s.unlocked || {},
   };

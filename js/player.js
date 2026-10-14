@@ -385,7 +385,12 @@ export class Player {
       const dist = to.length();
       if (dist < 3.2 * this.stats.spinRadius * this.char.spinRadius + e.radius) {
         to.normalize();
-        const k = this.char.spinKnock;
+        let k = this.char.spinKnock;
+        if (k < 0) { // ORIN: drag them in (a gentle pull that stops just short of him, never through him)
+          const pull = Math.min(0.45, Math.max(0, dist - (1.2 + e.radius)) * 0.3) * (e.type?.armored ? 0.5 : 1);
+          if (!e.isBoss) { e.position.addScaledVector(to, -pull); this.world.arena.resolve?.(e.position, e.radius); }
+          k = 0;
+        }
         this.strike(e, 8 * this.stats.spinDmg * this.char.spinDmg, to.x * k, to.z * k, true, 'spin');
         this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0xff8040, 4);
         this.world.sfx('hit');

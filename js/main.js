@@ -29,6 +29,7 @@ import { MUTATORS, isMutatorWave, rollMutator } from './mutators.js';
 import { GOLD_TIME } from './golden.js';
 import { ShopUI } from './shop-ui.js';
 import { Twitch } from './twitch.js';
+import { checkAchievements, rewardText } from './achievements.js';
 
 const IS_TOUCH = isTouchDevice();
 if (IS_TOUCH) document.body.classList.add('touch'); // shows the touch controls (see style.css)
@@ -110,6 +111,7 @@ const world = {
   onComboHit() { combo.add(1); },
   onEnemyKilled(e) {
     kills++;
+    meta.data.stats.kills++;
     sound.play('enemyDeath');
     combo.add(1);
     score += Math.round(e.points * combo.mult * (enemies.mutator?.score || 1) * player.stats.scoreMult);
@@ -129,6 +131,10 @@ const world = {
   },
   // A new wave is about to start: every 10 waves we move to the next arena
   onWaveBegin(n) {
+    const st = meta.data.stats;
+    st.bestWave = Math.max(st.bestWave, n);
+    if (n >= 10 && !coop.mode && !st.heroWave10.includes(player.char.id)) st.heroWave10.push(player.char.id);
+    milestones();
     const next = arenaForWave(n), cur = arena.current;
     if (next.index !== cur.index || next.loop !== cur.loop) {
       transition = { t: 0, index: next.index, loop: next.loop, wave: n, swapped: false };
@@ -161,6 +167,9 @@ const world = {
     score += Math.round(boss.points * combo.mult * player.stats.scoreMult);
     kills += parts.length;
     run.bosses++;
+    const st = meta.data.stats;
+    if (!st.bosses.includes(enemies.bossDef.name)) st.bosses.push(enemies.bossDef.name);
+    milestones();
     if (enemies.golden) goldenReward(boss);
     world.player.heal(60);
     enemies.killAllAdds();
@@ -183,7 +192,8 @@ const world = {
     hud.showToast(def.name + '!', def.hint, '#' + def.color.toString(16).padStart(6, '0'));
   },
   onWaveCleared(n) {
-    if (enemies.mutator) { run.mutators++; hud.setMutator(null); }
+    if (enemies.mutator) { run.mutators++; meta.data.stats.mutators++; hud.setMutator(null); }
+    milestones();
     if (isPickWave(n)) upgradeTimer = 1.3; // every 2nd wave: pause for the upgrade picker (after the banner lands)
     const bonus = 25 * n * combo.mult;
     score += bonus;
@@ -197,6 +207,7 @@ const world = {
     const id = world.forceMutator || rollMutator();
     return { id, ...MUTATORS[id] };
   },
+  onMilestoneStat(key) { meta.data.stats[key]++; milestones(); },
   goldenRoll() { return world.forceGolden || Math.random() < 1 / 20; },
   // a bolt just whizzed past (projectiles.js): CLOSE CALL slow-mo, solo only, with a cooldown
   onNearMiss(hero) {
@@ -207,6 +218,8 @@ const world = {
     score += 50 * combo.mult;
     hud.closeCall(`+${50 * combo.mult} pts`);
     document.body.classList.add('closecall');
+    meta.data.stats.closeCalls++;
+    milestones();
     sound.play('slowmoIn');
   },
 };
@@ -246,6 +259,7 @@ function openUpgradePicker() {
     world.effects.spawnRing(player.position, player.tierColor, 3, 0.5);
     sound.play('powerup');
     state = 'playing';
+    milestones();
     if (coop.mode === 'host' && coop.picksPending) { state = 'upgrade'; coop.checkPicksDone(); }
   });
   twitch.startVote(hand.length, (i) => picker.pickIndex(i)); // Streamer Mode: chat votes !1 !2 !3
@@ -275,11 +289,13 @@ function updateTransition(dt) {
 
 // ---------- Starting / ending a run ----------
 // Character select comes before EVERY run (the last pick is highlighted)
-let heroId = CHARACTERS[localStorage.getItem('coreburn-hero')] ? localStorage.getItem('coreburn-hero') : 'sarrow';
+let heroId = CHARACTERS[localStorage.getItem('coreburn-hero')] && (!CHARACTERS[localStorage.getItem('coreburn-hero')].secret || meta.data.unlocked[localStorage.getItem('coreburn-hero')]) ? localStorage.getItem('coreburn-hero') : 'sarrow';
 function showCharacterSelect() {
   state = 'select';
   hud.hideOverlay();
-  hud.showSelect(CHARACTER_ORDER.map((id) => CHARACTERS[id]), heroId, (id) => {
+  const chars = CHARACTER_ORDER.map((id) => ({ ...CHARACTERS[id], locked: CHARACTERS[id].secret && !meta.data.unlocked[id] }));
+  if (chars.find((c) => c.id === heroId)?.locked) heroId = 'sarrow';
+  hud.showSelect(chars, heroId, (id) => {
     heroId = id;
     localStorage.setItem('coreburn-hero', id);
     startGame(id);
@@ -397,13 +413,33 @@ function goldenReward(boss) {
   effects.spawnRing(boss.position, 0xffc23a, 7, 1.4);
 }
 
+// MILESTONES: check progress now (stats are updated as things happen); pop a toast for each new one
+const milestoneQueue = [];
+function milestones() {
+  meta.data.stats.bestCombo = Math.max(meta.data.stats.bestCombo, combo.best);
+  const live = { cursed: player.loadout.picked.filter((p) => p.group === 'cursed').length };
+  for (const a of checkAchievements(meta, live)) milestoneQueue.push(a);
+  if (milestoneQueue.length && !milestoneQueue.showing) showNextMilestone();
+}
+function showNextMilestone() {
+  const a = milestoneQueue.shift();
+  if (!a) { milestoneQueue.showing = false; return; }
+  milestoneQueue.showing = true;
+  hud.showMilestone(a.name, rewardText(a, meta), !!a.reward.hero);
+  sound.play('powerup');
+  shop.refreshTitle();
+  setTimeout(showNextMilestone, 2600);
+}
+
 // Scrap for this run so far (only the part not yet paid out, so an ad revive doesn't pay twice)
 function awardScrap(r) {
   const total = Math.round(scrapForRun(r) * (r.greed ? 1.5 : 1));
   const gain = Math.max(0, total - run.awarded);
   run.awarded = total;
   meta.addScrap(gain);
-  if (!run.counted) { meta.data.stats.runs++; run.counted = true; }
+  if (!run.counted) { meta.data.stats.runs++; if (coop.mode) meta.data.stats.coopRuns++; run.counted = true; }
+  if (coop.mode === 'client') { meta.data.stats.kills += r.kills || 0; meta.data.stats.bestWave = Math.max(meta.data.stats.bestWave, r.wave || 0); }
+  milestones();
   meta.data.stats.bestWave = Math.max(meta.data.stats.bestWave, r.wave || 0);
   meta.save();
   run.lastGain = gain;

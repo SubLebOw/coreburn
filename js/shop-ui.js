@@ -3,11 +3,13 @@
 // (if you have the scrap) or to equip / unequip it. Rare items can't be bought: golden bosses drop them.
 const $ = (id) => document.getElementById(id);
 const hex = (c) => '#' + c.toString(16).padStart(6, '0');
-const TABS = [['skin', 'SKINS'], ['talon', 'TALONS'], ['perk', 'PERKS']];
+import { ACHIEVEMENTS, rewardText } from './achievements.js';
+const TABS = [['skin', 'SKINS'], ['talon', 'TALONS'], ['perk', 'PERKS'], ['ach', 'MILESTONES']];
 const NOTES = {
   skin: 'Skins recolour whichever hero you pick. Solo runs only (co-op keeps everyone easy to tell apart).',
   talon: 'Your talons start in this colour; upgrade tiers still blend in as they grow.',
   perk: 'Equip ONE small head start for solo runs. Each is worth about one upgrade card.',
+  ach: 'Milestones pay out once. Progress is saved on this device.',
 };
 
 export class ShopUI {
@@ -27,6 +29,25 @@ export class ShopUI {
   open() { this.isOpen = true; this.panel.classList.remove('hidden'); this.render(); }
   close() { this.isOpen = false; this.panel.classList.add('hidden'); this.refreshTitle(); this.onClose?.(); }
 
+  renderMilestones(box) {
+    const { meta } = this, s = meta.data.stats;
+    const doneCount = ACHIEVEMENTS.filter((a) => meta.data.ach[a.id]).length;
+    $('sp-scrap').innerHTML = `<b>${doneCount}/${ACHIEVEMENTS.length}</b> DONE · <b>${meta.scrap.toLocaleString()}</b> SCRAP`;
+    for (const a of ACHIEVEMENTS) {
+      const done = !!meta.data.ach[a.id];
+      const [cur, target] = a.goal(s, {});
+      const el = document.createElement('div');
+      el.className = 'sp-ach' + (done ? ' done' : '');
+      const secret = a.reward.hero && !done;
+      el.innerHTML = `<div class="ah"><b></b><span class="rw"></span></div><div class="ad"></div>` +
+        (done ? '<div class="ap done">✔ DONE</div>' : `<div class="ap"><i style="width:${a.live ? 0 : Math.min(100, (cur / target) * 100)}%"></i><span>${a.live ? 'in one run' : `${Math.min(cur, target).toLocaleString()} / ${target.toLocaleString()}`}</span></div>`);
+      el.querySelector('b').textContent = a.name;
+      el.querySelector('.rw').textContent = secret ? '🔒 ???' : rewardText(a, meta);
+      el.querySelector('.ad').textContent = a.desc;
+      box.appendChild(el);
+    }
+  }
+
   render() {
     const { meta } = this;
     $('sp-scrap').innerHTML = `<b>${meta.scrap.toLocaleString()}</b> SCRAP`;
@@ -41,6 +62,8 @@ export class ShopUI {
     }
     const box = $('sp-items');
     box.innerHTML = '';
+    box.classList.toggle('ach', this.tab === 'ach');
+    if (this.tab === 'ach') { this.renderMilestones(box); $('sp-note').textContent = NOTES.ach; return; }
     for (const it of this.shop[this.tab]) {
       const owned = meta.owns(it.id), on = meta.data.equip[this.tab] === it.id && owned;
       const b = document.createElement('button');

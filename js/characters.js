@@ -14,7 +14,7 @@ import * as THREE from 'three';
 
 import { HERO_STATS, CHARACTER_ORDER, characterBudget } from './hero-stats.js';
 export { CHARACTER_ORDER, characterBudget };
-const BUILDERS = { sarrow: (t) => buildSarrow(t), zaleks: (t) => buildZaleks(t), iskra: (t) => buildIskra(t) };
+const BUILDERS = { sarrow: (t) => buildSarrow(t), zaleks: (t) => buildZaleks(t), iskra: (t) => buildIskra(t), orin: (t) => buildOrin(t) };
 export const CHARACTERS = Object.fromEntries(Object.entries(HERO_STATS).map(([id, c]) => [id, { ...c, build: BUILDERS[id] }]));
 
 // Co-op duplicates get a colour tint so you can tell them apart
@@ -27,7 +27,7 @@ export function displayName(c, dupIndex = 0) {
 function tintMats(tint, mats) {
   if (!tint) return mats;
   const t = new THREE.Color(tint);
-  for (const k of ['coat', 'coatDark', 'plate', 'plateDark', 'cloth', 'clothDark', 'pants', 'orange', 'accent']) {
+  for (const k of ['coat', 'coatDark', 'plate', 'plateDark', 'cloth', 'clothDark', 'pants', 'orange', 'accent', 'mask']) {
     if (mats[k]) mats[k].color.lerp(t, 0.4);
   }
   return mats;
@@ -261,4 +261,69 @@ function buildIskra(tint) {
   const armL = arm(0.33), armR = arm(-0.33);
   const flashMats = [mats.cloth, mats.clothDark, mats.accent, mats.metal];
   return { root, body, head, core, legL, legR, armL, armR, flashMats, blade: mats.blade, blades, halos, bladeBase: -0.75, bladeLen: 0.9 };
+}
+
+// ---------- ORIN: the secret 4th hero (unlocks at wave 50) ----------
+// A Grindchoir machine that broke from the hymn: rust-red iron plates, a cracked bell-mask with one
+// reclaimed teal eye, three silent organ pipes on his back, a stolen crimson core, and hooked
+// sickle-talons (two per arm, curved inward) that suit his pulling Overdrive.
+function buildOrin(tint) {
+  const mats = tintMats(tint, {
+    plate: new THREE.MeshLambertMaterial({ color: 0x6a2a22 }),     // rust-red iron
+    plateDark: new THREE.MeshLambertMaterial({ color: 0x2a2220 }),
+    cloth: new THREE.MeshLambertMaterial({ color: 0x3a3430 }),     // soot-black cabling
+    accent: new THREE.MeshLambertMaterial({ color: 0xb08a4a }),    // tarnished brass
+    metal: new THREE.MeshLambertMaterial({ color: 0x8a8580 }),
+    mask: new THREE.MeshLambertMaterial({ color: 0xcfc4ae }),      // bone-white bell mask
+    face: new THREE.MeshBasicMaterial({ color: 0x0a0606 }),
+    glow: new THREE.MeshBasicMaterial({ color: 0xff4a5a }),        // crimson core
+    eye: new THREE.MeshBasicMaterial({ color: 0x3ff6e0 }),         // the one reclaimed eye
+    blade: new THREE.MeshBasicMaterial({ color: 0xff9a8a, transparent: true, opacity: 0.9 }),
+  });
+  const box = boxMaker(new THREE.BoxGeometry(1, 1, 1));
+  const root = new THREE.Group(), body = new THREE.Group();
+  root.add(body);
+  function leg(x) {
+    const g = new THREE.Group(); g.position.set(x, 0.92, 0); body.add(g);
+    box(g, mats.cloth, 0.24, 0.6, 0.26, 0, -0.3, 0);
+    box(g, mats.plate, 0.3, 0.34, 0.36, 0, -0.76, 0.03);           // iron boot
+    box(g, mats.accent, 0.31, 0.05, 0.37, 0, -0.6, 0.03, false);
+    return g;
+  }
+  const legL = leg(0.16), legR = leg(-0.16);
+  box(body, mats.plate, 0.62, 0.62, 0.4, 0, 1.38, 0);              // chest plate
+  box(body, mats.plateDark, 0.5, 0.3, 0.34, 0, 1.0, 0);            // waist
+  box(body, mats.accent, 0.66, 0.08, 0.44, 0, 1.12, 0, false);      // brass band
+  for (const sx of [-0.36, 0.36]) box(body, mats.plateDark, 0.22, 0.2, 0.42, sx, 1.66, 0); // pauldrons
+  for (const [x, h] of [[-0.16, 0.7], [0, 0.9], [0.16, 0.6]]) {    // silent organ pipes on the back
+    box(body, mats.accent, 0.1, h, 0.1, x, 1.5 + h / 2 - 0.1, -0.28);
+    box(body, mats.plateDark, 0.12, 0.05, 0.12, x, 1.5 + h - 0.1, -0.28, false);
+  }
+  const coreRing = box(body, mats.accent, 0.22, 0.22, 0.05, 0, 1.42, 0.2, false); coreRing.rotation.z = Math.PI / 4;
+  const core = box(body, mats.glow, 0.13, 0.13, 0.06, 0, 1.42, 0.22, false); core.rotation.z = Math.PI / 4;
+  for (const y of [1.3, 1.54]) box(body, mats.plateDark, 0.5, 0.03, 0.03, 0, y, 0.21, false); // cracked grill
+  const head = new THREE.Group(); head.position.set(0, 2.06, 0); body.add(head);
+  box(head, mats.mask, 0.42, 0.44, 0.42, 0, 0, 0);                  // bell mask
+  box(head, mats.mask, 0.5, 0.08, 0.5, 0, -0.22, 0);                // flared rim
+  box(head, mats.face, 0.06, 0.2, 0.04, -0.09, -0.02, 0.215, false); // mouth slot
+  box(head, mats.face, 0.03, 0.26, 0.02, 0.12, 0.02, 0.215, false);  // the crack
+  box(head, mats.eye, 0.09, 0.07, 0.03, 0.06, 0.08, 0.22, false);    // one teal eye
+  box(head, mats.accent, 0.12, 0.08, 0.12, 0, 0.26, 0);             // crown bolt
+  const blades = [], halos = [];
+  function arm(x) {
+    const g = new THREE.Group(); g.position.set(x, 1.64, 0); body.add(g);
+    box(g, mats.cloth, 0.18, 0.55, 0.2, 0, -0.27, 0);
+    box(g, mats.plate, 0.26, 0.3, 0.28, 0, -0.66, 0);               // gauntlet
+    box(g, mats.accent, 0.27, 0.05, 0.29, 0, -0.55, 0, false);
+    for (const dz of [-0.06, 0.1]) {                                 // two hooked sickle-talons
+      const b = box(g, mats.blade, 0.04, 0.62, 0.07, 0, -1.08, dz, false); b.rotation.x = dz > 0 ? -0.18 : 0.12;
+      blades.push(b);
+      const halo = box(g, new THREE.MeshBasicMaterial({ color: 0xff9a8a, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }), 0.12, 0.7, 0.16, 0, -1.08, dz, false);
+      halo.rotation.x = b.rotation.x; halo.visible = false; halos.push(halo);
+    }
+    return g;
+  }
+  const armL = arm(0.44), armR = arm(-0.44);
+  const flashMats = [mats.plate, mats.plateDark, mats.cloth, mats.accent, mats.metal, mats.mask];
+  return { root, body, head, core, legL, legR, armL, armR, flashMats, blade: mats.blade, blades, halos, bladeBase: -0.8, bladeLen: 0.62 };
 }

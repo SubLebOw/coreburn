@@ -462,3 +462,28 @@ body.touch .ucard .tw-tally { margin-top: 4px; }
   #upgrade-cards.voting .ucard { padding-bottom: 34px; }
   .ucard .tw-tally { position: absolute; left: 12px; right: 12px; bottom: 8px; width: auto; margin: 0; }
 }
+.cp-hero.hidden { display: none; }
+.ucard.hero.locked { --c: #5a2a30; cursor: not-allowed; filter: saturate(.5); }
+.ucard.hero.locked .icon.sil { background: radial-gradient(circle, #3a1018, #000); border-color: #ff4a5a55; box-shadow: 0 0 14px #ff4a5a33; }
+.ucard.hero.locked .uname { color: #8a5a60; } .ucard.hero.locked .effect { color: #ffb0b8; }
+.ucard.nope { animation: nope .3s; }
+#milestone { position: absolute; bottom: 22%; left: 50%; transform: translateX(-50%); min-width: 240px; max-width: 92vw; text-align: center; padding: 8px 16px; border: 2px solid #ffc23a; border-radius: 10px; background: #1a1408ee; box-shadow: 0 0 22px #ffc23a66; opacity: 0; pointer-events: none; }
+#milestone small { display: block; font-size: 10px; letter-spacing: 3px; color: #ffc23a; font-weight: 900; }
+#milestone b { display: block; font-size: 20px; letter-spacing: 1px; color: #fff; }
+#milestone span { font-size: 13px; color: #ffe08a; font-weight: 700; }
+#milestone.big { border-color: #ff4a5a; box-shadow: 0 0 30px #ff4a5a88; } #milestone.big span { color: #ff8a9a; font-size: 15px; }
+#milestone.show { animation: milestone 2.5s ease forwards; }
+@keyframes milestone { 0% { opacity: 0; transform: translate(-50%, 20px); } 10% { opacity: 1; transform: translate(-50%, 0); } 85% { opacity: 1; } 100% { opacity: 0; } }
+#sp-items.ach { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.sp-ach { text-align: left; padding: 8px 10px; background: #161b20; border: 2px solid #333; border-radius: 10px; }
+.sp-ach.done { border-color: #ffc23a88; background: #1e1a10; }
+.sp-ach .ah { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.sp-ach b { color: #fff; letter-spacing: 1px; } .sp-ach.done b { color: #ffc23a; }
+.sp-ach .rw { font-size: 11px; font-weight: 800; color: #ffc23a; text-align: right; }
+.sp-ach .ad { font-size: 12px; opacity: .8; margin: 2px 0 6px; }
+.sp-ach .ap { position: relative; height: 16px; background: #0008; border-radius: 4px; overflow: hidden; font-size: 11px; font-weight: 800; text-align: center; line-height: 16px; }
+.sp-ach .ap i { position: absolute; left: 0; top: 0; bottom: 0; background: #e0702a; } .sp-ach .ap span { position: relative; }
+.sp-ach .ap.done { background: #ffc23a33; color: #ffc23a; }
+@media (max-width: 480px) { #sp-items.ach { grid-template-columns: 1fr; } .sp-tab { font-size: 11px; letter-spacing: 1px; } }
+#milestone { top: calc(96px + env(safe-area-inset-top)); bottom: auto; left: 12px; transform: none; min-width: 0; width: max-content; max-width: min(320px, 70vw); text-align: left; }
+@keyframes milestone { 0% { opacity: 0; transform: translateX(-20px); } 10% { opacity: 1; transform: none; } 85% { opacity: 1; } 100% { opacity: 0; } }

@@ -1,5 +1,5 @@
 // hero-stats.js
-// The three heroes' numbers (no Three.js here, so the time-to-kill simulator can use them).
+// The heroes' numbers (3 + the secret 4th) (no Three.js here, so the time-to-kill simulator can use them).
 // See characters.js for how they're balanced on one shared budget, and for their models.
 export const HERO_STATS = {
   sarrow: {
@@ -23,8 +23,19 @@ export const HERO_STATS = {
     dashSpeed: 26, dashTime: 0.24, dashCd: 0.95, dashCharges: 2, dashDmg: 8, dashKnock: 6, dashWidth: 1.2,
     spinRadius: 0.9, spinDmg: 1.05, spinKnock: 6, spinTick: 0.12,
   },
+  // SECRET 4th hero: unlocks when you reach wave 50 (any hero, solo or co-op). Shown as a locked
+  // silhouette until then. Same budget as the others (~100). His twist: Overdrive PULLS enemies in
+  // (negative knock) instead of throwing them out, so it groups them for your talons.
+  orin: {
+    id: 'orin', name: 'ORIN', title: 'Rogue choir-unit', color: 0xff4a5a, blade: 0xff9a8a, secret: true,
+    blurb: 'A Grindchoir machine that stopped singing. Steady all-rounder whose Overdrive drags enemies into his hooks.',
+    unlockHint: 'Reach wave 50 to unlock',
+    hp: 100, speed: 6.8, dmg: 1.05, atkSpeed: 0.98,
+    dashSpeed: 23, dashTime: 0.2, dashCd: 0.9, dashCharges: 1, dashDmg: 12, dashKnock: 8, dashWidth: 1.3,
+    spinRadius: 1.15, spinDmg: 1, spinKnock: -6, spinTick: 0.15,
+  },
 };
-export const CHARACTER_ORDER = ['sarrow', 'zaleks', 'iskra'];
+export const CHARACTER_ORDER = ['sarrow', 'zaleks', 'iskra', 'orin'];
 
 // The balance numbers (also used by the simulator)
 export function characterBudget(c) {

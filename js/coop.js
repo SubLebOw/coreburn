@@ -18,6 +18,7 @@ import { Player } from './player.js';
 import { Enemy } from './enemy.js';
 import { bossForNumber } from './bosses.js';
 import { makeGolden } from './golden.js';
+import { meta } from './meta.js';
 import { waveStats } from './waves.js';
 import { CHARACTERS, CHARACTER_ORDER, DUPLICATE_TINTS, displayName } from './characters.js';
 import { GAME_VERSION } from './version.js';
@@ -92,6 +93,7 @@ export class Coop {
       b.style.setProperty('--c', '#' + c.color.toString(16).padStart(6, '0'));
       b.innerHTML = `<b>⬢</b><span>${c.name}</span><small>${c.title}</small>`;
       b.addEventListener('click', () => this.chooseHero(id));
+      if (c.secret) b.classList.add('secret-hero');
       heroes.appendChild(b);
     }
   }
@@ -105,6 +107,7 @@ export class Coop {
   openMenu() {
     this.ctx.hud.hideOverlay();
     this.ctx.setState('lobby');
+    document.querySelectorAll('.secret-hero').forEach((b) => b.classList.toggle('hidden', !meta.data.unlocked[b.dataset.id])); // secret hero: only once unlocked
     this.panel.classList.remove('hidden');
     $('cp-menu').classList.remove('hidden');
     $('cp-lobby').classList.add('hidden');
@@ -372,6 +375,7 @@ export class Coop {
         this.ctx.world.sfx('revive');
         this.ctx.effects.spawnRing(h.position, 0x6aff9a, 3, 0.6);
         this.ctx.hud.showBanner(`${helper.netName.toUpperCase()} REVIVED ${h.netName.toUpperCase()}`, '');
+        if (helper === this.ctx.player) this.ctx.world.onMilestoneStat?.('revives');
       }
     }
   }

@@ -137,6 +137,7 @@ export class Player {
     this.lastHitBy = null;
     this.killedBy = null;
     this.damageMult = 1;              // 2 while FURY is active
+    this.powers = {};                 // active power-ups (type -> { time, max, hits })
     this.loadout.reset();
     this.applyLoadout();
     this.hp = this.maxHp;
@@ -394,6 +395,7 @@ export class Player {
   // Every hit Sarrow lands goes through here: weapon tier, perks, FURY, crits, double hits, leech, chains.
   // kind: 'slash' | 'dash' | 'spin' | 'shock' | 'trail' | 'chain'
   strike(e, base, kx, kz, heavy, kind) {
+    if (this.world.netClient) return; // co-op client: the host decides all damage
     const s = this.stats;
     let dmg = base * s.dmg * this.char.dmg * this.damageMult;
     const crit = kind !== 'trail' && Math.random() < s.crit;
@@ -411,7 +413,7 @@ export class Player {
     if ((kind === 'slash' || kind === 'dash') && s.leech > 0) this.leechHeal(s.leech, 6);
     if (kind === 'spin' && s.spinLeech > 0) this.leechHeal(s.spinLeech, 10);
     if (kind === 'slash' || kind === 'dash') {
-      this.world.onTalonHit?.(e, dmg); // ARC TALONS power-up
+      this.world.onTalonHit?.(e, dmg, this); // ARC TALONS power-up
       if (Math.random() < s.storm) this.stormChain(e, dmg * 0.35);
     }
   }
@@ -502,7 +504,7 @@ export class Player {
       g.material.opacity = Math.min(0.55, 0.12 + tier * 0.0175);
     }
     this.spinRing.material.color.setHex(tier > 0 ? this.tierColor : (this.char.id === 'sarrow' ? 0x3ff6e0 : this.char.color)); // overdrive ring matches the talons
-    this.world.powerups ? this.world.powerups.refreshBlade() : this.setBladeColor(this.tierColor);
+    this.world.powerups ? this.world.powerups.refreshBlade(this) : this.setBladeColor(this.tierColor);
   }
 
   // What the HUD shows on the BLINK button: ready while you have a charge
@@ -526,25 +528,30 @@ export class Player {
   takeDamage(amount, source = null, opts = {}) {
     if (this.dead || this.state === 'dash') return false; // blinking = untouchable
     if (this.invulnTimer > 0) return false;              // just revived
-    if (this.world.powerups && this.world.powerups.absorb(opts)) return false; // SHIELD
+    if (this.world.powerups && this.world.powerups.absorb(opts, this)) return false; // SHIELD
     if (this.state === 'spin') amount *= 0.5;             // overdrive = tougher
     this.hp -= amount;
     this.hurtTimer = 0.15;
     this.timeSinceHit = 0;
     if (source) this.lastHitBy = source;
-    this.world.onPlayerHurt();
+    this.world.onPlayerHurt(this);
     this.world.sfx('hurt');
     if (this.hp <= 0) {
-      this.hp = 0;
-      this.dead = true;
       this.killedBy = source || this.lastHitBy || null;
-      this.state = 'dead';
-      this.stateTime = 0;
-      this.spinRing.visible = false;
-      this.slashArc.material.opacity = 0;
-      this.bubble.visible = false;
+      this.goDown();
     }
     return true;
+  }
+
+  // Out of health (solo: game over; co-op: downed until a teammate revives you)
+  goDown() {
+    this.hp = 0;
+    this.dead = true;
+    this.state = 'dead';
+    this.stateTime = 0;
+    this.spinRing.visible = false;
+    this.slashArc.material.opacity = 0;
+    this.bubble.visible = false;
   }
 
   heal(amount) { this.hp = Math.min(this.maxHp, this.hp + amount); }
@@ -562,6 +569,7 @@ export class Player {
     this.model.body.rotation.set(0, 0, 0);
     this.model.body.position.set(0, 0, 0);
     this.model.core.visible = true;
+    this.model.root.position.y = 0;
   }
 
   // ---------- Animation ----------

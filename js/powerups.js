@@ -29,7 +29,7 @@ export class PowerUps {
     this.world = world;
     this.pickups = [];
     this.orbs = [];
-    this.active = {}; // type -> { time, max, hits }
+    this.nextId = 0;
     // one shape per power-up so they're easy to tell apart
     this.geos = {
       slowmo: new THREE.OctahedronGeometry(0.42),
@@ -45,8 +45,7 @@ export class PowerUps {
 
   reset() {
     this.clearFloor();
-    for (const t of Object.keys(this.active)) this.end(t, true);
-    this.active = {};
+    for (const h of this.heroes) { for (const t of Object.keys(h.powers || {})) this.end(t, true, h); h.powers = {}; }
   }
 
   // Arena change: remove everything lying on the floor (active power-ups keep running)
@@ -56,15 +55,19 @@ export class PowerUps {
     this.orbs = [];
   }
 
-  has(type) { return !!this.active[type]; }
+  // Power-ups belong to whoever grabbed them (co-op: each hero has their own). SLOW-MO slows the
+  // whole world, so it counts if anyone has it.
+  get heroes() { return this.world.heroes || [this.world.player]; }
+  get active() { return this.world.player.powers; } // the local hero's (HUD)
+  has(type, hero = this.world.player) { return !!(hero.powers && hero.powers[type]); }
 
   // How fast the world runs (main.js eases towards this)
-  get timeScale() { return this.has('slowmo') ? SLOW_SCALE : 1; }
+  get timeScale() { return this.heroes.some((h) => this.has('slowmo', h)) ? SLOW_SCALE : 1; }
 
   // ---------- Drops ----------
   onKill(e) {
     if (!e.isBoss && e.crumble) return; // minions crumbling after a boss: no drops
-    if (this.has('magnet') && !e.isBoss) this.dropOrb(e.position);
+    if (this.heroes.some((h) => this.has('magnet', h)) && !e.isBoss) this.dropOrb(e.position);
     let chance = e.isBoss ? 1 : e.elite ? 0.15 : e.typeName === 'mite' ? 0.01 : 0.03;
     if (Math.random() >= chance) return;
     this.drop(e.position, e.isBoss);
@@ -96,7 +99,7 @@ export class PowerUps {
     obj.add(gem, ring);
     obj.position.copy(pos);
     this.scene.add(obj);
-    const p = { type, obj, gem, ring, mat, pos, life: PICKUP_LIFE, t: Math.random() * 6 };
+    const p = { id: ++this.nextId, type, obj, gem, ring, mat, pos, life: PICKUP_LIFE, t: Math.random() * 6 };
     this.pickups.push(p);
     this.world.effects.spawnRing(pos, def.color, 1.6, 0.5);
     return p;
@@ -119,48 +122,45 @@ export class PowerUps {
   }
 
   // ---------- Grabbing and running out ----------
-  activate(type) {
+  activate(type, player = this.world.player) {
     const def = POWERUPS[type];
-    this.active[type] = { time: def.duration, max: def.duration, hits: def.hits || 0 };
-    const player = this.world.player;
+    player.powers = player.powers || {};
+    player.powers[type] = { time: def.duration, max: def.duration, hits: def.hits || 0 };
     if (type === 'fury') player.damageMult = 2;
     if (type === 'shield') player.bubble.visible = true;
-    this.refreshBlade();
-    this.world.onPowerup?.(type, def);
+    this.refreshBlade(player);
+    this.world.onPowerup?.(type, def, player);
   }
 
-  end(type, silent = false) {
-    if (!this.active[type]) return;
-    delete this.active[type];
-    const player = this.world.player;
+  end(type, silent = false, player = this.world.player) {
+    if (!player.powers || !player.powers[type]) return;
+    delete player.powers[type];
     if (type === 'fury') player.damageMult = 1;
     if (type === 'shield') player.bubble.visible = false;
-    this.refreshBlade();
-    if (!silent) this.world.onPowerupEnd?.(type);
+    this.refreshBlade(player);
+    if (!silent) this.world.onPowerupEnd?.(type, player);
   }
 
-  refreshBlade() {
-    const player = this.world.player;
-    player.setBladeColor(this.has('fury') ? 0xff4a3a : this.has('arc') ? 0x9ac4ff : player.tierColor);
+  refreshBlade(player = this.world.player) {
+    player.setBladeColor(this.has('fury', player) ? 0xff4a3a : this.has('arc', player) ? 0x9ac4ff : player.tierColor);
   }
 
   // SHIELD: returns true if the hit was blocked
-  absorb(opts = {}) {
-    const s = this.active.shield;
+  absorb(opts = {}, player = this.world.player) {
+    const s = player.powers && player.powers.shield;
     if (!s) return false;
-    const player = this.world.player;
     this.world.effects.spawnRing(player.position, 0x7fd8ff, 2, 0.3);
     this.world.sfx('shieldBlock');
     if (!opts.hazard) {
       s.hits--;
-      if (s.hits <= 0) this.end('shield');
+      if (s.hits <= 0) this.end('shield', false, player);
     }
     return true;
   }
 
   // ARC TALONS: lightning jumps from the enemy you hit to up to 3 more nearby
-  onTalonHit(target, damage) {
-    if (!this.has('arc')) return;
+  onTalonHit(target, damage, hero = this.world.player) {
+    if (!this.has('arc', hero)) return;
     const fx = this.world.effects;
     const hit = new Set([target]);
     let from = target;
@@ -182,17 +182,23 @@ export class PowerUps {
   }
 
   // ---------- Every frame (realDt: pickups and timers run on real time, not slow-mo) ----------
-  update(realDt) {
-    const player = this.world.player;
-    const magnet = this.has('magnet');
+  // visualOnly = co-op client: just spin/bob the pickups (the host decides who grabs what)
+  update(realDt, visualOnly = false) {
+    const heroes = this.heroes.filter((h) => !h.dead);
+    // the closest living hero to obj (and the distance)
+    const nearest = (obj) => {
+      let best = null, bd = Infinity;
+      for (const h of heroes) { const d = obj.position.distanceTo(h.position); if (d < bd) { bd = d; best = h; } }
+      return [best, bd];
+    };
     const pull = (obj, range, speed) => {
-      const d = obj.position.distanceTo(player.position);
-      if (d < range && d > 0.01) {
+      const [h, d] = nearest(obj);
+      if (h && this.has('magnet', h) && d < range && d > 0.01) {
         const k = Math.min(1, (speed * realDt) / d);
-        obj.position.x += (player.position.x - obj.position.x) * k;
-        obj.position.z += (player.position.z - obj.position.z) * k;
+        obj.position.x += (h.position.x - obj.position.x) * k;
+        obj.position.z += (h.position.z - obj.position.z) * k;
       }
-      return d;
+      return nearest(obj);
     };
 
     for (let i = this.pickups.length - 1; i >= 0; i--) {
@@ -204,15 +210,17 @@ export class PowerUps {
       p.ring.scale.setScalar(1 + Math.sin(p.t * 4) * 0.1);
       // blink during the last 3 seconds
       p.obj.visible = p.life > 3 || Math.floor(p.life * 8) % 2 === 0;
-      const d = magnet && !player.dead ? pull(p.obj, 10, 14) : p.obj.position.distanceTo(player.position);
-      if (!player.dead && d < 1.2) {
+      if (visualOnly) continue;
+      const [h, d] = pull(p.obj, 10, 14);
+      if (h && d < 1.2) {
         this.world.effects.spawnRing(p.obj.position, POWERUPS[p.type].color, 2.4, 0.4);
         this.removePickup(p);
-        this.activate(p.type);
+        this.activate(p.type, h); // whoever grabs it gets it
         continue;
       }
       if (p.life <= 0) this.removePickup(p);
     }
+    if (visualOnly) return;
 
     for (let i = this.orbs.length - 1; i >= 0; i--) {
       const o = this.orbs[i];
@@ -220,9 +228,9 @@ export class PowerUps {
       o.t += realDt;
       o.obj.position.y = 0.5 + Math.sin(o.t * 5) * 0.1;
       o.obj.visible = o.life > 2 || Math.floor(o.life * 8) % 2 === 0;
-      const d = magnet && !player.dead ? pull(o.obj, 10, 16) : o.obj.position.distanceTo(player.position);
-      if (!player.dead && d < 1.0) {
-        player.heal(5);
+      const [h, d] = pull(o.obj, 10, 16);
+      if (h && d < 1.0) {
+        h.heal(5);
         this.world.sfx('heal');
         this.scene.remove(o.obj);
         this.orbs.splice(i, 1);
@@ -231,18 +239,21 @@ export class PowerUps {
       if (o.life <= 0) { this.scene.remove(o.obj); this.orbs.splice(i, 1); }
     }
 
-    if (player.dead) return;
-    for (const type of Object.keys(this.active)) {
-      const a = this.active[type];
-      a.time -= realDt;
-      if (a.time <= 0) this.end(type);
+    for (const h of this.heroes) {
+      if (h.dead || !h.powers) continue;
+      for (const type of Object.keys(h.powers)) {
+        const a = h.powers[type];
+        a.time -= realDt;
+        if (a.time <= 0) this.end(type, false, h);
+      }
+      if (h.powers.shield) h.bubble.material.opacity = 0.16 + 0.08 * Math.sin(performance.now() / 120);
     }
-    if (this.active.shield) player.bubble.material.opacity = 0.16 + 0.08 * Math.sin(performance.now() / 120);
   }
 
   // For the HUD: [{ type, label, color, left (0-1), seconds, hits }]
-  get hudList() {
-    return Object.entries(this.active).map(([type, a]) => ({
+  get hudList() { return this.listFor(this.world.player); }
+  listFor(hero) {
+    return Object.entries(hero.powers || {}).map(([type, a]) => ({
       type, label: POWERUPS[type].label, color: POWERUPS[type].color,
       left: Math.max(0, a.time / a.max), seconds: Math.ceil(a.time), hits: a.hits,
     }));

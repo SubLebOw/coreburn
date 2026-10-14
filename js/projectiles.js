@@ -40,6 +40,7 @@ export class Projectiles {
   }
 
   update(dt, player, arena, effects) {
+    const heroes = Array.isArray(player) ? player : [player]; // co-op passes every hero
     for (const p of this.list) {
       if (p.life <= 0) continue;
       p.life -= dt;
@@ -51,8 +52,10 @@ export class Projectiles {
         if (Math.hypot(pos.x - o.x, pos.z - o.z) < o.r) { done = true; break; }
       }
       // hit the player? (takeDamage returns false while blinking, so the bolt flies on)
-      if (!done && !player.dead && Math.hypot(pos.x - player.position.x, pos.z - player.position.z) < 0.3 * p.size + player.radius) {
-        if (player.takeDamage(p.damage, p.source)) done = true;
+      for (const h of heroes) {
+        if (!done && !h.dead && Math.hypot(pos.x - h.position.x, pos.z - h.position.z) < 0.3 * p.size + h.radius) {
+          if (h.takeDamage(p.damage, p.source)) done = true;
+        }
       }
       if (done) {
         p.life = 0;

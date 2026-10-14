@@ -299,3 +299,13 @@ To go live: create your AdMob app, put your real App ID + ad unit IDs in `js/ads
 ## License / credits
 
 Original game design, characters and code. Built with [Three.js](https://threejs.org) (MIT).
+
+## Online co-op (2–4 players)
+
+Tap **CO-OP** → **HOST** to get a 4-letter room code; friends tap **JOIN** and enter it. Everyone picks a hero (duplicates get a tint and a "II/III" name), the host presses **START**.
+
+- **Architecture:** peer-to-peer WebRTC via PeerJS (public signalling server `0.peerjs.com`, Google STUN). The host runs the whole simulation; clients send inputs at 20 Hz and receive ~20 Hz snapshots, interpolated. Your own movement is predicted locally.
+- **Scaling:** enemy count ×(1+0.5·(n−1)), enemy HP ×(1+0.4·(n−1)), boss HP ×(1+0.6·(n−1)).
+- **Downed & revive:** at 0 HP you're downed; a teammate standing near you for ~3 s revives you. The run ends when everyone is down.
+- Upgrade picks and power-ups are per player; score and combo are shared. Bosses switch targets.
+- **Limits:** max 4 players. No TURN relay, so some strict/symmetric NATs (some mobile carriers, corporate Wi-Fi) can't connect. Enemy reactions lag by your round-trip time. A custom PeerJS server can be set via `localStorage['coreburn-peer']`.

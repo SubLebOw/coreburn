@@ -127,9 +127,11 @@ export class CantorVell extends Boss {
       if (g.t < g.delay) continue;
       g.pos.addScaledVector(g.dir, 26 * dt);
       g.obj.position.copy(g.pos);
-      if (!g.hit && !player.dead && g.pos.distanceTo(player.position) < 0.9 + player.radius) {
-        g.hit = true;
-        player.takeDamage(16 * this.dmgMult, this);
+      for (const h of this.world.teamOf(player)) {
+        if (!g.hit && !h.dead && g.pos.distanceTo(h.position) < 0.9 + h.radius) {
+          g.hit = true;
+          h.takeDamage(16 * this.dmgMult, this);
+        }
       }
       if (g.t > g.delay + 0.5) { g.done = true; this.fadeOut(g.obj, 0.3); }
     }

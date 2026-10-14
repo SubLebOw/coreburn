@@ -143,9 +143,9 @@ export class Hymnworks extends Boss {
       return;
     }
     if (this.attack === 'mortar') {
-      let hit = false;
+      const hit = new Set();
       for (const m of this.marks) {
-        if (!hit && !player.dead && m.distanceTo(player.position) < 2.2 + player.radius) { player.takeDamage(18 * this.dmgMult, this); hit = true; }
+        for (const h of this.world.teamOf(player)) if (!hit.has(h) && !h.dead && m.distanceTo(h.position) < 2.2 + h.radius) { h.takeDamage(18 * this.dmgMult, this); hit.add(h); }
         this.world.effects.spawnRing(m, 0xff6a3a, 2.4, 0.4);
         this.world.effects.spawnSparks(m.clone().setY(0.4), 0xffb060, 4, 7);
       }
@@ -171,15 +171,18 @@ export class Hymnworks extends Boss {
         b.obj.rotation.y = b.angle;
         b.obj.children[0].scale.x = b.obj.children[0].scale.y = 0.8 + Math.sin(this.stateTime * 40) * 0.15;
         // is Sarrow standing in this beam?
-        if (!player.dead && this.hurtCooldown <= 0) {
-          const dx = player.position.x - ox, dz = player.position.z - oz;
+        let burned = false;
+        for (const h of this.world.teamOf(player)) {
+          if (h.dead || this.hurtCooldown > 0) continue;
+          const dx = h.position.x - ox, dz = h.position.z - oz;
           const along = dx * Math.sin(b.angle) + dz * Math.cos(b.angle);
           const side = Math.abs(dx * Math.cos(b.angle) - dz * Math.sin(b.angle));
-          if (along > this.radius - 0.5 && along < BEAM_LEN + 1 && side < 0.45 + player.radius) {
-            player.takeDamage(12 * this.dmgMult, this);
-            this.hurtCooldown = 0.5;
+          if (along > this.radius - 0.5 && along < BEAM_LEN + 1 && side < 0.45 + h.radius) {
+            h.takeDamage(12 * this.dmgMult, this);
+            burned = true;
           }
         }
+        if (burned) this.hurtCooldown = 0.5;
       }
       this.drumAngle = this.beams[0].angle;
       if (this.stateTime >= this.beamDuration) { this.stopBeams(); this.recover(1.0); }
@@ -202,7 +205,7 @@ export class Hymnworks extends Boss {
     }
     // drum spins in world space (undo the body's facing)
     this.drum.rotation.y = this.drumAngle - this.facing;
-    const p = this.world.player.position;
+    const p = (this.coopTarget || this.world.player).position;
     if (this.state === 'chase') this.turnTowards(new THREE.Vector3(p.x - this.position.x, 0, p.z - this.position.z).normalize(), dt, 1);
     this.body.position.y = this.state === 'beaming' ? Math.sin(t * 50) * 0.02 : 0;
     return glow;

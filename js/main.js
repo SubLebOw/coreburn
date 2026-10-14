@@ -23,6 +23,7 @@ import { IS_NATIVE } from './native.js';
 import { Combo } from './combo.js';
 import { CHARACTERS, CHARACTER_ORDER, displayName } from './characters.js';
 import { isPickWave } from './upgrades.js';
+import { Coop } from './coop.js';
 
 const IS_TOUCH = isTouchDevice();
 if (IS_TOUCH) document.body.classList.add('touch'); // shows the touch controls (see style.css)
@@ -91,10 +92,12 @@ const world = {
   player: null,
   enemies: null,
   powerups: null,
+  heroes: null,      // co-op: every hero (null in solo)
+  teamOf(p) { return world.heroes || [p]; },
   shake(amount) { shakeAmount = Math.max(shakeAmount, amount); },
   sfx(name, option) { sound.play(name, option); },
   hitstop(seconds) { hitstopTimer = Math.max(hitstopTimer, seconds); }, // tiny freeze = punchy hits
-  onPlayerHurt() { hud.flashDamage(); world.shake(0.2); combo.hurt(); },
+  onPlayerHurt(hero = player) { if (hero === player) { hud.flashDamage(); world.shake(0.2); } combo.hurt(); },
   onComboHit() { combo.add(1); },
   onEnemyKilled(e) {
     kills++;
@@ -149,8 +152,9 @@ const world = {
     world.shake(0.5);
     sound.play('bossDefeated');
   },
-  onTalonHit(e, damage) { powerups.onTalonHit(e, damage); },
-  onPowerup(type, def) {
+  onTalonHit(e, damage, hero) { powerups.onTalonHit(e, damage, hero); },
+  onPowerup(type, def, hero = player) {
+    if (hero !== player) { world.coop?.onRemotePowerup(hero, type, def); return; }
     sound.play('powerup');
     hud.showToast(def.name + '!', def.hint, '#' + def.color.toString(16).padStart(6, '0'));
   },
@@ -181,10 +185,14 @@ function setSlowmo(on) {
 }
 
 // Upgrade picker: pause, show 3 cards, apply the pick (weapon tier +1 and the card's perk)
+let hostPicking = false;
 function openUpgradePicker() {
   state = 'upgrade';
   const loadout = player.loadout;
+  if (coop.mode === 'host') coop.beginPicks(); // every friend picks their own card too
+  hostPicking = true;
   hud.showPicker(loadout.roll(3), loadout, (id) => {
+    hostPicking = false;
     loadout.apply(id);
     player.applyLoadout();
     if (id === 'patch') player.heal(player.maxHp * 0.35);
@@ -193,6 +201,7 @@ function openUpgradePicker() {
     world.effects.spawnRing(player.position, player.tierColor, 3, 0.5);
     sound.play('powerup');
     state = 'playing';
+    if (coop.mode === 'host' && coop.picksPending) { state = 'upgrade'; coop.checkPicksDone(); }
   });
 }
 
@@ -205,6 +214,7 @@ function updateTransition(dt) {
     arena.setTheme(transition.index, transition.loop);
     player.position.set(0, 0, 0); // the middle of every arena is clear
     player.slide.set(0, 0, 0);
+    if (coop.mode === 'host') coop.teleportAll();
     projectiles.reset();
     effects.reset();
     powerups.clearFloor();
@@ -233,7 +243,8 @@ function showCharacterSelect() {
 function startGame(id = heroId) {
   if (typeof id !== 'string') id = heroId;
   player.setCharacter(id);
-  hud.setHeroName(player.char.name, player.char.color);
+  if (coop.mode === 'host') coop.setupHostGame(); // friends' heroes + co-op scaling (before wave 1)
+  hud.setHeroName(player.netName ? player.netName.toUpperCase() : player.char.name, player.tint || player.char.color);
   kills = 0;
   score = 0;
   combo.reset();
@@ -254,8 +265,61 @@ function startGame(id = heroId) {
   hud.hideOverlay();
   state = 'playing';
   revivedThisRun = false;
+  hostPicking = false;
   enemies.startWave(1);
 }
+
+// ---------- Co-op hooks (see coop.js) ----------
+function resetWorld() {
+  effects.reset();
+  projectiles.reset();
+  enemies.reset();
+  powerups.reset();
+  hud.hidePicker();
+  upgradeTimer = 0;
+  transition = null;
+  fadeEl.style.opacity = 0;
+  timeScale = 1;
+  setSlowmo(false);
+  const cur = arena.current;
+  if (cur.index !== 0 || cur.loop !== 0) arena.setTheme(0, 0);
+  if (player.dead) player.revive();
+  player.position.set(0, 0, 0);
+}
+function startClientGame(char, tint, name = char) {
+  resetWorld();
+  kills = 0;
+  score = 0;
+  combo.reset();
+  deathTimer = 0;
+  player.setCharacter(char, tint);
+  hud.setHeroName(name.toUpperCase(), tint || player.char.color);
+  hud.hideOverlay();
+  state = 'playing';
+}
+const RESTART_HINT = document.getElementById('restart-hint').innerHTML;
+function showTitle() {
+  state = 'title';
+  hud.showTitle(best);
+  document.getElementById('restart-btn').classList.remove('hidden');
+  document.getElementById('restart-hint').innerHTML = RESTART_HINT;
+}
+const coop = new Coop({
+  THREE, scene, camera, world, input, hud, sound, combo, effects, projectiles, powerups, enemies, arena,
+  get player() { return player; },
+  getState: () => state,
+  setState: (s) => { state = s; },
+  hostPicking: () => hostPicking,
+  startGame,
+  startClientGame,
+  resetWorld,
+  showTitle,
+  snapCamera: () => updateCamera(0, true),
+  flashFade: () => { fadeEl.style.transition = 'none'; fadeEl.style.opacity = 0.8; requestAnimationFrame(() => { fadeEl.style.transition = 'opacity .5s'; fadeEl.style.opacity = 0; }); },
+  getRun: () => ({ wave: Math.max(1, enemies.wave), score, kills }),
+  setLastRun: (r) => { lastRun = r; },
+});
+world.coop = coop;
 
 let lastRun = { wave: 1, score: 0, killer: null, place: null, tier: 0 }; // what the share buttons talk about
 
@@ -268,8 +332,10 @@ function gameOver() {
     best.wave = enemies.wave;
     localStorage.setItem('coreburn-best', JSON.stringify(best));
   }
-  const killer = player.killedBy ? player.killedBy.killerName : null; // e.g. "the Furnace Deacon"
-  lastRun = { wave: enemies.wave, score, killer, place: arena.current.place, tier: player.loadout.tier, combo: combo.best, hero: displayName(player.char) };
+  const lastDown = coop.mode === 'host' ? coop.heroes.reduce((a, h) => (h.killedBy ? h : a), player) : player;
+  const killer = lastDown.killedBy ? lastDown.killedBy.killerName : null; // e.g. "the Furnace Deacon"
+  lastRun = { wave: enemies.wave, score, killer, place: arena.current.place, tier: player.loadout.tier, combo: combo.best, hero: player.netName || displayName(player.char), kills,
+    team: coop.mode === 'host' ? coop.heroes.filter((h) => h !== player).map((h) => h.netName) : null };
   upgradeTimer = 0;
   powerups.reset();
   setSlowmo(false);
@@ -280,7 +346,8 @@ function gameOver() {
   sound.setIntensity(0);
   ads.onGameOver();
   // Offer the optional rewarded-ad revive (Android app only, once per run)
-  reviveOffered = !revivedThisRun && ads.canRevive;
+  reviveOffered = !coop.mode && !revivedThisRun && ads.canRevive; // no ad revive in co-op (teammates revive you)
+  if (coop.mode === 'host') coop.onGameOver(lastRun);
   reviveBtn.classList.toggle('hidden', !reviveOffered);
   document.getElementById('restart-hint').classList.toggle('hidden', reviveOffered);
 }
@@ -293,6 +360,7 @@ async function tryRestart(e) {
   if (e && e.code === 'KeyM') return;                 // M is the mute key
   if (e && e.target && e.target.closest && e.target.closest('.share-row')) return; // share/copy buttons
   if (reviveOffered && e && e.type !== 'click') return; // with a revive on offer, use the buttons
+  if (coop.mode) { coop.onRestartTap(); return; } // co-op: the host takes everyone back to the lobby
   restarting = true;
   try { await ads.maybeShowInterstitial(); } finally { restarting = false; }
   showCharacterSelect();
@@ -424,24 +492,27 @@ function frame() {
   timeScale += (powerups.timeScale - timeScale) * (1 - Math.exp(-10 * dt));
   if (Math.abs(timeScale - powerups.timeScale) < 0.01) timeScale = powerups.timeScale;
   const worldDt = dt * timeScale;
-  if (state === 'playing') setSlowmo(powerups.has('slowmo'));
+  if (state === 'playing') setSlowmo(powerups.timeScale < 1);
 
-  if (state === 'playing') {
+  if (coop.mode === 'client') {
+    coop.clientFrame(dt, state); // a friend's game: puppets driven by the host's snapshots
+  } else if (state === 'playing') {
     if (transition) {
       updateTransition(dt); // everything waits while the screen fades
     } else {
       player.update(dt, input);
       enemies.update(worldDt);
-      projectiles.update(worldDt, player, arena, effects);
+      projectiles.update(worldDt, world.heroes || player, arena, effects);
       arena.update(worldDt, player, world, true);
       powerups.update(dt);
+      if (coop.mode === 'host') coop.hostSim(dt);
       combo.update(worldDt);
       if (upgradeTimer > 0) {
         upgradeTimer -= dt;
-        if (upgradeTimer <= 0 && !player.dead) openUpgradePicker();
+        if (upgradeTimer <= 0 && (!player.dead || coop.mode === 'host')) openUpgradePicker();
       }
     }
-    if (player.dead) {
+    if (coop.mode === 'host' ? coop.allDown() : player.dead) {
       deathTimer += dt;
       if (deathTimer > 1.6) gameOver();
     }
@@ -454,10 +525,18 @@ function frame() {
     arena.update(dt, player, world, false);
   }
 
+  if (coop.mode === 'host') coop.hostNet(dt, state); // snapshots to friends
   if (state !== 'upgrade') effects.update(worldDt);
   updateCamera(dt);
-  hud.updateCombo(combo, state === 'playing');
-  hud.update(player, Math.max(1, enemies.wave), kills, score, state === 'playing' ? enemies.bossBar : null, powerups.hudList);
+  if (coop.mode === 'client' && coop.view) {
+    const v = coop.view;
+    hud.updateCombo(coop.comboView, state === 'playing');
+    hud.update(player, v.wave, v.kills, v.score, state === 'playing' ? v.bossBar : null, v.powers);
+  } else {
+    hud.updateCombo(combo, state === 'playing');
+    hud.update(player, Math.max(1, enemies.wave), kills, score, state === 'playing' ? enemies.bossBar : null, powerups.hudList);
+  }
+  coop.updateTags(camera);
   input.endFrame();
   renderer.render(scene, camera);
 }

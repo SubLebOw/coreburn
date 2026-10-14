@@ -147,9 +147,11 @@ export class Boss {
         this.position.copy(before);
         this.world.arena.resolve(this.position, this.radius);
         const hitWall = this.position.distanceTo(before) > 0.01;
-        if (!this.chargeHit && !player.dead && this.position.distanceTo(player.position) < this.radius + player.radius + 0.2) {
-          this.chargeHit = true;
-          player.takeDamage(this.chargeDamage * this.dmgMult, this);
+        for (const h of this.world.teamOf(player)) {
+          if (!this.chargeHit && !h.dead && this.position.distanceTo(h.position) < this.radius + h.radius + 0.2) {
+            this.chargeHit = true;
+            h.takeDamage(this.chargeDamage * this.dmgMult, this);
+          }
         }
         if (hitWall || this.stateTime > this.chargeTime) {
           if (hitWall) { this.world.shake(0.35); this.world.effects.spawnSparks(this.position.clone().setY(1), 0xffb060, 10); }
@@ -276,7 +278,7 @@ export class Boss {
         return;
 
       case 'slam':
-        if (dist < this.slamRadius + player.radius) player.takeDamage(26 * this.dmgMult, this);
+        for (const h of this.world.teamOf(player)) if (!h.dead && this.position.distanceTo(h.position) < this.slamRadius + h.radius) h.takeDamage(26 * this.dmgMult, this);
         fx.spawnRing(this.position, 0xff5a20, this.slamRadius, 0.5);
         fx.spawnSparks(this.position.clone().setY(0.3), 0xffb060, 14, 8);
         this.world.shake(0.5);
@@ -285,9 +287,9 @@ export class Boss {
         return;
 
       case 'markslam': {
-        let hit = false;
+        const hit = new Set();
         for (const m of this.marks) {
-          if (!hit && m.distanceTo(player.position) < 2.6 + player.radius) { player.takeDamage(18 * this.dmgMult, this); hit = true; }
+          for (const h of this.world.teamOf(player)) if (!hit.has(h) && !h.dead && m.distanceTo(h.position) < 2.6 + h.radius) { h.takeDamage(18 * this.dmgMult, this); hit.add(h); }
           fx.spawnRing(m, 0xffb020, 2.6, 0.4);
         }
         this.world.shake(0.3);

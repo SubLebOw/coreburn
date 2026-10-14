@@ -313,6 +313,9 @@ export function createArena(scene, env) {
       return 'ground';
     },
 
+    // Lightning bolt + flash (also replayed on co-op clients)
+    strikeVisual(pos) { bolt.strike(pos); flash = 0.22; },
+
     // Hazards, particles and little animations. dt is already slowed down by slow-mo.
     update(dt, player, world, active = true) {
       const t = performance.now() / 1000;
@@ -327,16 +330,21 @@ export function createArena(scene, env) {
         bolt.group.visible = flash > 0.08;
         if (flash <= 0) world.env.hemi.intensity = world.env.baseHemi;
       }
-      if (!active || player.dead) return;
+      const heroes = (world.heroes || [player]).filter((h) => !h.dead);
+      if (!active || !heroes.length) return;
 
       // lava cracks: 4 damage every half second while you stand in them
       if (theme.hazard === 'lava') {
         hazardTick -= dt;
-        if (hazardTick <= 0 && inCrack(player.position, player.radius * 0.5)) {
-          hazardTick = 0.5;
-          player.takeDamage(4 * loopMult(), { killerName: 'the molten cracks' }, { hazard: true });
-          world.effects.spawnSparks(player.position.clone().setY(0.3), 0xff8a2a, 5, 4);
-          world.sfx('sizzle');
+        if (hazardTick <= 0) {
+          let burned = false;
+          for (const h of heroes) {
+            if (!inCrack(h.position, h.radius * 0.5)) continue;
+            burned = true;
+            h.takeDamage(4 * loopMult(), { killerName: 'the molten cracks' }, { hazard: true });
+            world.effects.spawnSparks(h.position.clone().setY(0.3), 0xff8a2a, 5, 4);
+          }
+          if (burned) { hazardTick = 0.5; world.sfx('sizzle'); }
         }
       }
 
@@ -345,7 +353,7 @@ export function createArena(scene, env) {
         if (!strike) {
           strikeTimer -= dt;
           if (strikeTimer <= 0) {
-            const p = player.position;
+            const p = heroes[Math.floor(Math.random() * heroes.length)].position; // co-op: anyone
             const a = Math.random() * Math.PI * 2, d = Math.random() < 0.4 ? 0 : 2 + Math.random() * 4;
             const pos = api.findClearSpot(new THREE.Vector3(p.x + Math.cos(a) * d, 0, p.z + Math.sin(a) * d), 0.5);
             strike = { pos, time: 1.4 };
@@ -357,13 +365,14 @@ export function createArena(scene, env) {
             const pos = strike.pos;
             strike = null;
             strikeTimer = 4 + Math.random() * 3;
-            if (player.position.distanceTo(pos) < 2.2 + player.radius) {
-              player.takeDamage(16 * loopMult(), { killerName: 'a lightning strike' }, { hazard: true });
+            for (const h of heroes) {
+              if (h.position.distanceTo(pos) < 2.2 + h.radius) h.takeDamage(16 * loopMult(), { killerName: 'a lightning strike' }, { hazard: true });
             }
+            world.onArenaStrike?.(pos);
             for (const e of world.enemies.list) {
               if (e.canBeHit && !e.isBoss && e.position.distanceTo(pos) < 2.2 + e.radius) e.hit(40, 0, 0, true);
             }
-            bolt.strike(pos);
+            api.strikeVisual(pos);
             flash = 0.22;
             world.effects.spawnRing(pos, 0xbfe8ff, 3, 0.4);
             world.effects.spawnSparks(pos.clone().setY(0.3), 0xdff4ff, 12, 9);

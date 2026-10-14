@@ -351,3 +351,45 @@ body.touch .ucard .key { display: none; }
   .ucard.hero .uname { font-size: 18px; }
   .ucard .stats { margin-top: 2px; gap: 2px; }
 }
+
+/* ---------- Co-op ---------- */
+.big-btn.coop { display: block; margin: 10px auto 0; background: #1d2a33; color: #3ff6e0; border-color: #3ff6e0; font-size: 18px; }
+.big-btn.coop small { display: block; font-size: 11px; letter-spacing: 1px; opacity: .8; font-weight: 700; }
+#coop-panel { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, #0a0e12dd, #000f); padding: calc(12px + env(safe-area-inset-top)) 12px 12px; }
+#coop-panel.hidden { display: none; }
+.cp-box { width: 100%; max-width: 460px; max-height: 100%; overflow: auto; text-align: center; color: #eee; }
+.cp-title { font-size: clamp(28px, 7vw, 44px); font-weight: 900; letter-spacing: 6px; color: #3ff6e0; text-shadow: 0 3px 0 #000, 0 0 20px #3ff6e055; margin-bottom: 14px; }
+#cp-menu .big-btn { width: 100%; margin: 0; }
+.cp-or { margin: 16px 0 8px; font-size: 13px; opacity: .7; letter-spacing: 1px; }
+.cp-join { display: flex; gap: 8px; }
+.cp-join .big-btn { width: auto; flex: none; padding-left: 22px; padding-right: 22px; }
+#cp-code { flex: 1; min-width: 0; font: inherit; font-size: 28px; font-weight: 900; letter-spacing: 10px; text-align: center; text-transform: uppercase; background: #0b0f13; color: #ffd27a; border: 3px solid #e0702a; border-radius: 12px; padding: 6px; }
+#cp-code::placeholder { color: #ffd27a55; letter-spacing: 6px; }
+.cp-codelabel { font-size: 11px; letter-spacing: 3px; font-weight: 900; opacity: .7; margin-top: 10px; }
+#cp-roomcode { font-size: clamp(54px, 16vw, 80px); font-weight: 900; letter-spacing: 14px; color: #ffd27a; text-shadow: 0 4px 0 #000, 0 0 30px #e0702a88; line-height: 1.1; padding-left: 14px; }
+.cp-tip { font-size: 13px; opacity: .8; margin-bottom: 12px; }
+#cp-roster { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px; }
+.cp-row { --c: #3ff6e0; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: #161c22; border: 2px solid var(--c); text-align: left; }
+.cp-row b { font-size: 12px; color: #000; background: var(--c); border-radius: 4px; padding: 0 5px; }
+.cp-row span { flex: 1; font-weight: 900; color: var(--c); }
+.cp-row small { font-size: 10px; opacity: .7; letter-spacing: 1px; }
+.cp-row.empty { border-style: dashed; border-color: #ffffff30; opacity: .6; }
+.cp-row.empty span { color: #aaa; font-weight: 400; }
+#cp-heroes { display: flex; gap: 8px; margin: 6px 0 14px; }
+.cp-hero { --c: #3ff6e0; flex: 1; font: inherit; color: #eee; background: #161c22; border: 2px solid #ffffff22; border-radius: 12px; padding: 8px 4px; cursor: pointer; touch-action: manipulation; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.cp-hero b { font-size: 24px; color: var(--c); }
+.cp-hero span { font-weight: 900; letter-spacing: 2px; color: var(--c); }
+.cp-hero small { font-size: 10px; opacity: .7; }
+.cp-hero.sel { border-color: var(--c); box-shadow: 0 0 16px var(--c); background: color-mix(in srgb, var(--c) 18%, #161c22); }
+#cp-start { width: 100%; margin: 0; }
+#cp-start:disabled { opacity: .5; cursor: default; }
+#cp-wait { padding: 12px; font-weight: 900; color: #ffd27a; }
+#cp-start.hidden, #cp-wait.hidden { display: none; }
+#cp-leave, #cp-back { margin-top: 14px; }
+#cp-status { min-height: 20px; margin-top: 10px; font-size: 14px; color: #9fe; }
+#cp-status.error { color: #ff7a6a; font-weight: 900; }
+.ntag { --c: #3ff6e0; position: absolute; left: 0; top: 0; font-size: 11px; font-weight: 900; letter-spacing: 1px; color: var(--c); text-shadow: 0 2px 0 #000, 0 0 6px #000; white-space: nowrap; pointer-events: none; will-change: transform; }
+.ntag.down { color: #ff7a6a; font-size: 12px; }
+@media (max-width: 600px) { #cp-roster { grid-template-columns: 1fr; } .cp-hero small { display: none; } }
+#cp-menu.hidden, #cp-lobby.hidden { display: none; }
+#cp-menu .cp-join .big-btn { width: auto; margin: 0; padding: 10px 22px; }

@@ -129,7 +129,7 @@ export class Gulletworm extends Boss {
       for (const m of this.chainMarks) {
         if (m.popped || this.stateTime < m.time) continue;
         m.popped = true;
-        if (!player.dead && m.pos.distanceTo(player.position) < 1.5 + player.radius) player.takeDamage(16 * this.dmgMult, this);
+        for (const h of this.world.teamOf(player)) if (!h.dead && m.pos.distanceTo(h.position) < 1.5 + h.radius) h.takeDamage(16 * this.dmgMult, this);
         this.world.effects.spawnRing(m.pos, 0x9cff3a, 1.8, 0.35);
         this.world.effects.spawnSparks(m.pos.clone().setY(0.3), 0xd9c98e, 5, 7);
         this.world.sfx('enemyDeath');
@@ -161,7 +161,7 @@ export class Gulletworm extends Boss {
     for (const e of this.erupts) {
       const big = e === main;
       const r = 2.4;
-      if (!player.dead && e.distanceTo(player.position) < r + player.radius) player.takeDamage((big ? 28 : 18) * this.dmgMult, this);
+      for (const h of this.world.teamOf(player)) if (!h.dead && e.distanceTo(h.position) < r + h.radius) h.takeDamage((big ? 28 : 18) * this.dmgMult, this);
       this.world.effects.spawnRing(e, 0x9cff3a, 3, 0.5);
       this.world.effects.spawnSparks(e.clone().setY(0.5), big ? 0xd9c98e : 0x7a6a4a, big ? 16 : 8, 9);
     }
@@ -190,7 +190,7 @@ export class Gulletworm extends Boss {
     } else {
       this.head.rotation.x = Math.sin(t * 3) * 0.1;
     }
-    const p = this.world.player.position;
+    const p = (this.coopTarget || this.world.player).position;
     this.facing = Math.atan2(p.x - this.position.x, p.z - this.position.z);
     return glow;
   }

@@ -14,9 +14,9 @@ with a boss fight every 5 waves, power-ups to grab, and a new arena every 10 wav
 | Action | Keyboard / mouse | Phone / tablet |
 | --- | --- | --- |
 | Move | WASD or arrow keys | Drag on the left half of the screen (virtual joystick) |
-| Talon slash (3-hit combo) | J or left-click (hold to keep slashing) | SLASH button (hold to keep slashing) |
-| Blink dash (untouchable, hurts enemies you pass, dodges bolts) | K or Space | BLINK button |
-| Overdrive spin (8 s cooldown, half damage taken) | L | OVERDRIVE button |
+| **Attack** (each hero's own: talon combo / shield bash / needles / arc tether) | J or left-click (hold to keep going) | big button (hold) |
+| **Mobility** (blink / shoulder charge / phase hop / magnet grapple) | K or Space | lower small button |
+| **Ultimate** (overdrive / seismic slam / needle storm / hymn engine) | L | upper small button |
 | Start | Enter / J / START | START button |
 | Restart after game over | any key or click | tap anywhere |
 | Mute / unmute sound | M or the speaker button | speaker button (top right) |
@@ -87,24 +87,49 @@ Every talon hit adds +1 to your **combo** and every kill adds +1 more. Land noth
 
 Milestones pop a callout (NICE, SAVAGE, BRUTAL, UNSTOPPABLE, GODLIKE, MELTDOWN, COREBURN!). Your best combo shows on the game over screen and in the share text. The code is in `js/combo.js`.
 
-## Heroes
+## Heroes (v1.10.0: 4 different kits)
 
-Pick a hero before every run (the last one you played is highlighted). They all use the same controls and upgrade cards:
+Pick a hero before every run (the last one you played is highlighted). Every hero uses the **same 3 buttons**
+(attack / mobility / ultimate, same keys and touch buttons), but each one fights in a completely different way.
+The HUD buttons, the select screen and the upgrade cards all use the hero's own ability names and icons.
 
-| Hero | Style | Health | Damage x attack speed | Move speed | Blink | Overdrive |
-|---|---|---|---|---|---|---|
-| **Sarrow** | balanced all-rounder | 100 | 1.00 x 1.00 | 7.0 | 1 charge, normal | whirlwind spin |
-| **Zaleks** | plated bruiser, amber core | 120 | 1.16 x 0.90 | 6.1 | shorter shoulder-charge that knocks enemies back | ground-slam spin, 30% bigger radius |
-| **Iskra** | swift skirmisher, needle-talons | 78 | 0.84 x 1.26 | 7.9 | longer, 2 charges | quick, tighter spin |
+| Hero | Playstyle | HP | Attack (J) | Mobility (K / Space) | Ultimate (L) |
+|---|---|---|---|---|---|
+| **Sarrow** | DUELIST (melee) | 135 | **Talon Combo**: 3-hit combo, heavy finisher | **Blink**: untouchable dash that cuts through enemies (0.9 s) | **Overdrive**: 1.6 s whirlwind, half damage taken (8 s) |
+| **Zaleks** | TANK | 145 | **Shield Bash**: bash + hammer-fist, huge knockback, blocks 40% of frontal damage while swinging | **Shoulder Charge**: stuns everything it hits for 1 s, stops at walls (4.5 s) | **Seismic Slam**: 5.5 m AoE slam + stun, **taunts** nearby enemies (and bosses) for 5 s, shield = 20% max HP (12 s) |
+| **Iskra** | KITER (ranged) | 70 | **Needles**: rapid needles (pierce 1) auto-aimed at the nearest enemy in your move direction, fire while moving | **Phase Hop**: 5.5 m teleport, 2 charges, leaves a **decoy** enemies chase (3 s / 4 hits) (3.2 s) | **Needle Storm**: 3.5 s of 5-needle fan volleys, move freely (11 s) |
+| **Orin** (secret) | CONTROL / summoner | 125 | **Arc Tether**: 5.5 m beam that pins its target and chains to 2 more | **Magnet Grapple**: yanks an enemy to you (stunned), or pulls you to a pillar / boss / heavy enemy, else a short reel (3.5 s) | **Hymn Engine**: 3 s vortex that drags enemies in + 2 scrap drones that fight for 10 s (14 s) |
 
-They're balanced on one shared budget: **DPS x health x mobility** (mobility = 0.7 x move speed + 0.3 x blink reach per cooldown, both relative to Sarrow). The numbers live in `js/hero-stats.js` and the models in `js/characters.js`.
+All kit numbers live in `js/hero-stats.js`; the kits are in `js/player.js` (per-hero handlers on the same 3 slots)
+and the needles, decoys, drones and vortex in `js/allies.js`. In co-op the host runs all of them and friends see
+them through the snapshot (needles, decoys, drones, vortexes, Zaleks' shield and taunt).
 
-| | Sarrow | Zaleks | Iskra |
-|---|---|---|---|
-| DPS | 1.00 | 1.04 | 1.06 |
-| Health | 100 | 120 | 78 |
-| Mobility | 1.00 | 0.80 | 1.21 |
-| **Budget** | **100.0** | **100.4** | **100.3** |
+### Balance (`node scripts/sim-ttk.mjs`)
+
+The simulator reads the real kit and card numbers and models each hero's **single-target DPS** (attack rotation +
+ultimate and mobility damage over their cooldowns, x uptime), **AoE / crowd clear** (cones, pierce, chains, rings),
+**effective HP** (armour, frontal block, slam shield, regen, siphon) and **mobility / escape** (range kept, i-frames,
+decoys, stuns, pins). It runs a standard wave, an elite-heavy wave and a boss at waves 10 / 30 / 60 / 100 with a typical
+build for each hero (universal + that hero's cards). % = difference from the 4-hero average (target about 10%):
+
+| scenario | Sarrow clear | Sarrow survive | Zaleks clear | Zaleks survive | Iskra clear | Iskra survive | Orin clear | Orin survive |
+|---|---|---|---|---|---|---|---|---|
+| standard w10 | 5.4s ( -9.6%) | 14.3s (-10.3%) | 5.4s ( -9.9%) | 17.3s (  8.4%) | 6.5s (  8.5%) | 15.5s ( -2.9%) | 6.7s ( 11.1%) | 16.7s (  4.8%) |
+| standard w30 | 11.5s ( -4.3%) | 9.2s ( -7.0%) | 11.6s ( -3.1%) | 10.3s (  5.1%) | 12.5s (  4.0%) | 9.8s ( -0.1%) | 12.4s (  3.5%) | 10.0s (  2.0%) |
+| standard w60 | 9.5s ( -0.5%) | 6.8s ( -3.0%) | 9.2s ( -3.8%) | 7.2s (  2.4%) | 9.5s ( -0.4%) | 7.2s (  1.4%) | 10.0s (  4.7%) | 7.0s ( -0.8%) |
+| standard w100 | 6.8s (  0.6%) | 5.3s ( -7.0%) | 6.6s ( -1.3%) | 5.9s (  4.3%) | 6.5s ( -3.2%) | 5.7s (  1.2%) | 7.0s (  3.9%) | 5.8s (  1.5%) |
+| elite-heavy w10 | 8.6s ( -6.7%) | 9.2s (-11.5%) | 8.6s ( -6.5%) | 11.5s ( 10.7%) | 9.8s (  6.6%) | 10.3s ( -0.8%) | 9.8s (  6.6%) | 10.6s (  1.6%) |
+| elite-heavy w30 | 18.3s ( -2.0%) | 5.9s ( -7.9%) | 18.7s (  0.1%) | 6.9s (  7.2%) | 18.8s (  0.6%) | 6.6s (  1.8%) | 18.9s (  1.2%) | 6.4s ( -1.1%) |
+| elite-heavy w60 | 15.2s (  1.8%) | 4.3s ( -6.0%) | 15.0s (  0.4%) | 4.8s (  5.1%) | 14.3s ( -3.9%) | 4.8s (  4.0%) | 15.2s (  1.7%) | 4.4s ( -3.1%) |
+| elite-heavy w100 | 11.0s (  3.5%) | 3.3s ( -9.8%) | 11.0s (  2.9%) | 3.9s (  6.9%) | 9.8s ( -8.2%) | 3.8s (  3.7%) | 10.8s (  1.7%) | 3.7s ( -0.8%) |
+| boss w10 | 7.3s ( -1.4%) | 10.2s (  0.8%) | 7.5s (  0.6%) | 10.8s (  6.7%) | 8.0s (  7.9%) | 9.5s ( -6.1%) | 6.9s ( -7.2%) | 9.9s ( -1.4%) |
+| boss w30 | 10.4s (  1.9%) | 6.6s (  5.8%) | 11.0s (  7.0%) | 6.4s (  2.3%) | 10.1s ( -1.1%) | 6.0s ( -4.1%) | 9.4s ( -7.9%) | 6.0s ( -4.0%) |
+| boss w60 | 13.6s (  2.4%) | 4.6s (  8.6%) | 14.4s (  8.2%) | 4.2s ( -0.6%) | 13.3s ( -0.1%) | 4.0s ( -5.0%) | 11.9s (-10.5%) | 4.1s ( -3.0%) |
+| boss w100 | 15.8s (  4.3%) | 3.5s (  7.0%) | 16.5s (  8.8%) | 3.2s ( -2.6%) | 14.9s ( -1.9%) | 3.2s ( -4.0%) | 13.5s (-11.2%) | 3.3s ( -0.4%) |
+
+Worst cell: 11.5%. 42 of the 48 cells are within 10%; the 6 slightly over are all at wave 10 (Sarrow's early
+survival a bit low, Zaleks' a bit high, Orin's first clears a bit slow, as his drones need cards) or Orin's late boss
+kills (drones scale well). `--check` makes the script fail above 10%.
 
 ## Weapon upgrades (every 2 waves)
 
@@ -119,12 +144,16 @@ damage = base · hero damage · weaponMult(tier) · perks   // perks are capped,
 
 The base tier alone keeps time-to-kill flat for the whole run. Perks are the extra edge. They come in small steps with high caps, so they build slowly over the ~50 picks you'd make by wave 100. A maxed card leaves the pool. When fewer than 3 cards are left, **Reactor Patch** (+3 max health and a heal) fills the gap.
 
-| Group | Upgrades (max level) |
+The pool is **universal cards** (every hero) plus **hero cards** (only offered to that hero). The card's group label uses
+your hero's ability name (e.g. PHASE HOP, SEISMIC SLAM).
+
+| Who | Upgrades (max level) |
 |---|---|
-| Talons | Talon Edge +3.5% dmg (10), Wide Arc +6% reach (6), Shockwave Finisher (5), Crit Spark +3.5% (8), Twin Strike +4% (6), Storm Talons +7.5% (6), Core Leech (6) |
-| Overdrive | Long Overdrive +0.2s (6), Overdrive Reach +6% (6), Overdrive Fury +12.5% (6), Overdrive Siphon (6), Overdrive Coolant -5% (6) |
-| Blink | Blink Edge +25% (6), Long Blink +7.5% (6), Extra Blink +1 charge (1), Quick Blink -6% (6), Blink Trail (5) |
-| Core | Swift Step +3% (6), Reinforced Core +7.5% max health (8), Core Recharge +17.5% (6) |
+| Everyone | Core Edge +3.5% dmg (10), Crit Spark +3.5% (8), Twin Strike +4% (6), Storm Core +7.5% chain (6), Core Leech (6), Ultimate Fury +12.5% (6), Ultimate Coolant -5% (6), Quick Recovery -6% mobility cd (6), Swift Step +3% (6), Reinforced Core +7.5% HP (8), Core Recharge +17.5% (6) |
+| Sarrow | Wide Arc (6), Shockwave Finisher (5), Blink Edge (6), Long Blink (6), Extra Blink +1 charge (1), Blink Trail (5), Long Overdrive (6), Overdrive Reach (6), Overdrive Siphon (6) |
+| Zaleks | Tower Guard +6% block (2), Heavy Hammer +6% dmg/reach (6), Concussive Charge stun +0.5 s (3), Long Charge (5), Aftershock +8% slam radius (5), Bulwark Shield +10% (5), War Cry taunt +1 s (3) |
+| Iskra | Piercing Needles +1 (1), Split Needles (1), Extra Hop +1 charge (1), Long Hop +12% (4), Stubborn Decoy +1 s/+2 hits (4), Long Storm +0.5 s (5), Dense Storm +1 needle (2) |
+| Orin | Choir Chain +1 (3), Long Tether +10% (4), Magnet Shock stun +0.3 s (4), Extra Drone +1 (1), Drone Armament +10% (5), Drone Lifespan +1 s (3), Hymn Shell -6% damage while drones fly (4), Deep Vortex +10% (5) |
 
 Simulated time-to-kill, single target, typical mixed build (`node scripts/sim-ttk.mjs`):
 
@@ -135,16 +164,6 @@ Simulated time-to-kill, single target, typical mixed build (`node scripts/sim-tt
 | 30 | 14 | 4.92 | 0.56s | 1.24s | 1.11 | 0.51s | 1.12s | 0.80s |
 | 60 | 29 | 9.12 | 0.56s | 1.22s | 1.22 | 0.46s | 1.00s | 0.60s |
 | 100 | 49 | 14.72 | 0.55s | 1.22s | 1.38 | 0.40s | 0.88s | 0.59s |
-
-Per hero (typical build), time-to-kill for standard / elite enemies and how long you survive under steady pressure. Enemy damage grows 7% per wave, so late waves stay deadly:
-
-| wave | Sarrow TTK | Zaleks TTK | Iskra TTK | Sarrow survive | Zaleks survive | Iskra survive |
-|---|---|---|---|---|---|---|
-| 1 | 0.55 / 1.21s | 0.52 / 1.15s | 0.52 / 1.14s | 10.0s | 9.6s | 9.5s |
-| 10 | 0.53 / 1.16s | 0.51 / 1.11s | 0.50 / 1.10s | 6.6s | 6.3s | 6.3s |
-| 30 | 0.51 / 1.12s | 0.49 / 1.07s | 0.48 / 1.06s | 3.6s | 3.4s | 3.4s |
-| 60 | 0.46 / 1.00s | 0.44 / 0.96s | 0.43 / 0.95s | 2.2s | 2.2s | 2.1s |
-| 100 | 0.40 / 0.88s | 0.38 / 0.84s | 0.38 / 0.83s | 1.6s | 1.5s | 1.5s |
 
 ## Arenas (a new one every 10 waves)
 
@@ -193,7 +212,8 @@ Weapon upgrades: `js/upgrades.js` (upgrade list, caps, scaling formula). Heroes:
 index.html         Page layout: HUD, boss bar, touch buttons, title/game-over screens, Three.js import map
 style.css          All the styling (HUD, buttons, joystick, cooldown pies, mobile tweaks)
 js/main.js         Starting point: renderer, camera, lights, game loop, score, start/game over, resizing
-js/player.js       Sarrow: blocky model, movement, talon combo, blink, overdrive, core recharge
+js/player.js       heroes: movement + the 4 kits on the 3 ability slots, core recharge
+js/allies.js       kit objects: Iskra's needles + decoys, Orin's drones + vortex (co-op synced)
 js/enemy.js        Grindchoir enemy types (looks + AI), elites, hit flash, knockback, death
 js/boss.js         The shared boss brain (telegraph -> attack -> recover) + the three original bosses
 js/boss-vell.js    Cantor Vell (blink strikes, afterimages)
@@ -326,12 +346,9 @@ Title screen → **Streamer mode** → channel (default **CalebGCameron**) → *
 
 ## Milestones and the secret hero (v1.8.0)
 
-- **Milestones** (shop → MILESTONES tab): 16 long-term goals saved on this device, each paying out once. Rewards are scrap, milestone-only cosmetics (Veteran / Inferno skins, Hymnbreaker / Hex talons) and the secret hero. Examples: reach wave 10/25/50, beat all 7 bosses, hit a 100/400 combo, beat a golden boss, 10 close calls, 3 cursed cards in one run, wave 10 with each hero, finish a co-op run, revive a teammate.
-- **ORIN, the secret 4th hero**: shown as a locked silhouette on the select screen until you reach **wave 50** (any hero, solo or co-op). He's a rogue Grindchoir unit with the same balance budget as the others (99.6 vs 100). Steady stats; his Overdrive *pulls* enemies in towards his hooked talons instead of throwing them out. Once unlocked, he's also available in the co-op lobby.
+- **Milestones** (shop → MILESTONES tab): 16 long-term goals saved on this device, each paying out once. Rewards are scrap, milestone-only cosmetics (Veteran / Inferno skins, Hymnbreaker / Hex talons) and the secret hero. Examples: reach wave 10/25/50, beat all 7 bosses, hit a 100/400 combo, beat a golden boss, 10 close calls, 3 cursed cards in one run, wave 10 with 3 different heroes, finish a co-op run, revive a teammate.
+- **ORIN, the secret 4th hero**: shown as a locked silhouette on the select screen until you reach **wave 50** (any hero, solo or co-op). He's a rogue Grindchoir unit and, since v1.10.0, the CONTROL hero (arc tether, magnet grapple, Hymn Engine drones; see Heroes). Once unlocked, he's also available in the co-op lobby.
 
-| Hero | HP | Speed | Damage | Attack speed | Budget |
-|---|---|---|---|---|---|
-| ORIN | 100 | 6.8 | 1.05 | 0.98 | 99.6 |
 
 ## Daily challenge, weekly boss rush, leaderboards (v1.9.0)
 

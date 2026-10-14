@@ -35,9 +35,9 @@ export const SHOP = {
   ],
   // perk.card = the upgrade card you start the run with at Lv 1 (no weapon tier)
   perk: [
-    { id: 'whetted', name: 'Whetted Talons', desc: 'Start with Talon Edge Lv 1', card: 'edge', cost: 300 },
+    { id: 'whetted', name: 'Whetted Core', desc: 'Start with Core Edge Lv 1', card: 'edge', cost: 300 },
     { id: 'plating', name: 'Spare Plating', desc: 'Start with Reinforced Core Lv 1', card: 'maxHp', cost: 300 },
-    { id: 'fuse', name: 'Quick Fuse', desc: 'Start with Quick Blink Lv 1', card: 'bkCool', cost: 300 },
+    { id: 'fuse', name: 'Quick Fuse', desc: 'Start with Quick Recovery Lv 1', card: 'bkCool', cost: 300 },
     { id: 'boots', name: 'Light Boots', desc: 'Start with Swift Step Lv 1', card: 'speed', cost: 300 },
   ],
 };

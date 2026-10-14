@@ -167,7 +167,7 @@ export class Enemy {
     this.knockback.z += knockZ * resist;
     // Light hits interrupt most enemies; armoured ones only flinch from heavy hits
     if (!this.type.armored || heavy) {
-      this.stun = 0.3;
+      this.stun = Math.max(this.stun, 0.3); // (keeps a longer stun from a charge or slam)
       if (this.state === 'windup') { this.state = 'chase'; this.stateTime = 0; }
     }
     if (this.hp <= 0) this.die();

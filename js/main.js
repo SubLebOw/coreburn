@@ -4,6 +4,7 @@
 //   2. creates the arena, Sarrow, the waves, power-ups, the HUD and the controls
 //   3. runs the game loop ~60 times a second: update everything, then draw
 //   4. handles SLOW-MO (everything but Sarrow runs slower) and the fade between arenas
+import { Allies } from './allies.js';
 import * as THREE from 'three';
 import { Input } from './input.js';
 import { isTouchDevice, setupTouchControls } from './touch.js';
@@ -247,6 +248,9 @@ const powerups = new PowerUps(scene, world);
 world.player = player;
 world.enemies = enemies;
 world.powerups = powerups;
+const allies = new Allies(scene, world); // ISKRA's needles + decoys, ORIN's drones + vortex
+world.allies = allies;
+world.aggro = (e, t) => allies.aggro(e, t);
 
 // SLOW-MO look and sound on/off
 function setSlowmo(on) {
@@ -295,6 +299,7 @@ function updateTransition(dt) {
     player.slide.set(0, 0, 0);
     if (coop.mode === 'host') coop.teleportAll();
     projectiles.reset();
+  allies.reset();
     effects.reset();
     powerups.clearFloor();
     updateCamera(0, true);
@@ -334,7 +339,7 @@ function startGame(id = heroId) {
   const solo = !coop.mode;
   player.talonBase = solo ? meta.talonColor : null;
   player.startCard = solo && mode === 'endless' ? meta.perkCard : null; // shop perks: normal runs only (fair boards)
-  if (mode === 'daily') player.startCard = dailyStartCard(modeKey, Object.keys(UPGRADES).filter((u) => UPGRADES[u].max > 1)); // same for everyone
+  if (mode === 'daily') player.startCard = dailyStartCard(modeKey, Object.keys(UPGRADES).filter((u) => UPGRADES[u].max > 1 && !UPGRADES[u].heroes)); // same for everyone
   player.setCharacter(id, solo ? meta.skinColor : null);
   if (coop.mode === 'host') coop.setupHostGame(); // friends' heroes + co-op scaling (before wave 1)
   hud.setHeroName(player.netName ? player.netName.toUpperCase() : player.char.name, player.tint || player.char.color);
@@ -344,6 +349,7 @@ function startGame(id = heroId) {
   deathTimer = 0;
   effects.reset();
   projectiles.reset();
+  allies.reset();
   enemies.reset();
   player.reset();
   powerups.reset();
@@ -372,6 +378,7 @@ function startGame(id = heroId) {
 function resetWorld() {
   effects.reset();
   projectiles.reset();
+  allies.reset();
   enemies.reset();
   powerups.reset();
   hud.hidePicker();
@@ -408,7 +415,7 @@ function showTitle() {
   document.getElementById('restart-hint').innerHTML = RESTART_HINT;
 }
 const coop = new Coop({
-  THREE, scene, camera, world, input, hud, sound, combo, effects, projectiles, powerups, enemies, arena,
+  THREE, scene, camera, world, input, hud, sound, combo, effects, projectiles, powerups, enemies, arena, allies,
   get player() { return player; },
   getState: () => state,
   setState: (s) => { state = s; },
@@ -502,7 +509,7 @@ function gameOver() {
   }
   const lastDown = coop.mode === 'host' ? coop.heroes.reduce((a, h) => (h.killedBy ? h : a), player) : player;
   const killer = lastDown.killedBy ? lastDown.killedBy.killerName : null; // e.g. "the Furnace Deacon"
-  lastRun = { wave: enemies.wave, score, killer, place: arena.current.place, tier: player.loadout.tier, combo: combo.best, hero: player.netName || displayName(player.char), kills,
+  lastRun = { wave: enemies.wave, score, killer, place: arena.current.place, tier: player.loadout.tier, combo: combo.best, hero: player.netName || displayName(player.char), tag: player.char.tag, kills,
     team: coop.mode === 'host' ? coop.heroes.filter((h) => h !== player).map((h) => h.netName) : null,
     bosses: run.bosses, mutators: run.mutators, jackpot: run.jackpot, greed: player.stats.scoreMult > 1 };
   upgradeTimer = 0;
@@ -560,6 +567,7 @@ reviveBtn.addEventListener('click', async (e) => {
     if (away.length() < 8) { en.knockback.add(away.normalize().multiplyScalar(14)); en.stun = 1; }
   }
   projectiles.reset();
+  allies.reset();
   player.revive();
   deathTimer = 0;
   hud.hideOverlay();
@@ -763,6 +771,7 @@ function frame() {
     } else {
       player.update(dt, input);
       enemies.update(worldDt);
+      allies.update(worldDt);
       projectiles.update(worldDt, world.heroes || player, arena, effects);
       arena.update(worldDt, player, world, true);
       powerups.update(dt);

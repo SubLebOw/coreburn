@@ -1,0 +1,288 @@
+// allies.js
+// Things the heroes' kits put into the arena (pooled meshes, cheap on phones):
+//   - needles   (ISKRA's attack and Needle Storm)
+//   - decoys    (ISKRA's Phase Hop leaves one; nearby enemies chase it instead of her)
+//   - drones    (ORIN's Hymn Engine: little scrap drones that zap enemies)
+//   - vortexes  (ORIN's Hymn Engine: drags enemies to its centre)
+// Solo and co-op host: simulated here and every hit goes through the owner hero's strike().
+// Co-op friends: never simulate; they draw what the host's snapshot says (serialize / applySnapshot).
+import * as THREE from 'three';
+
+const NEEDLES = 80, DECOYS = 6, DRONES = 12, VORTEXES = 3;
+
+export class Allies {
+  constructor(scene, world) {
+    this.world = world;
+    const r2 = (x) => Math.round(x * 100) / 100;
+    this.r2 = r2;
+    this.mats = new Map();
+    // needles: thin glowing spikes
+    const ng = new THREE.BoxGeometry(0.09, 0.09, 0.75);
+    this.needles = [];
+    for (let i = 0; i < NEEDLES; i++) {
+      const mesh = new THREE.Mesh(ng, this.mat(0xe8a0ff));
+      mesh.visible = false;
+      scene.add(mesh);
+      this.needles.push({ mesh, vel: new THREE.Vector3(), life: 0, owner: null, dmg: 0, pierce: 0, hitSet: new Set(), color: 0xe8a0ff, target: new THREE.Vector3() });
+    }
+    // decoys: a translucent hologram pillar with a ring
+    this.decoys = [];
+    const dg = new THREE.CylinderGeometry(0.42, 0.5, 1.9, 8);
+    const rg = new THREE.RingGeometry(0.6, 0.8, 24);
+    for (let i = 0; i < DECOYS; i++) {
+      const g = new THREE.Group();
+      const mat = new THREE.MeshBasicMaterial({ color: 0xc070ff, transparent: true, opacity: 0.4, depthWrite: false });
+      const body = new THREE.Mesh(dg, mat); body.position.y = 0.95;
+      const ring = new THREE.Mesh(rg, mat); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05;
+      g.add(body, ring); g.visible = false; scene.add(g);
+      this.decoys.push(this.makeDecoy(g, mat));
+    }
+    // drones: a small boxy hover-drone with a glowing eye
+    this.drones = [];
+    const bg = new THREE.BoxGeometry(0.5, 0.22, 0.5), eg = new THREE.BoxGeometry(0.16, 0.1, 0.1);
+    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x5a5560 });
+    for (let i = 0; i < DRONES; i++) {
+      const g = new THREE.Group();
+      const eye = new THREE.Mesh(eg, this.mat(0xff4a5a)); eye.position.set(0, 0, 0.27);
+      const wl = new THREE.Mesh(eg, this.mat(0xff9a8a)); wl.position.set(-0.33, 0.05, 0); wl.scale.set(1, 1, 3);
+      const wr = wl.clone(); wr.position.x = 0.33;
+      g.add(new THREE.Mesh(bg, bodyMat), eye, wl, wr); g.visible = false; scene.add(g);
+      this.drones.push({ obj: g, eye, life: 0, owner: null, angle: 0, cd: 0, dmg: 0, target: new THREE.Vector3() });
+    }
+    // vortexes: two counter-rotating rings on the floor
+    this.vortexes = [];
+    const vg = new THREE.RingGeometry(0.82, 1, 40, 1, 0, Math.PI * 1.3); // thin swirling arcs
+    for (let i = 0; i < VORTEXES; i++) {
+      const g = new THREE.Group();
+      const mat = new THREE.MeshBasicMaterial({ color: 0xff4a5a, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false });
+      const a = new THREE.Mesh(vg, mat), b = new THREE.Mesh(vg, mat);
+      a.rotation.x = b.rotation.x = -Math.PI / 2; a.position.y = 0.06; b.position.y = 0.08; b.scale.setScalar(0.55);
+      const c = new THREE.Mesh(vg, mat); c.scale.setScalar(0.45); c.rotation.z = Math.PI; b.add(c); // inner swirl spins with b
+      g.add(a, b); g.visible = false; scene.add(g);
+      this.vortexes.push({ obj: g, a, b, life: 0, owner: null, radius: 1, dmg: 0, tick: 0, tickLeft: 0 });
+    }
+  }
+
+  mat(color) {
+    if (!this.mats.has(color)) this.mats.set(color, new THREE.MeshBasicMaterial({ color }));
+    return this.mats.get(color);
+  }
+
+  // A decoy looks like a hero to enemies: position, radius, dead, takeDamage (enemy melee calls it)
+  makeDecoy(obj, mat) {
+    const d = { obj, mat, life: 0, hits: 0, owner: null, position: new THREE.Vector3(), radius: 0.5, isDecoy: true, velocity: new THREE.Vector3(), state: 'normal' };
+    Object.defineProperty(d, 'dead', { get: () => d.life <= 0 });
+    d.takeDamage = () => {
+      if (d.life <= 0) return false;
+      d.hits--;
+      this.world.effects.spawnSparks(d.position.clone().setY(1), 0xc070ff, 5);
+      if (d.hits <= 0) this.popDecoy(d);
+      return true;
+    };
+    d.heal = () => {};
+    return d;
+  }
+
+  get host() { return !this.world.netClient; }
+
+  // ---------- spawning (solo / host only) ----------
+  fireNeedle(owner, from, dir, dmg, { pierce = 0, speed = 30, range = 15, color = 0xe8a0ff, kind = 'needle' } = {}) {
+    if (!this.host) return;
+    const n = this.needles.find((x) => x.life <= 0);
+    if (!n) return;
+    n.owner = owner; n.dmg = dmg; n.pierce = pierce; n.kind = kind; n.hitSet.clear();
+    n.vel.set(dir.x, 0, dir.z).normalize().multiplyScalar(speed);
+    n.life = range / speed;
+    n.color = color;
+    n.mesh.material = this.mat(color);
+    n.mesh.position.set(from.x, 1.1, from.z).addScaledVector(n.vel, 0.02);
+    n.mesh.rotation.set(0, Math.atan2(dir.x, dir.z), 0);
+    n.mesh.visible = true;
+  }
+
+  addDecoy(owner, pos, time, hits) {
+    if (!this.host) return;
+    const d = this.decoys.find((x) => x.life <= 0) || this.decoys[0];
+    d.owner = owner; d.life = time; d.hits = hits;
+    d.position.set(pos.x, 0, pos.z);
+    d.mat.color.setHex(owner.tint || owner.char.color);
+    d.obj.position.copy(d.position); d.obj.visible = true;
+    this.world.effects.spawnRing(d.position, 0xc070ff, 1.6, 0.35);
+  }
+
+  popDecoy(d) {
+    d.life = 0; d.obj.visible = false;
+    this.world.effects.spawnRing(d.position, 0xc070ff, 2.2, 0.4);
+    this.world.sfx('zap');
+  }
+
+  addDrones(owner, count, time, dmg) {
+    if (!this.host) return;
+    // a new Hymn Engine replaces this hero's old drones
+    for (const d of this.drones) if (d.owner === owner) { d.life = 0; d.obj.visible = false; }
+    for (let i = 0; i < count; i++) {
+      const d = this.drones.find((x) => x.life <= 0);
+      if (!d) break;
+      d.owner = owner; d.life = time; d.dmg = dmg; d.cd = 0.3 + i * 0.15;
+      d.angle = (i / count) * Math.PI * 2;
+      d.obj.position.set(owner.position.x, 1.8, owner.position.z);
+      d.obj.visible = true;
+    }
+  }
+
+  addVortex(owner, pos, time, radius, dmg, tick) {
+    if (!this.host) return;
+    const v = this.vortexes.find((x) => x.life <= 0) || this.vortexes[0];
+    v.owner = owner; v.life = time; v.radius = radius; v.dmg = dmg; v.tick = tick; v.tickLeft = 0;
+    v.obj.position.set(pos.x, 0, pos.z);
+    v.obj.scale.setScalar(radius);
+    v.obj.visible = true;
+  }
+
+  // Who an enemy goes for, given its normal target: a taunting hero beats everything, then decoys
+  aggro(e, target) {
+    const heroes = this.world.heroes || [this.world.player];
+    for (const h of heroes) {
+      if (h && !h.dead && h.tauntTimer > 0 && (e.isBoss || h.position.distanceTo(e.position) < h.tauntRadius)) return h;
+    }
+    if (e.isBoss) return target;
+    let best = null, bd = Infinity;
+    for (const d of this.decoys) {
+      if (d.life <= 0) continue;
+      const dist = d.position.distanceTo(e.position);
+      if (dist < (d.owner?.char.decoyRadius || 10) && dist < bd) { bd = dist; best = d; }
+    }
+    return best || target;
+  }
+
+  // ---------- update (solo / host) ----------
+  update(dt) {
+    if (!this.host) return this.clientUpdate(dt);
+    const enemies = this.world.enemies.list, arena = this.world.arena;
+    for (const n of this.needles) {
+      if (n.life <= 0) continue;
+      n.life -= dt;
+      const pos = n.mesh.position;
+      pos.addScaledVector(n.vel, dt);
+      let done = n.life <= 0 || Math.abs(pos.x) > 19 || Math.abs(pos.z) > 19;
+      for (const o of arena.obstacles) if (Math.hypot(pos.x - o.x, pos.z - o.z) < o.r) { done = true; break; }
+      if (!done) {
+        for (const e of enemies) {
+          if (!e.canBeHit || n.hitSet.has(e)) continue;
+          if (Math.hypot(pos.x - e.position.x, pos.z - e.position.z) < e.radius + 0.35) {
+            n.hitSet.add(e);
+            const k = n.vel.clone().normalize().multiplyScalar(2);
+            n.owner?.strike(e, n.dmg, k.x, k.z, false, n.kind);
+            this.world.effects.spawnSparks(pos.clone(), n.color, 3, 4);
+            if (n.pierce-- <= 0) { done = true; break; }
+          }
+        }
+      }
+      if (done) { n.life = 0; n.mesh.visible = false; }
+    }
+    for (const d of this.decoys) {
+      if (d.life <= 0) continue;
+      d.life -= dt;
+      d.obj.rotation.y += dt * 3;
+      d.mat.opacity = 0.3 + 0.15 * Math.sin(performance.now() / 90);
+      if (d.life <= 0) this.popDecoy(d);
+    }
+    for (const d of this.drones) {
+      if (d.life <= 0) continue;
+      d.life -= dt;
+      const o = d.owner;
+      if (!o || o.dead || d.life <= 0) { d.life = 0; d.obj.visible = false; continue; }
+      d.angle += dt * 2.2;
+      const tx = o.position.x + Math.cos(d.angle) * 1.7, tz = o.position.z + Math.sin(d.angle) * 1.7;
+      d.obj.position.x += (tx - d.obj.position.x) * Math.min(1, dt * 6);
+      d.obj.position.z += (tz - d.obj.position.z) * Math.min(1, dt * 6);
+      d.obj.position.y = 1.8 + Math.sin(performance.now() / 200 + d.angle) * 0.15;
+      d.cd -= dt;
+      let best = null, bd = o.char.droneRange || 9;
+      for (const e of enemies) {
+        if (!e.canBeHit) continue;
+        const dist = Math.hypot(e.position.x - d.obj.position.x, e.position.z - d.obj.position.z);
+        if (dist < bd) { bd = dist; best = e; }
+      }
+      if (best) d.obj.rotation.y = Math.atan2(best.position.x - d.obj.position.x, best.position.z - d.obj.position.z);
+      if (best && d.cd <= 0) {
+        d.cd = o.char.droneRate || 0.5;
+        this.world.effects.spawnZap(d.obj.position.clone(), best.position, 0xff6a5a);
+        o.strike(best, d.dmg, 0, 0, false, 'drone');
+      }
+    }
+    for (const v of this.vortexes) {
+      if (v.life <= 0) continue;
+      v.life -= dt;
+      v.a.rotation.z -= dt * 6; v.b.rotation.z += dt * 9;
+      if (v.life <= 0 || !v.owner) { v.life = 0; v.obj.visible = false; continue; }
+      const c = v.obj.position;
+      v.tickLeft -= dt;
+      const tick = v.tickLeft <= 0;
+      if (tick) v.tickLeft = v.tick;
+      for (const e of enemies) {
+        if (!e.canBeHit) continue;
+        const to = new THREE.Vector3(c.x - e.position.x, 0, c.z - e.position.z);
+        const dist = to.length();
+        if (dist > v.radius + e.radius) continue;
+        if (!e.isBoss && dist > 0.8) {
+          const pull = Math.min(dist - 0.8, dt * 7 * (e.type?.armored ? 0.5 : 1));
+          e.position.addScaledVector(to.normalize(), pull);
+          arena.resolve?.(e.position, e.radius);
+        }
+        if (tick) v.owner.strike(e, v.dmg, 0, 0, false, 'spin');
+      }
+    }
+  }
+
+  // ---------- co-op: what friends see ----------
+  serialize() {
+    const r2 = this.r2, out = [];
+    for (const n of this.needles) if (n.life > 0) out.push(['n', r2(n.mesh.position.x), r2(n.mesh.position.z), r2(n.mesh.rotation.y), n.color]);
+    for (const d of this.decoys) if (d.life > 0) out.push(['d', r2(d.position.x), r2(d.position.z), d.mat.color.getHex()]);
+    for (const d of this.drones) if (d.life > 0) out.push(['r', r2(d.obj.position.x), r2(d.obj.position.z), r2(d.obj.rotation.y)]);
+    for (const v of this.vortexes) if (v.life > 0) out.push(['v', r2(v.obj.position.x), r2(v.obj.position.z), r2(v.radius)]);
+    return out;
+  }
+
+  applySnapshot(list) {
+    const used = { n: 0, d: 0, r: 0, v: 0 };
+    for (const s of list || []) {
+      const [k, x, z, a, b] = s;
+      if (k === 'n') {
+        const n = this.needles[used.n++]; if (!n) continue;
+        if (!n.mesh.visible) n.mesh.position.set(x, 1.1, z);
+        n.target.set(x, 1.1, z); n.mesh.rotation.y = a; n.mesh.material = this.mat(b); n.mesh.visible = true; n.life = 1;
+      } else if (k === 'd') {
+        const d = this.decoys[used.d++]; if (!d) continue;
+        d.position.set(x, 0, z); d.obj.position.copy(d.position); d.mat.color.setHex(a); d.obj.visible = true; d.life = 1;
+      } else if (k === 'r') {
+        const d = this.drones[used.r++]; if (!d) continue;
+        if (!d.obj.visible) d.obj.position.set(x, 1.8, z);
+        d.target.set(x, 1.8, z); d.obj.rotation.y = a; d.obj.visible = true; d.life = 1;
+      } else if (k === 'v') {
+        const v = this.vortexes[used.v++]; if (!v) continue;
+        v.obj.position.set(x, 0, z); v.obj.scale.setScalar(a); v.obj.visible = true; v.life = 1;
+      }
+    }
+    this.needles.slice(used.n).forEach((n) => { n.life = 0; n.mesh.visible = false; });
+    this.decoys.slice(used.d).forEach((d) => { d.life = 0; d.obj.visible = false; });
+    this.drones.slice(used.r).forEach((d) => { d.life = 0; d.obj.visible = false; });
+    this.vortexes.slice(used.v).forEach((v) => { v.life = 0; v.obj.visible = false; });
+  }
+
+  clientUpdate(dt) {
+    const k = 1 - Math.exp(-14 * dt);
+    for (const n of this.needles) if (n.mesh.visible) n.mesh.position.lerp(n.target, k);
+    for (const d of this.drones) if (d.obj.visible) d.obj.position.lerp(d.target, k);
+    for (const d of this.decoys) if (d.obj.visible) { d.obj.rotation.y += dt * 3; d.mat.opacity = 0.3 + 0.15 * Math.sin(performance.now() / 90); }
+    for (const v of this.vortexes) if (v.obj.visible) { v.a.rotation.z -= dt * 6; v.b.rotation.z += dt * 9; }
+  }
+
+  reset() {
+    for (const n of this.needles) { n.life = 0; n.mesh.visible = false; }
+    for (const d of this.decoys) { d.life = 0; d.obj.visible = false; }
+    for (const d of this.drones) { d.life = 0; d.obj.visible = false; d.owner = null; }
+    for (const v of this.vortexes) { v.life = 0; v.obj.visible = false; v.owner = null; }
+  }
+}

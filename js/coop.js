@@ -410,7 +410,8 @@ export class Coop {
       bb: bb ? [bb.name, Math.round(bb.hp), Math.round(bb.maxHp)] : 0,
       ar: [arena.current.index, arena.current.loop],
       h: this.heroes.map((h) => [h.slot, r2(h.position.x), r2(h.position.z), r2(h.facing), h.state, h.comboStep, Math.ceil(h.hp), h.maxHp, h.dead ? 1 : 0, r2(h.reviveProgress || 0), h.loadout.tier,
-        powerups.listFor(h).map((p) => [p.type, r2(p.left), p.seconds, p.hits])]),
+        powerups.listFor(h).map((p) => [p.type, r2(p.left), p.seconds, p.hits]), (h.shieldHp > 0 ? 1 : 0) | (h.tauntTimer > 0 ? 2 : 0)]),
+      a: this.ctx.allies.serialize(), // needles, decoys, drones, vortexes
       e: enemies.list.filter((e) => e.nid).map((e) => e.isBoss
         ? [e.nid, 'B', r2(e.position.x), r2(e.position.z), r2(e.facing), e.state, (e.flashTimer > 0 ? 2 : 0) | (e.dead ? 4 : 0) | (e.golden ? 8 : 0), e.bossNumber, e.part, r2(e.stateTime), e.attack || '', e.hidden ? 1 : 0, r2(e.telegraphTime || 1), r2(e.rootY || 0)]
         : [e.nid, e.typeName, r2(e.position.x), r2(e.position.z), r2(e.facing), e.state, (e.elite ? 1 : 0) | (e.flashTimer > 0 ? 2 : 0) | (e.dead ? 4 : 0) | (e.stun > 0 ? 8 : 0), r2(e.stateTime)]),
@@ -661,14 +662,18 @@ export class Coop {
       arena.setTheme(m.ar[0], m.ar[1]);
       effects.reset();
       projectiles.reset();
+      this.ctx.allies.reset();
       this.ctx.flashFade();
     }
     // heroes
     for (const hs of m.h) {
-      const [slot, x, z, f, st, cs, hp, mhp, dead, rv, tier, pw] = hs;
+      const [slot, x, z, f, st, cs, hp, mhp, dead, rv, tier, pw, kf = 0] = hs;
       const h = slot === this.mySlot ? player : this.puppets.get(slot);
       if (!h) continue;
       h.reviveProgress = rv;
+      h.netShield = !!(kf & 1);
+      h.guard.visible = h.netShield && !dead;
+      h.tauntTimer = kf & 2 ? 0.2 : 0;
       h.netDead = !!dead;
       if (h.loadout.tier !== tier && h !== player) { h.loadout.tier = tier; h.applyLoadout(); }
       h.powers = Object.fromEntries(pw.map(([type, left, secs, hits]) => [type, { time: secs, max: secs / Math.max(0.01, left), hits }]));
@@ -694,8 +699,8 @@ export class Coop {
         h.state = st;
         h.stateTime = 0;
         h.comboStep = cs;
-        h.spinRing.visible = st === 'spin';
-        if (st === 'spin') h.spinRing.scale.setScalar(h.stats.spinRadius * h.char.spinRadius);
+        h.spinRing.visible = st === 'spin' && h.kit !== 'zaleks';
+        if (st === 'spin') h.spinRing.scale.setScalar(h.kit === 'sarrow' ? h.stats.spinRadius * h.char.spinRadius : (h.kit === 'iskra' ? 0.6 : 0.8));
         if (st !== 'spin') h.model.body.rotation.y = 0;
       } else if (st === 'attack' && cs !== h.comboStep) { h.comboStep = cs; h.stateTime = 0; }
     }
@@ -741,6 +746,7 @@ export class Coop {
       p.mesh.visible = true;
       p.life = 1;
     });
+    this.ctx.allies.applySnapshot(m.a);
     // pickups + heal orbs
     const pseen = new Set();
     for (const [id, type, x, z] of m.pu) {
@@ -867,6 +873,7 @@ export class Coop {
     // bolts glide between snapshots
     for (const p of this.ctx.projectiles.list) if (p.mesh.visible && p.target) p.mesh.position.lerp(p.target, k);
     powerups.update(dt, true);
+    this.ctx.allies.update(dt); // friends: just glide what the host sent
     arena.update(dt, player, world, false);
   }
 

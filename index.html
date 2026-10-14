@@ -69,13 +69,13 @@
 
     <!-- Ability cooldowns (keyboard players) -->
     <div id="abilities" class="kb-only">
-      <div class="ability ready" id="ab-dash"><span class="cd-text"></span><span class="key">K</span><span class="label">BLINK</span></div>
-      <div class="ability ready" id="ab-spin"><span class="cd-text"></span><span class="key">L</span><span class="label">OVERDRIVE</span></div>
+      <div class="ability ready" id="ab-dash"><span class="cd-text"></span><span class="key">K</span><span class="aicon">➹</span><span class="pips"></span><span class="label">BLINK</span></div>
+      <div class="ability ready" id="ab-spin"><span class="cd-text"></span><span class="key">L</span><span class="aicon">⟲</span><span class="label">OVERDRIVE</span></div>
     </div>
 
     <div id="controls-hint" class="kb-only">
-      <b>WASD / Arrows</b> move &nbsp;·&nbsp; <b>J / Left-click</b> slash combo &nbsp;·&nbsp;
-      <b>K / Space</b> blink &nbsp;·&nbsp; <b>L</b> overdrive spin
+      <b>WASD / Arrows</b> move &nbsp;·&nbsp; <b>J / Left-click</b> attack (hold) &nbsp;·&nbsp;
+      <b>K / Space</b> mobility &nbsp;·&nbsp; <b>L</b> ultimate
     </div>
 
     <div id="banner"><div id="banner-text"></div><div id="banner-sub"></div></div>
@@ -100,7 +100,7 @@
     </div>
     <div id="touch-buttons">
       <button id="btn-slash" class="tbtn">SLASH</button>
-      <button id="btn-dash" class="tbtn ready"><span class="cd-text"></span><span class="lbl">BLINK</span></button>
+      <button id="btn-dash" class="tbtn ready"><span class="cd-text"></span><span class="pips"></span><span class="lbl">BLINK</span></button>
       <button id="btn-spin" class="tbtn ready"><span class="cd-text"></span><span class="lbl">OVER<br>DRIVE</span></button>
     </div>
   </div>
@@ -189,15 +189,16 @@
         with a stolen reactor core burning in his chest, has decided the song ends here.</p>
       <ul class="kb-only">
         <li><b>WASD / Arrows</b> - move</li>
-        <li><b>J / Left-click</b> - talon slash (tap 3x for a combo, hold to keep going)</li>
-        <li><b>K / Space</b> - blink dash (untouchable while blinking)</li>
-        <li><b>L</b> - overdrive spin (8s cooldown)</li>
+        <li><b>J / Left-click</b> - attack (hold to keep going)</li>
+        <li><b>K / Space</b> - mobility (blink, charge, phase hop or grapple)</li>
+        <li><b>L</b> - ultimate (on a cooldown)</li>
+        <li>4 heroes, 4 different kits: duelist, tank, kiter, controller</li>
       </ul>
       <ul class="touch-only">
         <li><b>Left thumb</b> - drag to move</li>
-        <li><b>SLASH</b> - talon combo (hold to keep slashing)</li>
-        <li><b>BLINK</b> - dash through enemies and bullets</li>
-        <li><b>OVERDRIVE</b> - spin attack (8s cooldown)</li>
+        <li><b>Big button</b> - attack (hold to keep going)</li>
+        <li><b>Low button</b> - mobility (each hero's is different)</li>
+        <li><b>High button</b> - ultimate (on a cooldown)</li>
       </ul>
       <p class="small">Endless waves · 7 bosses · power-ups · a new arena every 10 waves · how far can you go?</p>
       <button id="start-btn" class="big-btn">START</button>

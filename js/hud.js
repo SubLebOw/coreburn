@@ -3,7 +3,8 @@
 // the boss health bar, banners like "WAVE 2", the red damage flash, the active
 // power-ups (with timers), and the title / game over screens.
 
-import { UPGRADES, FALLBACK, GROUP_LABELS, weaponMult, tierColor } from './upgrades.js';
+import { UPGRADES, FALLBACK, GROUP_LABELS, groupLabel, weaponMult, tierColor } from './upgrades.js';
+import { HERO_STATS } from './hero-stats.js';
 
 const $ = (id) => document.getElementById(id);
 const formatSecs = (sec) => { const m = Math.floor(sec / 60), s = sec - m * 60; return `${m}:${s.toFixed(1).padStart(4, '0')}`; };
@@ -50,6 +51,12 @@ export class Hud {
     if (this.last.wave !== wave) { this.last.wave = wave; this.waveEl.textContent = wave; }
     if (this.last.kills !== kills) { this.last.kills = kills; this.killsEl.textContent = kills; }
     if (this.last.score !== score) { this.last.score = score; this.scoreEl.textContent = score.toLocaleString(); }
+    if (this.last.kit !== player.char.id) { this.last.kit = player.char.id; this.setKit(player.char); }
+    const ch = player.maxCharges > 1 ? player.dashCharges : -1;
+    if (this.last.charges !== ch) {
+      this.last.charges = ch;
+      for (const el of this.dashEls) el.querySelector('.pips').textContent = ch >= 0 ? '●'.repeat(ch) + '○'.repeat(Math.max(0, player.maxCharges - ch)) : '';
+    }
     this.setCooldown('dash', this.dashEls, player.dashCooldownShown, player.dashCooldownMax);
     this.setCooldown('spin', this.spinEls, player.spinCooldown, player.spinCooldownMax);
 
@@ -99,7 +106,7 @@ export class Hud {
       b.className = 'ucard' + (cursed ? ' cursed' : '');
       b.style.setProperty('--c', hex(def.color));
       const lvl = cursed ? `<b>CURSED</b> · ${def.bane}` : id === 'patch' ? `Taken ${lv}x` : (lv === 0 ? `<b>NEW</b> · Lv 1/${def.max}` : `Lv ${lv} → <b>${lv + 1}</b>/${def.max}`);
-      b.innerHTML = `<span class="key">${i + 1}</span><div class="icon"></div><div class="ubody"><div class="group">${GROUP_LABELS[def.group]}</div><div class="uname"></div><div class="effect"></div><div class="lvl">${lvl}</div></div>`;
+      b.innerHTML = `<span class="key">${i + 1}</span><div class="icon"></div><div class="ubody"><div class="group">${def.group === 'cursed' ? GROUP_LABELS.cursed : groupLabel(def.group, HERO_STATS[loadout.hero]?.abilities)}</div><div class="uname"></div><div class="effect"></div><div class="lvl">${lvl}</div></div>`;
       b.querySelector('.icon').textContent = def.icon;
       b.querySelector('.uname').textContent = def.name;
       b.querySelector('.effect').textContent = def.desc(lv);
@@ -131,7 +138,7 @@ export class Hud {
   showSelect(chars, current, onPick) {
     const hex = (c) => '#' + c.toString(16).padStart(6, '0');
     $('upgrade-title').textContent = 'CHOOSE YOUR HERO';
-    $('upgrade-sub').textContent = 'Same controls and upgrades, different ways to fight. Pick one for this run:';
+    $('upgrade-sub').textContent = 'Same 3 buttons, 4 different kits. Pick one for this run:';
     $('upgrade-hint').textContent = `Press 1-${chars.length} · ← → and Enter · or click a hero`;
     const box = $('upgrade-cards');
     box.innerHTML = '';
@@ -149,9 +156,12 @@ export class Hud {
       }
       b.className = 'ucard hero';
       b.style.setProperty('--c', hex(c.color));
+      const range = { sarrow: 0.3, zaleks: 0.25, iskra: 1, orin: 0.6 }[c.id] ?? 0.5;
+      const kit = c.abilities ? ['attack', 'mobility', 'ultimate'].map((k, j) =>
+        `<div class="kslot"><b>${c.abilities[k].icon} ${c.abilities[k].name}</b> <span>${['J', 'K', 'L'][j]}</span><i>${c.abilities[k].desc}</i></div>`).join('') : '';
       b.innerHTML = `<span class="key">${i + 1}</span><div class="icon">⬢</div><div class="ubody"><div class="group"></div><div class="uname"></div><div class="effect"></div>` +
-        `<div class="stats">${bar('HEALTH', c.hp / 125)}${bar('POWER', (c.dmg * (c.id === 'zaleks' ? 1.15 : 1)) / 1.35)}${bar('SPEED', c.speed / 8.3)}</div></div>`;
-      b.querySelector('.group').textContent = c.title.toUpperCase();
+        `<div class="kit">${kit}</div><div class="stats">${bar('HEALTH', c.hp / 150)}${bar('SPEED', c.speed / 8.3)}${bar('RANGE', range)}</div></div>`;
+      b.querySelector('.group').innerHTML = `<span class="ptag">${c.tag}</span> ${c.title.toUpperCase()}`;
       b.querySelector('.uname').textContent = c.name;
       b.querySelector('.effect').textContent = c.blurb;
       b.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -239,6 +249,24 @@ export class Hud {
     this.toast.classList.remove('show');
     void this.toast.offsetWidth;
     this.toast.classList.add('show');
+  }
+
+  // Each hero names (and draws) the 3 ability slots differently
+  setKit(c) {
+    const a = c.abilities;
+    if (!a) return;
+    const flat = (t) => t.replace(/<br>/g, ' ');
+    for (const [id, slot] of [['ab-dash', a.mobility], ['ab-spin', a.ultimate]]) {
+      const el = $(id);
+      el.querySelector('.label').textContent = flat(slot.short);
+      el.querySelector('.aicon').textContent = slot.icon;
+      el.title = `${slot.name}: ${slot.desc}`;
+    }
+    const icon = (t) => `<span class="ticon">${t}</span>`;
+    $('btn-slash').innerHTML = icon(a.attack.icon) + flat(a.attack.short);
+    $('btn-dash').querySelector('.lbl').innerHTML = icon(a.mobility.icon) + a.mobility.short;
+    $('btn-spin').querySelector('.lbl').innerHTML = icon(a.ultimate.icon) + a.ultimate.short;
+    this.last.dash = this.last.spin = undefined;
   }
 
   // Draws the dark "pie" over an ability while it recharges, plus seconds left
@@ -336,7 +364,7 @@ export class Hud {
 
   showGameOver(score, wave, kills, best, newBest, killer = null, place = null, loadout = null, bestCombo = 0, hero = 'Sarrow') {
     const build = loadout && loadout.tier > 0
-      ? `<span class="build">Tier ${loadout.tier} talons · ${loadout.picked.map((p) => `${p.name} ${p.level}`).join(', ')}</span><br>` : '';
+      ? `<span class="build">Weapon tier ${loadout.tier} · ${loadout.picked.map((p) => `${p.name} ${p.level}`).join(', ')}</span><br>` : '';
     $('gameover-score').textContent = `${score.toLocaleString()} pts`;
     $('gameover-stats').innerHTML =
       `<b>${hero}</b> reached <b>wave ${wave}</b>${place ? ` in ${place}` : ''} · <b>${kills}</b> kills · best combo <b>${bestCombo}</b><br>` +

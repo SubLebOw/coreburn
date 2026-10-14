@@ -154,7 +154,11 @@ export class WaveManager {
     }
 
     // co-op: each enemy goes for its own target (see main.js targetFor); solo: always the player
-    for (const e of this.list) e.update(dt, this.world.targetFor ? this.world.targetFor(e) : player, this.list);
+    for (const e of this.list) {
+      let t = this.world.targetFor ? this.world.targetFor(e) : player;
+      if (this.world.aggro && !this.world.netClient) t = this.world.aggro(e, t); // ZALEKS' taunt, ISKRA's decoys
+      e.update(dt, t, this.list);
+    }
 
     // remove anything whose death animation has finished
     for (let i = this.list.length - 1; i >= 0; i--) {

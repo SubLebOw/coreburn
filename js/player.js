@@ -1,11 +1,11 @@
 // player.js
-// Sarrow, our hero! Builds his blocky 3D model, moves him around, and handles his attacks:
-//   - 3-hit talon combo (J / click / SLASH)
-//   - blink dash: untouchable, and hurts enemies you pass through (K / Space / BLINK)
-//   - overdrive spin attack with a cooldown (L / OVERDRIVE)
-//   - core recharge: health slowly comes back by itself
-//   - weapon tier + upgrade cards picked after each boss (see upgrades.js)
-//   - power-ups (see powerups.js) can double his damage, shield him or electrify his talons
+// A hero: model, movement and the three ability slots. Every hero has the same slots and keys
+// (ATTACK J/click, MOBILITY K/Space, ULTIMATE L) but a different kit (numbers in hero-stats.js):
+//   SARROW  talon combo        / Blink (untouchable dash)     / Overdrive (spin, half damage taken)
+//   ZALEKS  shield bash+hammer / Shoulder Charge (stuns)      / Seismic Slam (AoE, taunt, shield)
+//   ISKRA   auto-aimed needles / Phase Hop (2 charges, decoy) / Needle Storm (fan barrage)
+//   ORIN    chaining arc tether/ Magnet Grapple (yank / pull) / Hymn Engine (vortex + drones)
+// Also: core recharge (regen), weapon tier + upgrade cards (upgrades.js), power-ups (powerups.js).
 import * as THREE from 'three';
 import { Loadout, tierColor } from './upgrades.js';
 import { CHARACTERS } from './characters.js';
@@ -15,16 +15,9 @@ import { CHARACTERS } from './characters.js';
 const SCREEN_UP = new THREE.Vector3(-1, 0, -1).normalize();
 const SCREEN_RIGHT = new THREE.Vector3(1, 0, -1).normalize();
 
-// The three hits of the talon combo. Tweak these numbers to change how it feels!
-const COMBO = [
-  { damage: 12, knockback: 6, range: 2.4, duration: 0.24 }, // hit 1: one arm
-  { damage: 12, knockback: 6, range: 2.4, duration: 0.24 }, // hit 2: other arm
-  { damage: 28, knockback: 14, range: 2.9, duration: 0.40 }, // hit 3: big double-talon finisher
-];
-
-// Speeds, blink and overdrive numbers are per character (see characters.js)
-const SPIN_TIME = 1.6;
-const SPIN_COOLDOWN = 8;
+// attack kinds that count as "attacks" for leech, twin strike, storm and ARC TALONS
+const ATTACK_KINDS = new Set(['slash', 'dash', 'needle', 'beam']);
+const COMBO_OF = (c) => c.combo || [];
 
 export class Player {
   constructor(scene, world, charId = 'sarrow', tint = null) {
@@ -35,7 +28,7 @@ export class Player {
     this.maxHp = this.char.hp;
     this.radius = 0.5;
     this.dashCooldownMax = this.char.dashCd;
-    this.spinCooldownMax = SPIN_COOLDOWN;
+    this.spinCooldownMax = this.char.ultCd;
     this.position = new THREE.Vector3();
     this.velocity = new THREE.Vector3();
 
@@ -74,6 +67,13 @@ export class Player {
     );
     this.bubble.position.y = 1.1;
     this.bubble.visible = false;
+    // ZALEKS' Seismic Slam shield (orange shell)
+    this.guard = new THREE.Mesh(
+      new THREE.SphereGeometry(1.3, 16, 10),
+      new THREE.MeshBasicMaterial({ color: 0xffa030, transparent: true, opacity: 0.2, depthWrite: false })
+    );
+    this.guard.position.y = 1.1;
+    this.guard.visible = false;
     this.attachExtras();
 
     // Blink Trail upgrade: glowing patches left behind by a blink (pooled)
@@ -89,13 +89,13 @@ export class Player {
     }
     this.trailMat = trailMat;
 
-    this.loadout = new Loadout();
+    this.loadout = new Loadout(this.char.id);
     this.reset();
   }
 
   // The arcs, rings and bubble ride on whichever hero model is in use
   attachExtras() {
-    this.model.root.add(this.slashArc, this.spinRing, this.marker, this.bubble);
+    this.model.root.add(this.slashArc, this.spinRing, this.marker, this.bubble, this.guard);
     this.marker.material.color.setHex(this.tint || this.char.color);
   }
 
@@ -109,6 +109,7 @@ export class Player {
     this.model = c.build(tint);
     this.scene.add(this.model.root);
     this.attachExtras();
+    this.loadout.hero = c.id;
     this.bladeColor = null;
     this.currentFlash = null;
     this.reset();
@@ -145,6 +146,15 @@ export class Player {
     this.dashCharges = this.maxCharges;
     this.trailTick = 0;
     this.leechBudget = 0;
+    this.mobBuffer = this.ultBuffer = 0;
+    this.fireCd = 0;           // ISKRA needle / ORIN tether tick timer
+    this.phaseTimer = 0;       // ISKRA: untouchable for a moment after a hop
+    this.tauntTimer = 0;       // ZALEKS: enemies come for him
+    this.tauntRadius = 0;
+    this.shieldHp = 0;         // ZALEKS: slam shield
+    this.shieldTimer = 0;
+    this.tether = null;        // ORIN: who the beam is locked on
+    this.guard.visible = false;
     for (const t of this.trail) { t.life = 0; t.mesh.visible = false; }
     this.slide = new THREE.Vector3(); // momentum on ice
     this.bubble.visible = false;
@@ -176,6 +186,11 @@ export class Player {
     this.hurtTimer -= dt;
     this.invulnTimer -= dt;
     this.timeSinceHit += dt;
+    this.fireCd -= dt;
+    this.phaseTimer -= dt;
+    this.tauntTimer -= dt;
+    if (this.shieldTimer > 0) { this.shieldTimer -= dt; if (this.shieldTimer <= 0) this.shieldHp = 0; }
+    this.guard.visible = this.shieldHp > 0 || !!this.netShield;
 
     // ----- Core recharge: slow regen, faster if you avoid getting hit for 3 seconds -----
     const regen = (this.timeSinceHit > 3 ? 5 : 1.5) * this.stats.regen;
@@ -191,67 +206,42 @@ export class Player {
     if (input.wasPressed('attack')) this.attackBuffer = 0.3;
     if (input.attackHeld) this.attackBuffer = Math.max(this.attackBuffer, 0.05);
 
-    // Dash and spin can interrupt normal movement or attacks
-    if (input.wasPressed('dash') && this.dashCharges > 0 && (this.state === 'normal' || this.state === 'attack')) {
-      this.startDash(moving ? dir.clone().normalize() : this.facingDir);
+    // Mobility and ultimate can interrupt normal movement or attacks
+    const aim = moving ? dir.clone().normalize() : this.facingDir;
+    // (presses are remembered for a moment, so an ultimate pressed mid-dash still comes out)
+    if (input.wasPressed('dash')) this.mobBuffer = 0.2;
+    if (input.wasPressed('spin')) this.ultBuffer = 0.35;
+    this.mobBuffer -= dt; this.ultBuffer -= dt;
+    if (this.mobBuffer > 0 && this.dashCharges > 0 && (this.state === 'normal' || this.state === 'attack')) {
+      this.mobBuffer = 0;
+      this.useMobility(aim);
     }
-    if (input.wasPressed('spin') && this.spinCooldown <= 0 && this.state !== 'dash' && this.state !== 'spin') {
-      this.startSpin();
+    if (this.ultBuffer > 0 && this.spinCooldown <= 0 && this.state !== 'dash' && this.state !== 'spin') {
+      this.ultBuffer = 0;
+      this.useUltimate();
     }
 
     this.stateTime += dt;
     this.velocity.set(0, 0, 0);
+    const walk = this.char.speed * this.stats.speed;
 
     switch (this.state) {
       case 'normal':
         if (moving) {
-          this.velocity.copy(dir).multiplyScalar(this.char.speed * this.stats.speed);
+          this.velocity.copy(dir).multiplyScalar(walk);
           this.turnTowards(Math.atan2(dir.x, dir.z), dt, 20);
         }
-        if (this.attackBuffer > 0) {
-          this.startAttack(this.comboGrace > 0 && this.comboStep < 3 ? this.comboStep + 1 : 1, moving ? dir : null);
-        }
+        if (this.attackBuffer > 0) this.attackStart(moving ? dir : null);
         break;
-
-      case 'attack': {
-        const hit = COMBO[this.comboStep - 1];
-        const t = this.stateTime / (hit.duration / this.char.atkSpeed);
-        // small step forward at the start of each swing, and slow steering
-        if (t < 0.4) this.velocity.copy(this.facingDir).multiplyScalar(this.comboStep === 3 ? 6 : 4);
-        if (moving) this.velocity.addScaledVector(dir, this.char.speed * 0.25);
-        if (!this.hasHit && t >= 0.45) { this.hasHit = true; this.doSlashHit(hit); }
-        if (this.attackBuffer > 0 && this.comboStep < 3 && t >= 0.6) {
-          this.startAttack(this.comboStep + 1, moving ? dir : null);
-        } else if (t >= 1) {
-          this.state = 'normal';
-          this.comboGrace = 0.35;
-          if (this.comboStep >= 3) this.comboStep = 0; // after the finisher, start over at hit 1
-        }
-        break;
-      }
-
-      case 'dash':
-        this.velocity.copy(this.dashDir).multiplyScalar(this.char.dashSpeed);
-        this.dashHits();
-        if (this.stats.trail > 0) this.dropTrail();
-        if (this.stateTime >= this.char.dashTime * this.stats.dashTime) this.state = 'normal';
-        break;
-
-      case 'spin':
-        if (moving) this.velocity.copy(dir).multiplyScalar(this.char.speed * 0.75 * this.stats.speed);
-        this.spinTick -= dt;
-        if (this.spinTick <= 0) { this.spinTick = this.char.spinTick; this.spinHits(); }
-        if (this.stateTime >= SPIN_TIME + this.stats.spinTime) {
-          this.state = 'normal';
-          this.spinRing.visible = false;
-          this.model.body.rotation.y = 0;
-        }
-        break;
+      case 'attack': this.attackUpdate(dt, dir, moving, walk); break;
+      case 'dash': this.dashUpdate(dt); break;
+      case 'spin': this.ultUpdate(dt, dir, moving, walk); break;
     }
 
     this.updateTrail(dt);
 
     // ----- Ice: you keep sliding and turn slowly (not while blinking) -----
+    const before = this.position.clone();
     if (this.state !== 'dash' && this.world.arena.surfaceAt(this.position.x, this.position.z) === 'ice') {
       this.slide.lerp(this.velocity, 1 - Math.exp(-2.2 * dt));
       this.velocity.copy(this.slide);
@@ -262,6 +252,9 @@ export class Player {
     // ----- Move and collide -----
     this.position.addScaledVector(this.velocity, dt);
     this.world.arena.resolve(this.position, this.radius);
+    // ZALEKS' charge (and ORIN's reel) stop dead at walls and pillars
+    if (this.state === 'dash' && this.stateTime > 0.06 && this.velocity.lengthSq() > 1 &&
+        this.position.distanceTo(before) < this.velocity.length() * dt * 0.35) this.hitWall();
 
     this.animate(dt);
     this.syncModel();
@@ -274,12 +267,153 @@ export class Player {
     this.facing += diff * Math.min(1, speed * dt);
   }
 
-  // ---------- Attacks ----------
+    // ======================= KITS =======================
+  // The three slots dispatch on the hero. States stay 'normal' | 'attack' | 'dash' | 'spin' for
+  // every hero (co-op sends the state name, and puppets pose from it), 'dash' = mobility, 'spin' = ultimate.
+  get kit() { return this.char.id; }
+  get combo() { return COMBO_OF(this.char); }
+
+  attackStart(moveDir) {
+    switch (this.kit) {
+      case 'iskra': this.state = 'attack'; this.stateTime = 0; break;
+      case 'orin': this.state = 'attack'; this.stateTime = 0; this.tether = null; break;
+      default: {
+        const n = this.combo.length;
+        this.startAttack(this.comboGrace > 0 && this.comboStep < n ? this.comboStep + 1 : 1, moveDir);
+      }
+    }
+  }
+
+  attackUpdate(dt, dir, moving, walk) {
+    const k = this.kit;
+    if (k === 'iskra' || k === 'orin') {
+      // ranged / channelled: keep moving (a bit slower) while the button is held
+      const slow = k === 'iskra' ? this.char.needle.moveWhileFiring : this.char.beam.moveWhileFiring;
+      if (moving) this.velocity.copy(dir).multiplyScalar(walk * slow);
+      if (k === 'iskra') this.needleUpdate(dir, moving);
+      else this.tetherUpdate(dir, moving, dt);
+      if (this.attackBuffer <= 0 && this.fireCd <= 0) { this.state = 'normal'; this.tether = null; }
+      else if (moving && !this.aimLock) this.turnTowards(Math.atan2(dir.x, dir.z), dt, 14);
+      return;
+    }
+    // melee combos (SARROW 3 hits, ZALEKS 2 heavy hits)
+    const combo = this.combo, n = combo.length;
+    const hit = combo[this.comboStep - 1];
+    const t = this.stateTime / (hit.duration / this.char.atkSpeed);
+    const fin = this.comboStep === n;
+    if (t < 0.4) this.velocity.copy(this.facingDir).multiplyScalar(k === 'zaleks' ? (fin ? 3 : 4.5) : (fin ? 6 : 4));
+    if (moving) this.velocity.addScaledVector(dir, this.char.speed * 0.25);
+    if (!this.hasHit && t >= 0.45) { this.hasHit = true; this.doSlashHit(hit); }
+    if (this.attackBuffer > 0 && this.comboStep < n && t >= 0.6) {
+      this.startAttack(this.comboStep + 1, moving ? dir : null);
+    } else if (t >= 1) {
+      this.state = 'normal';
+      this.comboGrace = 0.35;
+      if (this.comboStep >= n) this.comboStep = 0; // after the finisher, start over at hit 1
+    }
+  }
+
+  useMobility(aim) {
+    switch (this.kit) {
+      case 'zaleks': return this.startCharge(aim);
+      case 'iskra': return this.phaseHop(aim);
+      case 'orin': return this.grapple(aim);
+      default: return this.startDash(aim);
+    }
+  }
+
+  spendCharge() {
+    this.dashCharges--;
+    if (this.dashCooldown <= 0) this.dashCooldown = this.dashCooldownMax;
+  }
+
+  dashUpdate() {
+    switch (this.kit) {
+      case 'iskra': // the hop already happened; this is just the short blink-in pose
+        if (this.stateTime >= 0.14) this.state = 'normal';
+        return;
+      case 'orin':
+        this.velocity.copy(this.dashDir).multiplyScalar(this.char.grappleSpeed);
+        if (this.stateTime >= this.dashLen) this.state = 'normal';
+        return;
+      case 'zaleks':
+        this.velocity.copy(this.dashDir).multiplyScalar(this.char.dashSpeed);
+        this.dashHits();
+        if (this.stateTime >= this.char.dashTime * this.stats.chargeDist) this.state = 'normal';
+        return;
+      default:
+        this.velocity.copy(this.dashDir).multiplyScalar(this.char.dashSpeed);
+        this.dashHits();
+        if (this.stats.trail > 0) this.dropTrail();
+        if (this.stateTime >= this.char.dashTime * this.stats.dashTime) this.state = 'normal';
+    }
+  }
+
+  // ran into a wall or pillar mid-dash
+  hitWall() {
+    if (this.kit === 'zaleks') {
+      this.world.shake(0.3);
+      this.world.effects.spawnRing(this.position, 0xffa030, 1.6, 0.3);
+      this.world.sfx('hit');
+    }
+    if (this.kit !== 'sarrow') this.state = 'normal';
+  }
+
+  useUltimate() {
+    this.state = 'spin';
+    this.stateTime = 0;
+    this.spinTick = 0;
+    this.spinCooldown = this.spinCooldownMax;
+    this.ultDone = false;
+    switch (this.kit) {
+      case 'zaleks':
+        this.world.effects.spawnRing(this.position, 0xffd090, 1.6, 0.35);
+        this.world.sfx('blink');
+        break;
+      case 'iskra':
+        this.spinRing.scale.setScalar(0.6);
+        this.spinRing.visible = true;
+        this.world.effects.spawnRing(this.position, 0xe060ff, 3, 0.4);
+        this.world.sfx('overdrive');
+        break;
+      case 'orin': this.hymnEngine(); break;
+      default: this.startSpin();
+    }
+  }
+
+  ultUpdate(dt, dir, moving, walk) {
+    const c = this.char, s = this.stats;
+    const end = () => { this.state = 'normal'; this.spinRing.visible = false; this.model.body.rotation.y = 0; this.model.root.position.y = 0; };
+    switch (this.kit) {
+      case 'zaleks': // a short hop, then the slam lands
+        if (!this.ultDone && this.stateTime >= 0.4) { this.ultDone = true; this.seismicSlam(); }
+        if (this.stateTime >= 0.75) end();
+        return;
+      case 'iskra': { // Needle Storm: move freely, a fan of needles every volley
+        if (moving) { this.velocity.copy(dir).multiplyScalar(walk); this.turnTowards(Math.atan2(dir.x, dir.z), dt, 14); }
+        this.spinTick -= dt;
+        if (this.spinTick <= 0) { this.spinTick = c.stormRate; this.stormVolley(); }
+        if (this.stateTime >= c.stormTime + s.stormTime) end();
+        return;
+      }
+      case 'orin':
+        if (moving) this.velocity.copy(dir).multiplyScalar(walk * 0.5);
+        if (this.stateTime >= 0.6) end();
+        return;
+      default:
+        if (moving) this.velocity.copy(dir).multiplyScalar(c.speed * 0.75 * s.speed);
+        this.spinTick -= dt;
+        if (this.spinTick <= 0) { this.spinTick = c.spinTick; this.spinHits(); }
+        if (this.stateTime >= c.spinTime + s.spinTime) end();
+    }
+  }
+
+  // ---------- melee combo (SARROW, ZALEKS) ----------
 
   startAttack(step, moveDir) {
     this.state = 'attack';
     this.comboStep = step;
-    this.world.sfx('slash', step);
+    this.world.sfx('slash', this.kit === 'zaleks' ? step + 1 : step);
     this.stateTime = 0;
     this.hasHit = false;
     this.attackBuffer = 0;
@@ -296,8 +430,11 @@ export class Player {
   doSlashHit(hit) {
     const forward = this.facingDir;
     const s = this.stats;
-    const range = hit.range * s.range;
-    const arcDot = 0.35 - 0.05 * s.arcLevel; // Wide Arc swings wider
+    const zal = this.kit === 'zaleks';
+    const fin = this.comboStep === this.combo.length;
+    const range = hit.range * (zal ? s.bash : s.range);
+    const knock = hit.knockback * (zal ? s.bashKnock : 1);
+    const arcDot = hit.arc ?? (0.35 - 0.05 * s.arcLevel); // Wide Arc swings wider; Zaleks' bash is wide anyway
     let hitSomething = false;
     const struck = new Set();
     for (const e of this.world.enemies.list) {
@@ -307,16 +444,17 @@ export class Player {
       const dist = to.length();
       if (dist > range + e.radius) continue;
       to.normalize();
-      // only hit enemies in front of us (about 140 degree arc, wider with Wide Arc), or really close ones
+      // only hit enemies in front of us, or really close ones
       if (forward.dot(to) < arcDot && dist > 1) continue;
-      this.strike(e, hit.damage, to.x * hit.knockback, to.z * hit.knockback, this.comboStep === 3, 'slash');
-      this.world.effects.spawnSparks(e.position.clone().setY(1.1), this.comboStep === 3 ? 0xffa040 : 0x9ffff5, this.comboStep === 3 ? 12 : 6);
+      this.strike(e, hit.damage * (zal ? s.bashDmg : 1), to.x * knock, to.z * knock, fin, 'slash');
+      this.world.effects.spawnSparks(e.position.clone().setY(1.1), fin ? 0xffa040 : (zal ? 0xffd090 : 0x9ffff5), fin ? 12 : 6);
       struck.add(e);
       hitSomething = true;
     }
-    // Shockwave Finisher: the 3rd hit sends out a ring that hits everything around you
-    if (this.comboStep === 3 && s.shock > 0) {
-      const radius = 2.8 + 0.3 * s.shock, pct = 0.3 + 0.09 * s.shock;
+    if (zal && fin) this.world.effects.spawnRing(this.position.clone().addScaledVector(forward, 1.8), 0xffa030, 1.6, 0.3);
+    // Shockwave Finisher (Sarrow): the 3rd hit sends out a ring that hits everything around you
+    if (fin && s.shock > 0) {
+      const radius = 2.8 + 0.3 * s.shock, pct = 0.24 + 0.07 * s.shock;
       this.world.effects.spawnRing(this.position, 0xffd040, radius, 0.35);
       for (const e of this.world.enemies.list) {
         if (!e.canBeHit || struck.has(e)) continue;
@@ -330,50 +468,53 @@ export class Player {
     }
     if (hitSomething) {
       this.world.sfx('hit');
-      this.world.shake(this.comboStep === 3 ? 0.35 : 0.15);
-      this.world.hitstop(this.comboStep === 3 ? 0.08 : 0.03);
+      this.world.shake(fin ? (zal ? 0.45 : 0.35) : 0.15);
+      this.world.hitstop(fin ? 0.08 : 0.03);
     }
   }
+
+  // ---------- SARROW: Blink + Overdrive ----------
 
   startDash(direction) {
     this.state = 'dash';
     this.stateTime = 0;
     this.dashDir = direction.clone();
     this.facing = Math.atan2(direction.x, direction.z);
-    this.dashCharges--;
-    if (this.dashCooldown <= 0) this.dashCooldown = this.dashCooldownMax;
+    this.spendCharge();
     this.dashHitSet = new Set();
     this.world.effects.spawnRing(this.position, 0x3ff6e0, 1.5, 0.3);
     this.world.sfx('blink');
   }
 
   dashHits() {
+    const zal = this.kit === 'zaleks';
     for (const e of this.world.enemies.list) {
       if (!e.canBeHit || this.dashHitSet.has(e)) continue;
       if (e.position.distanceTo(this.position) < this.char.dashWidth + e.radius) {
         this.dashHitSet.add(e);
-        // knock enemies off to the side of the dash path
-        const side = new THREE.Vector3(-this.dashDir.z, 0, this.dashDir.x);
-        if (side.dot(new THREE.Vector3().subVectors(e.position, this.position)) < 0) side.negate();
-        const k = this.char.dashKnock; // Zaleks' shoulder-charge shoves hard
-        this.strike(e, this.char.dashDmg * this.stats.dashDmg, side.x * k, side.z * k, k > 10, 'dash');
-        this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0x9ffff5, 6);
-        this.world.shake(0.12);
+        const k = this.char.dashKnock;
+        let kx, kz;
+        if (zal) { // the charge shoves them ahead and to the side
+          kx = this.dashDir.x * k; kz = this.dashDir.z * k;
+        } else { // the blink knocks enemies off to the side of the path
+          const side = new THREE.Vector3(-this.dashDir.z, 0, this.dashDir.x);
+          if (side.dot(new THREE.Vector3().subVectors(e.position, this.position)) < 0) side.negate();
+          kx = side.x * k; kz = side.z * k;
+        }
+        this.strike(e, this.char.dashDmg * (zal ? this.stats.chargeDmg : this.stats.dashDmg), kx, kz, zal, 'dash');
+        if (zal) this.stun(e, this.char.chargeStun + this.stats.chargeStun); // after the hit (a hit resets the flinch timer)
+        this.world.effects.spawnSparks(e.position.clone().setY(1.1), zal ? 0xffd090 : 0x9ffff5, zal ? 10 : 6);
+        this.world.shake(zal ? 0.2 : 0.12);
         this.world.sfx('hit');
       }
     }
   }
 
   startSpin() {
-    this.state = 'spin';
-    this.stateTime = 0;
-    this.spinTick = 0;
-    this.spinCooldown = this.spinCooldownMax;
     this.spinRing.scale.setScalar(this.stats.spinRadius * this.char.spinRadius);
     this.spinRing.visible = true;
-    const slam = this.char.id === 'zaleks'; // Zaleks slams the ground first
-    this.world.effects.spawnRing(this.position, slam ? 0xffa030 : 0xe0702a, 4 * this.char.spinRadius, slam ? 0.7 : 0.5);
-    this.world.shake(slam ? 0.5 : 0.25);
+    this.world.effects.spawnRing(this.position, 0xe0702a, 4 * this.char.spinRadius, 0.5);
+    this.world.shake(0.25);
     this.world.sfx('overdrive');
   }
 
@@ -385,21 +526,249 @@ export class Player {
       const dist = to.length();
       if (dist < 3.2 * this.stats.spinRadius * this.char.spinRadius + e.radius) {
         to.normalize();
-        let k = this.char.spinKnock;
-        if (k < 0) { // ORIN: drag them in (a gentle pull that stops just short of him, never through him)
-          const pull = Math.min(0.45, Math.max(0, dist - (1.2 + e.radius)) * 0.3) * (e.type?.armored ? 0.5 : 1);
-          if (!e.isBoss) { e.position.addScaledVector(to, -pull); this.world.arena.resolve?.(e.position, e.radius); }
-          k = 0;
-        }
-        this.strike(e, 8 * this.stats.spinDmg * this.char.spinDmg, to.x * k, to.z * k, true, 'spin');
+        const k = this.char.spinKnock;
+        this.strike(e, this.char.spinHit * this.stats.spinDmg * this.char.spinDmg, to.x * k, to.z * k, true, 'spin');
         this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0xff8040, 4);
         this.world.sfx('hit');
       }
     }
   }
 
-  // Every hit Sarrow lands goes through here: weapon tier, perks, FURY, crits, double hits, leech, chains.
-  // kind: 'slash' | 'dash' | 'spin' | 'shock' | 'trail' | 'chain'
+  // Stun a regular enemy (bosses shrug it off)
+  stun(e, secs) {
+    if (e.isBoss || this.world.netClient) return;
+    e.stun = Math.max(e.stun || 0, secs);
+  }
+
+  // ---------- ZALEKS: Shoulder Charge + Seismic Slam ----------
+
+  startCharge(direction) {
+    this.state = 'dash';
+    this.stateTime = 0;
+    this.dashDir = direction.clone();
+    this.facing = Math.atan2(direction.x, direction.z);
+    this.spendCharge();
+    this.dashHitSet = new Set();
+    this.world.effects.spawnRing(this.position, 0xffa030, 1.8, 0.3);
+    this.world.sfx('blink');
+    this.world.shake(0.15);
+  }
+
+  seismicSlam() {
+    const c = this.char, s = this.stats;
+    const radius = c.slamRadius * s.slamRadius;
+    this.world.effects.spawnRing(this.position, 0xffa030, radius, 0.6);
+    this.world.effects.spawnRing(this.position, 0xff5a20, radius * 0.6, 0.45);
+    this.world.shake(0.6);
+    this.world.hitstop(0.08);
+    this.world.sfx('overdrive');
+    for (const e of this.world.enemies.list) {
+      if (!e.canBeHit) continue;
+      const to = new THREE.Vector3().subVectors(e.position, this.position).setY(0);
+      const d = to.length();
+      if (d > radius + e.radius) continue;
+      to.normalize();
+      this.strike(e, c.slamDmg * s.spinDmg * s.slamDmg, to.x * c.slamKnock, to.z * c.slamKnock, true, 'spin');
+      this.stun(e, c.slamStun);
+      this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0xffa030, 6);
+    }
+    // TAUNT: everything nearby (and any boss) comes for Zaleks; the shield soaks it
+    this.tauntTimer = c.tauntTime + s.taunt;
+    this.tauntRadius = c.tauntRadius;
+    this.shieldHp = this.maxHp * c.shieldPct * s.shield;
+    this.shieldTimer = c.shieldTime + s.taunt;
+    this.guard.visible = true;
+  }
+
+  // ---------- ISKRA: Needles, Phase Hop, Needle Storm ----------
+
+  // Nearest enemy in the move direction (a 120 degree cone), or the nearest at all when standing still
+  aimTarget(dir, moving, range) {
+    let best = null, bd = range;
+    for (const e of this.world.enemies.list) {
+      if (!e.canBeHit) continue;
+      const dx = e.position.x - this.position.x, dz = e.position.z - this.position.z;
+      const d = Math.hypot(dx, dz);
+      if (d >= bd) continue;
+      if (moving && d > 1.5 && (dx * dir.x + dz * dir.z) / (d * Math.hypot(dir.x, dir.z)) < 0.5) continue;
+      best = e; bd = d;
+    }
+    return best;
+  }
+
+  needleUpdate(dir, moving) {
+    if (this.fireCd > 0) return;
+    const nd = this.char.needle, s = this.stats;
+    this.fireCd = nd.rate / this.char.atkSpeed;
+    const t = this.aimTarget(dir, moving, nd.aimRange);
+    let aim;
+    if (t) aim = new THREE.Vector3(t.position.x - this.position.x, 0, t.position.z - this.position.z).normalize();
+    else aim = moving ? dir.clone().normalize() : this.facingDir;
+    this.facing = Math.atan2(aim.x, aim.z);
+    this.aimLock = !!t;
+    const color = this.damageMult > 1 ? 0xff3a2a : this.bladeColor;
+    const opts = { pierce: nd.pierce + s.pierce, speed: nd.speed, range: nd.range, color };
+    this.world.allies?.fireNeedle(this, this.position, aim, nd.damage, opts);
+    for (let i = 1; i <= s.split; i++) {
+      for (const sgn of [-1, 1]) {
+        const a = this.facing + sgn * 0.16 * i;
+        this.world.allies?.fireNeedle(this, this.position, new THREE.Vector3(Math.sin(a), 0, Math.cos(a)), nd.damage * 0.2, opts);
+      }
+    }
+    this.armFlip = !this.armFlip;
+    this.world.sfx('slash', 1);
+  }
+
+  phaseHop(direction) {
+    const c = this.char, s = this.stats;
+    const from = this.position.clone();
+    this.spendCharge();
+    // teleport (stops short of the arena wall; resolve() pushes us out of any pillar we land in)
+    const to = from.clone().addScaledVector(direction, c.hopDist * s.hopDist);
+    this.position.copy(to);
+    this.world.arena.resolve(this.position, this.radius);
+    this.slide.set(0, 0, 0);
+    this.facing = Math.atan2(direction.x, direction.z);
+    this.phaseTimer = c.hopGuard;
+    this.state = 'dash';
+    this.stateTime = 0;
+    this.world.allies?.addDecoy(this, from, c.decoyTime + s.decoy, c.decoyHits + 2 * s.decoy);
+    this.world.effects.spawnRing(from, 0xc070ff, 1.4, 0.3);
+    this.world.effects.spawnRing(this.position, 0xe8a0ff, 1.8, 0.3);
+    this.world.effects.spawnSparks(this.position.clone().setY(1), 0xe8a0ff, 8);
+    this.world.sfx('teleport');
+  }
+
+  stormVolley() {
+    const c = this.char, s = this.stats;
+    const n = c.stormCount + s.stormCount;
+    const t = this.aimTarget(null, false, 14);
+    const base = t ? Math.atan2(t.position.x - this.position.x, t.position.z - this.position.z) : this.facing;
+    const color = this.damageMult > 1 ? 0xff3a2a : 0xff80ff;
+    const wobble = Math.sin(this.stateTime * 9) * 0.15;
+    for (let i = 0; i < n; i++) {
+      const a = base + wobble + (n > 1 ? (i / (n - 1) - 0.5) * 2 * c.stormSpread : 0);
+      this.world.allies?.fireNeedle(this, this.position, new THREE.Vector3(Math.sin(a), 0, Math.cos(a)), c.stormDmg * s.spinDmg,
+        { pierce: 1, speed: 28, range: 14, color, kind: 'spin' });
+    }
+    this.world.sfx('slash', 2);
+  }
+
+  // ---------- ORIN: Arc Tether, Magnet Grapple, Hymn Engine ----------
+
+  tetherUpdate(dir, moving) {
+    const b = this.char.beam, s = this.stats;
+    const range = b.range * s.reach;
+    let t = this.tether;
+    if (!t || !t.canBeHit || t.position.distanceTo(this.position) > range * 1.25) t = this.tether = this.aimTarget(dir, moving, range) || this.findNearestEnemy(range);
+    this.aimLock = !!t;
+    if (t) this.facing = Math.atan2(t.position.x - this.position.x, t.position.z - this.position.z);
+    if (this.fireCd > 0) return;
+    this.fireCd = b.tick / this.char.atkSpeed;
+    if (!t) return;
+    const col = this.damageMult > 1 ? 0xff3a2a : this.bladeColor;
+    const hand = this.position.clone().addScaledVector(this.facingDir, 0.6);
+    this.world.effects.spawnZap(hand, t.position, col);
+    this.strike(t, b.damage, 0, 0, false, 'beam');
+    this.stun(t, b.lock); // locked on: the tethered enemy can't move or swing
+    // chain to the next nearest enemies
+    const done = new Set([t]);
+    let src = t;
+    for (let i = 0; i < b.chains + s.chains; i++) {
+      let best = null, bd = b.chainRange;
+      for (const e of this.world.enemies.list) {
+        if (!e.canBeHit || done.has(e)) continue;
+        const d = e.position.distanceTo(src.position);
+        if (d < bd) { bd = d; best = e; }
+      }
+      if (!best) break;
+      done.add(best);
+      this.world.effects.spawnZap(src.position, best.position, col);
+      this.strike(best, b.damage * b.chainPct, 0, 0, false, 'beam');
+      src = best;
+    }
+    if (Math.random() < 0.35) this.world.sfx('zap');
+  }
+
+  grapple(direction) {
+    const c = this.char, s = this.stats;
+    this.spendCharge();
+    this.dashHitSet = new Set();
+    const range = c.grappleRange;
+    // 1) an enemy in front of us (60 degree cone)
+    let best = null, bd = range;
+    for (const e of this.world.enemies.list) {
+      if (!e.canBeHit) continue;
+      const dx = e.position.x - this.position.x, dz = e.position.z - this.position.z, d = Math.hypot(dx, dz);
+      if (d < bd && d > 0.5 && (dx * direction.x + dz * direction.z) / d > 0.85) { best = e; bd = d; }
+    }
+    const hand = this.position.clone().setY(1.1);
+    if (best) {
+      this.facing = Math.atan2(best.position.x - this.position.x, best.position.z - this.position.z);
+      this.world.effects.spawnZap(hand, best.position, 0xff4a5a);
+      this.world.sfx('zap');
+      if (best.isBoss || best.type?.armored) { // too heavy: Orin reels himself in instead
+        this.pullTo(best.position, best.radius + 0.9);
+      } else { // yank it right up to Orin, stunned
+        if (!this.world.netClient) {
+          best.position.copy(this.position).addScaledVector(this.facingDir, 1.4 + best.radius);
+          this.world.arena.resolve(best.position, best.radius);
+        }
+        this.strike(best, c.grappleDmg * (1 + 0.25 * s.grapple), 0, 0, true, 'dash');
+        this.stun(best, c.grappleStun + 0.3 * s.grapple);
+        this.world.effects.spawnSparks(best.position.clone().setY(1.1), 0xff4a5a, 10);
+        this.state = 'dash'; this.stateTime = 0; this.dashDir = new THREE.Vector3(); this.dashLen = 0.12;
+        this.world.shake(0.2);
+      }
+      return;
+    }
+    // 2) a pillar in front of us
+    let pil = null, pd = range;
+    for (const o of this.world.arena.obstacles) {
+      const dx = o.x - this.position.x, dz = o.z - this.position.z, d = Math.hypot(dx, dz);
+      if (d - o.r < pd && d > o.r + 0.6 && (dx * direction.x + dz * direction.z) / d > 0.85) { pil = o; pd = d - o.r; }
+    }
+    if (pil) {
+      const p = new THREE.Vector3(pil.x, 0, pil.z);
+      this.world.effects.spawnZap(hand, p, 0xff4a5a);
+      this.world.sfx('zap');
+      this.pullTo(p, pil.r + this.radius + 0.1);
+      return;
+    }
+    // 3) nothing to grab: a short magnetic reel in the move direction
+    this.dashDir = direction.clone();
+    this.facing = Math.atan2(direction.x, direction.z);
+    this.state = 'dash'; this.stateTime = 0;
+    this.dashLen = c.reelDist / c.grappleSpeed;
+    this.world.effects.spawnRing(this.position, 0xff4a5a, 1.4, 0.3);
+    this.world.sfx('blink');
+  }
+
+  pullTo(point, stopAt) {
+    const to = new THREE.Vector3(point.x - this.position.x, 0, point.z - this.position.z);
+    const d = Math.max(0, to.length() - stopAt);
+    this.dashDir = to.normalize();
+    this.facing = Math.atan2(to.x, to.z);
+    this.dashLen = d / this.char.grappleSpeed;
+    this.state = 'dash'; this.stateTime = 0;
+    this.world.sfx('blink');
+  }
+
+  hymnEngine() {
+    const c = this.char, s = this.stats;
+    const at = this.position.clone().addScaledVector(this.facingDir, 2.5);
+    this.world.arena.resolve(at, 0.5);
+    this.world.allies?.addVortex(this, at, c.vortexTime, c.vortexRadius * s.vortex, c.vortexDmg * s.spinDmg, c.vortexTick);
+    this.world.allies?.addDrones(this, c.drones + s.drones, c.droneTime + s.droneTime, c.droneDmg * s.droneDmg * s.spinDmg);
+    this.spinRing.scale.setScalar(0.8);
+    this.spinRing.visible = true;
+    this.world.effects.spawnRing(at, 0xff4a5a, c.vortexRadius * s.vortex, 0.6);
+    this.world.shake(0.3);
+    this.world.sfx('overdrive');
+  }
+
+  // Every hit a hero lands goes through here: weapon tier, perks, FURY, crits, double hits, leech, chains.
+  // kind: 'slash' | 'dash' | 'needle' | 'beam' (attacks) | 'spin' (ultimates) | 'drone' | 'shock' | 'trail'
   strike(e, base, kx, kz, heavy, kind) {
     if (this.world.netClient) return; // co-op client: the host decides all damage
     const s = this.stats;
@@ -411,14 +780,15 @@ export class Player {
     }
     e.hit(dmg, kx, kz, heavy);
     this.world.onComboHit?.(); // COMBO +1 per hit
-    if (kind === 'slash' && Math.random() < s.twin) {
+    const attack = ATTACK_KINDS.has(kind);
+    if (attack && kind !== 'dash' && Math.random() < s.twin) {
       e.hit(dmg, 0, 0, false); // Twin Strike
       this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0x9ab8ff, 4);
     }
     // healing (capped per second so it can't make you unkillable)
-    if ((kind === 'slash' || kind === 'dash') && s.leech > 0) this.leechHeal(s.leech, 6);
+    if (attack && s.leech > 0) this.leechHeal(s.leech, 6);
     if (kind === 'spin' && s.spinLeech > 0) this.leechHeal(s.spinLeech, 10);
-    if (kind === 'slash' || kind === 'dash') {
+    if (attack) {
       this.world.onTalonHit?.(e, dmg, this); // ARC TALONS power-up
       if (Math.random() < s.storm) this.stormChain(e, dmg * 0.35);
     }
@@ -490,10 +860,10 @@ export class Player {
     const s = this.stats = this.loadout.stats;
     const oldMax = this.maxHp || this.char.hp;
     this.maxHp = Math.round(this.char.hp * (1 + s.maxHpPct)) + s.maxHpFlat;
-    const charges = s.dashCharges + this.char.dashCharges - 1;
+    const charges = s.dashCharges + this.char.dashCharges - 1; // Extra Blink / Extra Hop
     if (this.hp !== undefined) this.hp = Math.min(this.maxHp, this.hp + Math.max(0, this.maxHp - oldMax));
     this.dashCooldownMax = this.char.dashCd * s.dashCd;
-    this.spinCooldownMax = SPIN_COOLDOWN * s.spinCd;
+    this.spinCooldownMax = this.char.ultCd * s.spinCd;
     if (this.dashCharges !== undefined) this.dashCharges = Math.min(charges, this.dashCharges + (charges > this.prevCharges ? 1 : 0));
     this.prevCharges = this.maxCharges = charges;
     // talons: longer, glowier, and colour-cycle with the tier
@@ -532,11 +902,34 @@ export class Player {
   // screen and the share text can say what killed Sarrow)
   // opts.hazard = lava / lightning (the SHIELD blocks those without using up a charge)
   takeDamage(amount, source = null, opts = {}) {
-    if (this.dead || this.state === 'dash') return false; // blinking = untouchable
+    if (this.dead) return false;
+    if (this.state === 'dash' && (this.kit === 'sarrow' || this.kit === 'orin')) return false; // blinking / grappling = untouchable
+    if (this.phaseTimer > 0) return false;               // ISKRA: just phased
     if (this.invulnTimer > 0) return false;              // just revived
     if (this.world.powerups && this.world.powerups.absorb(opts, this)) return false; // SHIELD
-    if (this.state === 'spin') amount *= 0.5;             // overdrive = tougher
+    const c = this.char;
+    if (this.state === 'spin' && c.spinGuard) amount *= 1 - c.spinGuard; // overdrive = tougher
+    amount *= 1 - (c.armor || 0);                         // ZALEKS' plating
+    if (this.kit === 'zaleks') {
+      if (this.state === 'dash') amount *= 1 - c.chargeGuard;
+      // frontal block while swinging
+      if (this.state === 'attack' && source && source.position) {
+        const dx = source.position.x - this.position.x, dz = source.position.z - this.position.z, d = Math.hypot(dx, dz) || 1;
+        if ((dx * Math.sin(this.facing) + dz * Math.cos(this.facing)) / d > 0.3) {
+          amount *= 1 - (c.block + this.stats.block);
+          this.world.effects.spawnSparks(this.position.clone().addScaledVector(this.facingDir, 0.8).setY(1.2), 0xffd090, 4);
+        }
+      }
+    }
+    if (this.stats.shell && this.world.allies?.drones.some((d) => d.owner === this && d.life > 0)) amount *= 1 - this.stats.shell; // ORIN: Hymn Shell
     amount *= this.stats.hurtMult || 1;                   // cursed cards (Greed Engine, Glass Heart)
+    if (this.shieldHp > 0) {                              // ZALEKS' slam shield soaks it first
+      const soak = Math.min(this.shieldHp, amount);
+      this.shieldHp -= soak;
+      amount -= soak;
+      if (this.shieldHp <= 0) { this.shieldTimer = 0; this.world.effects.spawnRing(this.position, 0xffa030, 1.8, 0.3); }
+      if (amount <= 0) { this.world.sfx('shieldBlock'); return true; }
+    }
     this.hp -= amount;
     this.hurtTimer = 0.15;
     this.timeSinceHit = 0;
@@ -559,6 +952,8 @@ export class Player {
     this.spinRing.visible = false;
     this.slashArc.material.opacity = 0;
     this.bubble.visible = false;
+    this.guard.visible = false;
+    this.shieldHp = 0; this.tauntTimer = 0;
   }
 
   heal(amount) { this.hp = Math.min(this.maxHp, this.hp + amount); }
@@ -598,14 +993,25 @@ export class Player {
     m.armR.rotation.set(-0.6 + swing * 0.4 * speedRatio, 0, -0.15);
     this.slashArc.material.opacity = Math.max(0, this.slashArc.material.opacity - dt * 6);
 
-    if (this.state === 'attack') {
-      const hit = COMBO[this.comboStep - 1];
+    const kit = this.kit;
+    if (this.state === 'attack' && (kit === 'iskra' || kit === 'orin')) {
+      // ranged: aim the arm at the target, the other arm flicks (needles) or stays raised (tether)
+      const flick = kit === 'iskra' ? Math.max(0, this.fireCd) / 0.14 : 0.3 + 0.1 * Math.sin(performance.now() / 40);
+      if (kit === 'iskra' && this.armFlip) { m.armL.rotation.set(-1.5 + flick * 0.4, 0, 0.1); m.armR.rotation.set(-0.9, 0, -0.2); }
+      else { m.armR.rotation.set(-1.5 + flick * 0.4, 0, -0.1); m.armL.rotation.set(kit === 'orin' ? -1.3 : -0.9, 0, 0.2); }
+    } else if (this.state === 'attack') {
+      const hit = this.combo[Math.max(0, this.comboStep - 1)] || this.combo[0];
       const t = Math.min(1, this.stateTime / (hit.duration / this.char.atkSpeed));
+      const n = this.combo.length;
       const e = 1 - Math.pow(1 - t, 3); // ease out
-      if (this.comboStep === 1) {
+      if (kit === 'zaleks' && this.comboStep === 1) {
+        // shield-bash: the left arm punches straight out
+        m.armL.rotation.set(THREE.MathUtils.lerp(-0.4, -1.7, e), 0, 0.1);
+        m.body.rotation.x = e * 0.15;
+      } else if (this.comboStep === 1) {
         // left arm sweeps from the outside across the body
         m.armL.rotation.set(-1.5, 0, THREE.MathUtils.lerp(1.3, -0.9, e));
-      } else if (this.comboStep === 2) {
+      } else if (this.comboStep === 2 && n > 2) {
         m.armR.rotation.set(-1.5, 0, THREE.MathUtils.lerp(-1.3, 0.9, e));
       } else {
         // both arms come down from overhead
@@ -614,26 +1020,55 @@ export class Player {
         m.armR.rotation.set(x, 0, -0.2);
         m.body.rotation.x = e * 0.25;
       }
+      const fin = this.comboStep === n;
       if (t > 0.3 && t < 0.6) {
-        this.slashArc.material.opacity = this.comboStep === 3 ? 0.75 : 0.55;
+        this.slashArc.material.opacity = fin ? 0.75 : 0.55;
         // finisher is orange at first; from weapon tier 3 every swing glows in the talons' tier colour
-        this.slashArc.material.color.setHex(this.damageMult > 1 ? 0xff3a2a : (this.comboStep === 3 && this.loadout.tier < 3 ? 0xffa040 : this.bladeColor));
-        this.slashArc.scale.set(this.comboStep === 2 ? -1 : 1, 1, 1).multiplyScalar((this.comboStep === 3 ? 1.2 : 1) * this.stats.range);
+        this.slashArc.material.color.setHex(this.damageMult > 1 ? 0xff3a2a : (fin && this.loadout.tier < 3 ? 0xffa040 : this.bladeColor));
+        this.slashArc.scale.set(this.comboStep === 2 && !fin ? -1 : 1, 1, 1).multiplyScalar((fin ? 1.2 : 1) * (kit === 'zaleks' ? this.stats.bash * 1.05 : this.stats.range));
       }
     } else if (this.state === 'dash') {
-      m.body.rotation.x = 0.5; // lean forward
-      m.armL.rotation.set(0.9, 0, 0.2);
-      m.armR.rotation.set(0.9, 0, -0.2);
+      if (kit === 'zaleks') { // shoulder first
+        m.body.rotation.x = 0.35; m.body.rotation.y = 0.5;
+        m.armL.rotation.set(-0.3, 0, 0.6); m.armR.rotation.set(0.6, 0, -0.2);
+      } else if (kit === 'iskra') { // blink-in: crouched, arms spread
+        m.body.rotation.x = 0.3;
+        m.armL.rotation.set(0.4, 0, 1.2); m.armR.rotation.set(0.4, 0, -1.2);
+      } else if (kit === 'orin') { // reeling in on the magnet line
+        m.body.rotation.x = 0.4;
+        m.armR.rotation.set(-1.7, 0, -0.1); m.armL.rotation.set(0.8, 0, 0.2);
+      } else {
+        m.body.rotation.x = 0.5; // lean forward
+        m.armL.rotation.set(0.9, 0, 0.2);
+        m.armR.rotation.set(0.9, 0, -0.2);
+      }
     } else if (this.state === 'spin') {
-      m.body.rotation.y += dt * 24; // overdrive whirlwind!
-      m.armL.rotation.set(-0.2, 0, 1.5);
-      m.armR.rotation.set(-0.2, 0, -1.5);
-      this.spinRing.rotation.z -= dt * 18;
+      if (kit === 'zaleks') { // hop up, then smash both fists down
+        const t = this.stateTime;
+        m.body.position.y = t < 0.4 ? Math.sin((t / 0.4) * Math.PI * 0.5) * 1.1 * (1 - Math.max(0, t - 0.3) / 0.1) : 0;
+        const x = t < 0.3 ? -2.9 : THREE.MathUtils.lerp(-2.9, -0.5, Math.min(1, (t - 0.3) / 0.1));
+        m.armL.rotation.set(x, 0, 0.3); m.armR.rotation.set(x, 0, -0.3);
+        m.body.rotation.x = t > 0.4 ? 0.35 : -0.1;
+      } else if (kit === 'iskra') { // arms wide, needles everywhere
+        m.armL.rotation.set(-1.3, 0, 0.9 + Math.sin(this.stateTime * 30) * 0.3);
+        m.armR.rotation.set(-1.3, 0, -0.9 - Math.sin(this.stateTime * 30) * 0.3);
+        this.spinRing.rotation.z -= dt * 10;
+      } else if (kit === 'orin') { // conducting the hymn: arms raised
+        m.armL.rotation.set(-2.7, 0, 0.5); m.armR.rotation.set(-2.7, 0, -0.5);
+        m.body.rotation.x = -0.15;
+        this.spinRing.rotation.z += dt * 12;
+      } else {
+        m.body.rotation.y += dt * 24; // overdrive whirlwind!
+        m.armL.rotation.set(-0.2, 0, 1.5);
+        m.armR.rotation.set(-0.2, 0, -1.5);
+        this.spinRing.rotation.z -= dt * 18;
+      }
     }
+    if (this.guard.visible) this.guard.material.opacity = 0.14 + 0.08 * Math.sin(performance.now() / 120);
 
     // flash red when hurt
     const reviveGlow = this.invulnTimer > 0 && Math.floor(this.invulnTimer * 8) % 2 === 0;
-    this.setFlash(this.hurtTimer > 0 ? 0x990000 : (this.state === 'spin' || reviveGlow ? 0x0a3a36 : 0x000000));
+    this.setFlash(this.hurtTimer > 0 ? 0x990000 : ((this.state === 'spin' && kit === 'sarrow') || reviveGlow ? 0x0a3a36 : (this.tauntTimer > 0 ? 0x3a1a00 : 0x000000)));
     // the chest core pulses (faster while in overdrive)
     const pulse = 0.16 * (1 + 0.25 * Math.sin(performance.now() / (this.state === 'spin' ? 60 : 250)));
     m.core.scale.set(pulse, pulse, 0.06);

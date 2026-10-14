@@ -15,7 +15,7 @@
 //     so late waves stay dangerous.
 //
 // Once a card is maxed it stops appearing; if fewer than 3 cards are left, REACTOR PATCH fills in.
-// Every card works for all three heroes (percent-based, on top of each hero's own numbers).
+// Universal cards work for every hero; hero cards only show up for that hero (Loadout.hero).
 // This file has no Three.js in it, so tools (like the time-to-kill simulator) can import it too.
 
 export const WEAPON_TIER_STEP = 0.28; // = 0.14 enemy health per wave x 2 waves per pick
@@ -35,43 +35,74 @@ export function tierColor(tier, base = TIER_COLOURS[0]) {
   return (ch(16) << 16) | (ch(8) << 8) | ch(0);
 }
 
-// group: talons / overdrive / blink / core. desc(level) = what the NEXT level gives.
+// group: attack / mobility / ultimate / core. desc(level) = what the NEXT level gives.
+// heroes: only offered to those heroes (no `heroes` = a universal card every hero can roll).
+const S = ['sarrow'], Z = ['zaleks'], I = ['iskra'], O = ['orin'];
 export const UPGRADES = {
-  // ---- talons ----
-  edge:     { name: 'Talon Edge', group: 'talons', icon: '✦', color: 0xff8a3a, max: 10, desc: () => '+3.5% talon damage' },
-  arc:      { name: 'Wide Arc', group: 'talons', icon: '◠', color: 0x7ffff2, max: 6, desc: () => '+6% slash reach, wider swing' },
-  shock:    { name: 'Shockwave Finisher', group: 'talons', icon: '◎', color: 0xffd040, max: 5, desc: (l) => l === 0 ? 'Combo finisher sends out a shockwave' : 'Bigger, stronger finisher shockwave' },
-  crit:     { name: 'Crit Spark', group: 'talons', icon: '✸', color: 0xfff27a, max: 8, desc: () => '+3.5% chance for 1.8x critical hits' },
-  twin:     { name: 'Twin Strike', group: 'talons', icon: '⫽', color: 0x9ab8ff, max: 6, desc: () => '+4% chance to hit twice' },
-  storm:    { name: 'Storm Talons', group: 'talons', icon: 'ϟ', color: 0x8ab4ff, max: 6, desc: () => '+7.5% chance hits chain lightning to 2 foes' },
-  leech:    { name: 'Core Leech', group: 'talons', icon: '♥', color: 0x6aff7a, max: 6, desc: () => 'Heal +0.25 per talon hit (max 6/s)' },
-  // ---- overdrive (spin / slam) ----
-  odTime:   { name: 'Long Overdrive', group: 'overdrive', icon: '⟲', color: 0xff8a3a, max: 6, desc: () => '+0.2s overdrive duration' },
-  odRadius: { name: 'Overdrive Reach', group: 'overdrive', icon: '⭘', color: 0xffb060, max: 6, desc: () => '+6% overdrive radius' },
-  odDamage: { name: 'Overdrive Fury', group: 'overdrive', icon: '✺', color: 0xff5a2a, max: 6, desc: () => '+12.5% overdrive damage' },
-  odLeech:  { name: 'Overdrive Siphon', group: 'overdrive', icon: '❥', color: 0xff6aa0, max: 6, desc: () => 'Heal +0.5 per overdrive hit (max 10/s)' },
-  odCool:   { name: 'Overdrive Coolant', group: 'overdrive', icon: '❄', color: 0x9ae4ff, max: 6, desc: () => '-5% overdrive cooldown' },
-  // ---- blink (dash / charge) ----
-  bkDamage: { name: 'Blink Edge', group: 'blink', icon: '➹', color: 0x3ff6e0, max: 6, desc: () => '+25% blink damage' },
-  bkRange:  { name: 'Long Blink', group: 'blink', icon: '⇢', color: 0x6ad8ff, max: 6, desc: () => '+7.5% blink distance' },
-  bkCharge: { name: 'Extra Blink', group: 'blink', icon: '⇉', color: 0xc8a0ff, max: 1, desc: () => '+1 blink charge' },
-  bkCool:   { name: 'Quick Blink', group: 'blink', icon: '⟳', color: 0x7affc8, max: 6, desc: () => '-6% blink cooldown' },
-  bkTrail:  { name: 'Blink Trail', group: 'blink', icon: '≋', color: 0x3fd0ff, max: 5, desc: (l) => l === 0 ? 'Blink leaves a burning trail' : 'Trail burns hotter' },
-  // ---- core (the hero) ----
+  // ---- universal (every hero) ----
+  edge:     { name: 'Core Edge', group: 'attack', icon: '✦', color: 0xff8a3a, max: 10, desc: () => '+3.5% damage (everything)' },
+  crit:     { name: 'Crit Spark', group: 'attack', icon: '✸', color: 0xfff27a, max: 8, desc: () => '+3.5% chance for 1.8x critical hits' },
+  twin:     { name: 'Twin Strike', group: 'attack', icon: '⫽', color: 0x9ab8ff, max: 6, desc: () => '+4% chance an attack hits twice' },
+  storm:    { name: 'Storm Core', group: 'attack', icon: 'ϟ', color: 0x8ab4ff, max: 6, desc: () => '+7.5% chance attacks chain lightning to 2 foes' },
+  leech:    { name: 'Core Leech', group: 'attack', icon: '♥', color: 0x6aff7a, max: 6, desc: () => 'Heal +0.25 per attack hit (max 6/s)' },
+  odDamage: { name: 'Ultimate Fury', group: 'ultimate', icon: '✺', color: 0xff5a2a, max: 6, desc: () => '+12.5% ultimate damage' },
+  odCool:   { name: 'Ultimate Coolant', group: 'ultimate', icon: '❄', color: 0x9ae4ff, max: 6, desc: () => '-5% ultimate cooldown' },
+  bkCool:   { name: 'Quick Recovery', group: 'mobility', icon: '⟳', color: 0x7affc8, max: 6, desc: () => '-6% mobility cooldown' },
   speed:    { name: 'Swift Step', group: 'core', icon: '»', color: 0xd0ff6a, max: 6, desc: () => '+3% move speed' },
   maxHp:    { name: 'Reinforced Core', group: 'core', icon: '⬢', color: 0x6aff9a, max: 8, desc: () => '+7.5% max health' },
   regen:    { name: 'Core Recharge', group: 'core', icon: '✚', color: 0x3ff6a0, max: 6, desc: () => '+17.5% health regen' },
+  // ---- SARROW ----
+  arc:      { name: 'Wide Arc', heroes: S, group: 'attack', icon: '◠', color: 0x7ffff2, max: 6, desc: () => '+6% slash reach, wider swing' },
+  shock:    { name: 'Shockwave Finisher', heroes: S, group: 'attack', icon: '◎', color: 0xffd040, max: 5, desc: (l) => l === 0 ? 'Combo finisher sends out a shockwave' : 'Bigger, stronger finisher shockwave' },
+  bkDamage: { name: 'Blink Edge', heroes: S, group: 'mobility', icon: '➹', color: 0x3ff6e0, max: 6, desc: () => '+25% blink damage' },
+  bkRange:  { name: 'Long Blink', heroes: S, group: 'mobility', icon: '⇢', color: 0x6ad8ff, max: 6, desc: () => '+7.5% blink distance' },
+  bkCharge: { name: 'Extra Blink', heroes: S, group: 'mobility', icon: '⇉', color: 0xc8a0ff, max: 1, desc: () => '+1 blink charge' },
+  bkTrail:  { name: 'Blink Trail', heroes: S, group: 'mobility', icon: '≋', color: 0x3fd0ff, max: 5, desc: (l) => l === 0 ? 'Blink leaves a burning trail' : 'Trail burns hotter' },
+  odTime:   { name: 'Long Overdrive', heroes: S, group: 'ultimate', icon: '⟲', color: 0xff8a3a, max: 6, desc: () => '+0.2s overdrive duration' },
+  odRadius: { name: 'Overdrive Reach', heroes: S, group: 'ultimate', icon: '⭘', color: 0xffb060, max: 6, desc: () => '+6% overdrive radius' },
+  odLeech:  { name: 'Overdrive Siphon', heroes: S, group: 'ultimate', icon: '❥', color: 0xff6aa0, max: 6, desc: () => 'Heal +0.5 per overdrive hit (max 10/s)' },
+  // ---- ZALEKS ----
+  zGuard:   { name: 'Tower Guard', heroes: Z, group: 'attack', icon: '⛊', color: 0xffc060, max: 2, desc: () => 'Frontal block +6% while attacking' },
+  zHammer:  { name: 'Heavy Hammer', heroes: Z, group: 'attack', icon: '⚒', color: 0xff9a40, max: 6, desc: () => '+6% bash damage and reach, +10% knockback' },
+  zStun:    { name: 'Concussive Charge', heroes: Z, group: 'mobility', icon: '✱', color: 0xffe080, max: 3, desc: () => 'Charge stun +0.5s' },
+  zCharge:  { name: 'Long Charge', heroes: Z, group: 'mobility', icon: '⇛', color: 0xffb860, max: 5, desc: () => '+12% charge distance, +20% charge damage' },
+  zQuake:   { name: 'Aftershock', heroes: Z, group: 'ultimate', icon: '◎', color: 0xffa030, max: 5, desc: () => '+8% slam radius, +10% slam damage' },
+  zShield:  { name: 'Bulwark Shield', heroes: Z, group: 'ultimate', icon: '⬡', color: 0xffd090, max: 5, desc: () => 'Slam shield +10% stronger' },
+  zTaunt:   { name: 'War Cry', heroes: Z, group: 'ultimate', icon: '!', color: 0xff7040, max: 3, desc: () => 'Taunt lasts +1s' },
+  // ---- ISKRA ----
+  iPierce:  { name: 'Piercing Needles', heroes: I, group: 'attack', icon: '➶', color: 0xe8a0ff, max: 1, desc: () => 'Needles pierce +1 enemy' },
+  iSplit:   { name: 'Split Needles', heroes: I, group: 'attack', icon: '⋔', color: 0xd090ff, max: 1, desc: () => '+1 side needle each side per shot (20% damage)' },
+  iHop:     { name: 'Extra Hop', heroes: I, group: 'mobility', icon: '⇉', color: 0xc070ff, max: 1, desc: () => 'Phase Hop +1 charge' },
+  iHopRange:{ name: 'Long Hop', heroes: I, group: 'mobility', icon: '⇢', color: 0xb0a0ff, max: 4, desc: () => '+12% hop distance' },
+  iDecoy:   { name: 'Stubborn Decoy', heroes: I, group: 'mobility', icon: '◈', color: 0xa070ff, max: 4, desc: () => 'Decoy lasts +1s and takes +2 hits' },
+  iStorm:   { name: 'Long Storm', heroes: I, group: 'ultimate', icon: '⁂', color: 0xff80ff, max: 5, desc: () => 'Needle Storm +0.5s' },
+  iVolley:  { name: 'Dense Storm', heroes: I, group: 'ultimate', icon: '⁘', color: 0xe060ff, max: 2, desc: () => '+1 needle per storm volley' },
+  // ---- ORIN ----
+  oChain:   { name: 'Choir Chain', heroes: O, group: 'attack', icon: 'ϟ', color: 0xff9a8a, max: 3, desc: () => 'Tether chains to +1 enemy' },
+  oReach:   { name: 'Long Tether', heroes: O, group: 'attack', icon: '⟿', color: 0xff8070, max: 4, desc: () => '+10% tether range' },
+  oGrapple: { name: 'Magnet Shock', heroes: O, group: 'mobility', icon: '⊸', color: 0xff6a5a, max: 4, desc: () => 'Grapple stun +0.3s, +25% grapple damage' },
+  oDrone:   { name: 'Extra Drone', heroes: O, group: 'ultimate', icon: '❂', color: 0xff4a5a, max: 1, desc: () => 'Drone count +1' },
+  oDroneDmg:{ name: 'Drone Armament', heroes: O, group: 'ultimate', icon: '✜', color: 0xff7a6a, max: 5, desc: () => '+10% drone damage' },
+  oDroneTime:{ name: 'Drone Lifespan', heroes: O, group: 'ultimate', icon: '⧗', color: 0xffaa9a, max: 3, desc: () => 'Drones last +1s' },
+  oShell:   { name: 'Hymn Shell', heroes: O, group: 'ultimate', icon: '⬣', color: 0xff8a9a, max: 4, desc: () => 'Take -6% damage while your drones fly' },
+  oVortex:  { name: 'Deep Vortex', heroes: O, group: 'ultimate', icon: '◉', color: 0xff5070, max: 5, desc: () => '+10% vortex radius and pull' },
 };
 export const FALLBACK = { id: 'patch', name: 'Reactor Patch', group: 'core', icon: '⛨', color: 0xc8c8c8, max: Infinity, desc: () => '+3 max health and heal 35%' };
-export const GROUP_LABELS = { talons: 'TALONS', overdrive: 'OVERDRIVE', blink: 'BLINK', core: 'CORE', cursed: 'CURSED' };
+export const GROUP_LABELS = { attack: 'ATTACK', mobility: 'MOBILITY', ultimate: 'ULTIMATE', core: 'CORE', cursed: 'CURSED' };
+export const cardForHero = (id, hero) => { const u = UPGRADES[id]; return !!u && (!u.heroes || !hero || u.heroes.includes(hero)); };
+// The card's group label, using the hero's own ability names (e.g. "PHASE HOP" for Iskra)
+export function groupLabel(group, kit) {
+  const a = kit && kit[group];
+  return a ? a.name.toUpperCase() : GROUP_LABELS[group];
+}
 
 // CURSED CARDS: from wave 10, about 1 pick in 3 swaps one card for a cursed one. A big boon WITH a
 // real drawback. Each curse can only be taken once. They still give the weapon tier like any card.
 export const CURSES = {
-  bloodPact: { name: 'Blood Pact', group: 'cursed', icon: '☠', color: 0xd02a5a, max: 1, boon: '+25% talon damage', bane: '-20% max health' },
-  overclock: { name: 'Overclocked Core', group: 'cursed', icon: '⚡', color: 0xa040ff, max: 1, boon: '-30% blink & overdrive cooldowns', bane: 'Core recharge (regen) stops' },
+  bloodPact: { name: 'Blood Pact', group: 'cursed', icon: '☠', color: 0xd02a5a, max: 1, boon: '+25% damage', bane: '-20% max health' },
+  overclock: { name: 'Overclocked Core', group: 'cursed', icon: '⚡', color: 0xa040ff, max: 1, boon: '-30% mobility & ultimate cooldowns', bane: 'Core recharge (regen) stops' },
   greed:     { name: 'Greed Engine', group: 'cursed', icon: '¤', color: 0xe0b020, max: 1, boon: '+50% score and scrap', bane: 'Enemies deal +15% damage to you' },
-  heavy:     { name: 'Leaden Talons', group: 'cursed', icon: '⚒', color: 0x8a4a2a, max: 1, boon: '+35% talon damage', bane: '-12% move speed' },
+  heavy:     { name: 'Leaden Core', group: 'cursed', icon: '⚒', color: 0x8a4a2a, max: 1, boon: '+35% damage', bane: '-12% move speed' },
   glass:     { name: 'Glass Heart', group: 'cursed', icon: '◇', color: 0x6ad0ff, max: 1, boon: '+20% crit chance', bane: 'Take +20% damage' },
 };
 for (const c of Object.values(CURSES)) c.desc = () => c.boon;
@@ -79,7 +110,7 @@ export const CURSE_FROM_WAVE = 10;
 export const CURSE_CHANCE = 0.35;
 
 export class Loadout {
-  constructor() { this.reset(); }
+  constructor(hero = null) { this.hero = hero; this.reset(); }
 
   reset() {
     this.tier = 0;
@@ -95,7 +126,7 @@ export class Loadout {
 
   // 3 different random cards that aren't maxed yet (Reactor Patch fills any gaps)
   roll(count = 3, rng = Math.random) {
-    const open = Object.keys(UPGRADES).filter((id) => this.level(id) < UPGRADES[id].max);
+    const open = Object.keys(UPGRADES).filter((id) => cardForHero(id, this.hero) && this.level(id) < UPGRADES[id].max);
     const hand = [];
     while (hand.length < count && open.length) hand.push(open.splice(Math.floor(rng() * open.length), 1)[0]);
     if (hand.length < count) hand.push('patch');
@@ -139,7 +170,7 @@ export class Loadout {
       spinCd: 1 - 0.05 * L('odCool'),
       dashDmg: 1 + 0.25 * L('bkDamage'),
       dashTime: 1 + 0.075 * L('bkRange'),
-      dashCharges: 1 + L('bkCharge'),
+      dashCharges: 1 + L('bkCharge') + L('iHop'),
       dashCd: 1 - 0.06 * L('bkCool'),
       trail: L('bkTrail') * 0.6,                  // trail tick = (4 + 3 x this) x damage
       speed: 1 + 0.03 * L('speed'),
@@ -147,6 +178,17 @@ export class Loadout {
       maxHpFlat: 3 * this.patches,
       regen: (1 + 0.175 * L('regen')) * (L('overclock') ? 0 : 1),
       scoreMult: L('greed') ? 1.5 : 1,
+      // Zaleks
+      block: 0.06 * L('zGuard'),
+      bash: 1 + 0.06 * L('zHammer'), bashDmg: 1 + 0.06 * L('zHammer'), slamDmg: 1 + 0.1 * L('zQuake'), bashKnock: 1 + 0.1 * L('zHammer'),
+      chargeStun: 0.5 * L('zStun'), chargeDist: 1 + 0.12 * L('zCharge'), chargeDmg: 1 + 0.2 * L('zCharge'),
+      slamRadius: 1 + 0.08 * L('zQuake'), shield: 1 + 0.1 * L('zShield'), taunt: L('zTaunt'),
+      // Iskra
+      pierce: L('iPierce'), split: L('iSplit'), hopCharges: L('iHop'), hopDist: 1 + 0.12 * L('iHopRange'),
+      decoy: L('iDecoy'), stormTime: 0.5 * L('iStorm'), stormCount: L('iVolley'),
+      // Orin
+      chains: L('oChain'), reach: 1 + 0.1 * L('oReach'), grapple: L('oGrapple'), drones: L('oDrone'),
+      droneDmg: 1 + 0.1 * L('oDroneDmg'), droneTime: 1 * L('oDroneTime'), vortex: 1 + 0.1 * L('oVortex'), shell: 0.06 * L('oShell'),
       hurtMult: (L('greed') ? 1.15 : 1) * (L('glass') ? 1.2 : 1),
     };
     // cursed cards

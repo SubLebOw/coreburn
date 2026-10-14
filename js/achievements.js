@@ -19,7 +19,7 @@ export const ACHIEVEMENTS = [
   { id: 'closeCalls', name: 'Hair\'s Breadth', desc: 'Get 10 CLOSE CALLs (total)', goal: (s) => [s.closeCalls, 10], reward: { scrap: 60 } },
   { id: 'mutators', name: 'Adaptable', desc: 'Clear 5 mutator waves (total)', goal: (s) => [s.mutators, 5], reward: { scrap: 60 } },
   { id: 'cursed', name: 'Bad Deal', desc: 'Take 3 cursed cards in one run', goal: (s, live) => [live.cursed || 0, 3], live: true, reward: { item: ['talon', 'hex'] } },
-  { id: 'heroes', name: 'Polymath', desc: 'Reach wave 10 with Sarrow, Zaleks and Iskra', goal: (s) => [['sarrow', 'zaleks', 'iskra'].filter((h) => s.heroWave10.includes(h)).length, 3], reward: { scrap: 120 } },
+  { id: 'heroes', name: 'Polymath', desc: 'Reach wave 10 with 3 different heroes (each plays differently!)', goal: (s) => [new Set(s.heroWave10).size, 3], reward: { scrap: 120 } },
   { id: 'coop', name: 'Squad Up', desc: 'Finish a co-op run', goal: (s) => [s.coopRuns, 1], reward: { scrap: 50 } },
   { id: 'revive', name: 'Medic', desc: 'Revive a teammate in co-op', goal: (s) => [s.revives, 1], reward: { scrap: 50 } },
   { id: 'daily', name: 'Daily Grind', desc: 'Play a daily challenge', goal: (s) => [s.dailies, 1], reward: { scrap: 40 } },

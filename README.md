@@ -309,3 +309,13 @@ Tap **CO-OP** → **HOST** to get a 4-letter room code; friends tap **JOIN** and
 - **Downed & revive:** at 0 HP you're downed; a teammate standing near you for ~3 s revives you. The run ends when everyone is down.
 - Upgrade picks and power-ups are per player; score and combo are shared. Bosses switch targets.
 - **Limits:** max 4 players. No TURN relay, so some strict/symmetric NATs (some mobile carriers, corporate Wi-Fi) can't connect. Enemy reactions lag by your round-trip time. A custom PeerJS server can be set via `localStorage['coreburn-peer']`.
+
+## Scrap, shop and run twists (v1.6.0)
+
+- **Scrap** is earned every run (solo and co-op): 1 per 4 kills + 3 per wave + 15 per boss + 10 per mutator wave + golden jackpots. It's saved on this device (no account).
+- **Shop** (title screen): skins (recolour any hero), talon colours and small starting perks. Each perk is about one upgrade card's worth, and you can equip one at a time. Cosmetics and perks apply to solo runs only.
+- **Double scrap**: on the game over screen of the Android app you can watch an optional rewarded ad to double that run's scrap. The button never shows on the website.
+- **Mutator waves**: from wave 7, every 4th regular wave (7, 11, 19, 23...) gets one twist, announced with a banner: Overclocked, Swarm, Glass Arena, Gilded Host, Volatile (enemies burst on death) or Bounty (double score).
+- **Cursed cards**: from wave 10, about 1 pick in 3 offers a cursed card. Each gives a big boon with a real drawback (e.g. Blood Pact: +25% damage, -20% max health) and can only be taken once.
+- **CLOSE CALL**: when a bolt only just misses you, the world slows to 30% for 0.4 s (+2 combo, bonus points). It has a 7 s cooldown and is solo only.
+- **Golden bosses**: about 1 boss in 20 is golden, with a gold shader, 1.5x health and 3x points. It pays a scrap jackpot (150 + 50 per boss number) and has a 40% chance to drop a rare cosmetic (Gilded skin / Aurum talons) that can't be bought.

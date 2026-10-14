@@ -53,6 +53,7 @@
       <!-- COMBO counter (filled in by hud.js, see combo.js) -->
       <div id="combo"><div class="row"><span id="combo-count">0</span><span id="combo-mult">x1</span></div><div class="cbar"><div id="combo-fill"></div></div><div class="clabel">COMBO</div></div>
       <div id="combo-callout"></div>
+      <div id="mutator-tag" class="hidden"></div>
     </div>
 
     <!-- Active power-ups with timers (filled in by hud.js) -->
@@ -77,6 +78,7 @@
 
     <div id="banner"><div id="banner-text"></div><div id="banner-sub"></div></div>
     <div id="toast"></div>
+    <div id="closecall"><b>CLOSE CALL</b><span></span></div>
   </div>
 
   <!-- Sound on/off (remembered between visits). Keyboard shortcut: M -->
@@ -138,6 +140,17 @@
     </div>
   </div>
 
+  <!-- Unlock shop: skins, talon colours, starting perks (see meta.js / shop-ui.js) -->
+  <div id="shop-panel" class="hidden">
+    <div class="sp-box">
+      <div class="sp-head"><div class="cp-title">SHOP</div><div id="sp-scrap"></div></div>
+      <div id="sp-tabs"></div>
+      <div id="sp-items"></div>
+      <div id="sp-note"></div>
+      <button id="sp-close" class="big-btn">DONE</button>
+    </div>
+  </div>
+
   <!-- Title screen + game over screen -->
   <div id="overlay">
     <div class="panel" id="title-panel">
@@ -160,6 +173,7 @@
       <p class="small">Endless waves · 7 bosses · power-ups · a new arena every 10 waves · how far can you go?</p>
       <button id="start-btn" class="big-btn">START</button>
       <button id="coop-btn" class="big-btn coop">CO-OP <small>online, 2-4 players</small></button>
+      <button id="shop-btn" class="big-btn shop">SHOP <small id="shop-scrap">0 scrap</small></button>
       <div class="best" id="best-text"></div>
       <div class="footer-links">
         <a href="https://sublebow.github.io/coreburn/privacy.html" target="_blank" rel="noopener">Privacy policy</a>
@@ -172,10 +186,12 @@
       <h1>CORE OFFLINE</h1>
       <div id="gameover-score"></div>
       <p id="gameover-stats"></p>
+      <div id="gameover-scrap" class="hidden"></div>
       <div class="share-row">
         <button id="share-btn" class="share-btn">&#128228; SHARE SCORE</button>
         <button id="copy-btn" class="share-btn secondary">COPY</button>
       </div>
+      <button id="double-btn" class="big-btn double hidden">&#9654; DOUBLE SCRAP <small>(watch an ad)</small></button>
       <button id="revive-btn" class="big-btn revive hidden">&#9654; REVIVE <small>(watch an ad)</small></button>
       <button id="restart-btn" class="big-btn">PLAY AGAIN</button>
       <div class="small" id="restart-hint"><span class="kb-only">Press any key or click to restart</span><span class="touch-only">Tap anywhere to restart</span></div>

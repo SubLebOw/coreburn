@@ -393,3 +393,50 @@ body.touch .ucard .key { display: none; }
 @media (max-width: 600px) { #cp-roster { grid-template-columns: 1fr; } .cp-hero small { display: none; } }
 #cp-menu.hidden, #cp-lobby.hidden { display: none; }
 #cp-menu .cp-join .big-btn { width: auto; margin: 0; padding: 10px 22px; }
+
+/* ---------- Part C: banners with a colour, mutator tag, scrap, shop, cursed cards, close call ---------- */
+#banner.tinted #banner-text { color: var(--bc); text-shadow: 0 3px 0 #000, 0 0 22px var(--bc); }
+#mutator-tag { margin-top: 6px; display: inline-block; font-size: 11px; font-weight: 900; letter-spacing: 2px; padding: 2px 8px; border-radius: 4px; color: #000; background: var(--c, #ffb020); box-shadow: 0 0 12px var(--c, #ffb020); }
+#mutator-tag::before { content: 'MUTATOR · '; opacity: .7; }
+#mutator-tag.hidden { display: none; }
+#gameover-scrap { margin: 4px 0 10px; font-size: 15px; color: #ddd; }
+#gameover-scrap b { color: #ffc23a; font-size: 20px; letter-spacing: 1px; }
+#gameover-scrap i { color: #7aff9a; font-style: normal; font-weight: 900; }
+#gameover-scrap .rare { color: #ffe08a; font-weight: 800; margin-top: 4px; }
+#gameover-scrap.hidden { display: none; }
+.big-btn.shop { display: block; margin: 10px auto 0; background: #2a2416; color: #ffc23a; border-color: #ffc23a; font-size: 18px; }
+.big-btn.shop small, .big-btn.double small { display: block; font-size: 11px; letter-spacing: 1px; opacity: .85; font-weight: 700; }
+.big-btn.double { background: #2a2416; color: #ffc23a; border-color: #ffc23a; margin-bottom: 8px; }
+#shop-panel { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, #0a0e12ee, #000f); padding: calc(12px + env(safe-area-inset-top)) 12px 12px; }
+#shop-panel.hidden { display: none; }
+.sp-box { width: 100%; max-width: 640px; max-height: 100%; overflow: auto; text-align: center; color: #eee; }
+.sp-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+#sp-scrap { color: #ffc23a; font-size: 14px; letter-spacing: 2px; } #sp-scrap b { font-size: 24px; }
+#sp-tabs { display: flex; gap: 6px; margin: 10px 0; }
+.sp-tab { flex: 1; padding: 10px 0; font: inherit; font-weight: 900; letter-spacing: 2px; color: #aaa; background: #1b2126; border: 2px solid #333; border-radius: 8px; cursor: pointer; }
+.sp-tab.on { color: #ffc23a; border-color: #ffc23a; background: #2a2416; }
+#sp-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.sp-item { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; font: inherit; color: #eee; background: #161b20; border: 2px solid #333; border-radius: 10px; cursor: pointer; min-height: 120px; }
+.sp-item .sw { width: 40px; height: 40px; border-radius: 50%; background: var(--c); box-shadow: 0 0 14px var(--c); display: flex; align-items: center; justify-content: center; color: #000; font-weight: 900; font-size: 20px; }
+.sp-item .nm { font-weight: 900; color: var(--c); letter-spacing: 1px; }
+.sp-item .ds { font-size: 11px; line-height: 1.25; opacity: .85; }
+.sp-item .st { margin-top: auto; font-size: 11px; font-weight: 900; letter-spacing: 1px; color: #ffc23a; }
+.sp-item.owned .st { color: #9ad; } .sp-item.on { border-color: var(--c); box-shadow: 0 0 14px var(--c) inset; } .sp-item.on .st { color: #7aff9a; }
+.sp-item.poor { opacity: .55; } .sp-item.rare:not(.owned) { opacity: .6; } .sp-item.rare:not(.owned) .sw { filter: grayscale(1) brightness(.5); }
+.sp-item.nope { animation: nope .3s; }
+@keyframes nope { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+#sp-note { font-size: 12px; opacity: .75; margin: 10px 0; }
+@media (max-width: 480px) { #sp-items { grid-template-columns: repeat(2, 1fr); } .sp-item { min-height: 104px; } }
+.ucard.cursed { background: linear-gradient(160deg, #2a0f1e, #12080e); border-color: var(--c); box-shadow: 0 0 18px #c0206088, inset 0 0 22px #60103088; }
+.ucard.cursed .lvl { color: #ff7a9a; }
+.ucard.cursed .lvl b { color: #ff3a6a; letter-spacing: 2px; }
+.ucard.cursed .icon { animation: cursepulse 1.2s ease-in-out infinite; }
+@keyframes cursepulse { 50% { box-shadow: 0 0 28px var(--c); transform: scale(1.06); } }
+body.closecall #slowmo-tint { opacity: 1; background: radial-gradient(ellipse at center, transparent 45%, #d8f0ff55 100%); }
+body.closecall #game canvas { filter: saturate(.55) contrast(1.15); }
+#mutator-tag { margin-right: 48px; }
+#closecall { position: absolute; top: 62%; left: 0; right: 0; text-align: center; opacity: 0; pointer-events: none; }
+#closecall b { display: block; font-size: clamp(26px, 6vw, 44px); font-weight: 900; font-style: italic; letter-spacing: 4px; color: #fff; text-shadow: 0 3px 0 #000, 0 0 18px #7ad8ff, 0 0 40px #3ff6e0; }
+#closecall span { font-size: 14px; font-weight: 800; color: #bff; text-shadow: 0 2px 0 #000; }
+#closecall.show { animation: closecall 1.1s ease-out forwards; }
+@keyframes closecall { 0% { opacity: 0; transform: scale(1.6); } 12% { opacity: 1; transform: scale(1); } 70% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px); } }

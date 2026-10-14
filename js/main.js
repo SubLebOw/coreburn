@@ -24,6 +24,10 @@ import { Combo } from './combo.js';
 import { CHARACTERS, CHARACTER_ORDER, displayName } from './characters.js';
 import { isPickWave } from './upgrades.js';
 import { Coop } from './coop.js';
+import { meta, scrapForRun, RARE_DROPS, SHOP } from './meta.js';
+import { MUTATORS, isMutatorWave, rollMutator } from './mutators.js';
+import { GOLD_TIME } from './golden.js';
+import { ShopUI } from './shop-ui.js';
 
 const IS_TOUCH = isTouchDevice();
 if (IS_TOUCH) document.body.classList.add('touch'); // shows the touch controls (see style.css)
@@ -80,6 +84,10 @@ const TRANSITION_TIME = 0.9;
 const combo = new Combo();  // hit streak -> score multiplier (see combo.js)
 let upgradeTimer = 0;       // counts down after a boss dies, then the upgrade picker opens
 const fadeEl = document.getElementById('fade');
+// per-run extras (Part C): scrap sources, near-miss slow-mo, volatile bursts
+let run = { bosses: 0, mutators: 0, jackpot: 0, awarded: 0, drops: [] };
+let closeCall = 0, closeCallCd = 0; // CLOSE CALL slow-mo (real seconds) and its cooldown
+const bursts = [];                  // VOLATILE mutator: { pos, t }
 const best = JSON.parse(localStorage.getItem('coreburn-best') || '{"score":0,"wave":0}');
 
 // "world" is a shared object that the player and enemies use to reach each other
@@ -103,8 +111,12 @@ const world = {
     kills++;
     sound.play('enemyDeath');
     combo.add(1);
-    score += e.points * combo.mult;
+    score += Math.round(e.points * combo.mult * (enemies.mutator?.score || 1) * player.stats.scoreMult);
     powerups.onKill(e);
+    if (enemies.mutator?.burst && !e.crumble && !e.isBoss) { // VOLATILE: a short fuse, then a burst
+      bursts.push({ pos: e.position.clone(), t: 0.6 });
+      effects.spawnRing(e.position, 0xff8a1e, 2.2, 0.6);
+    }
     // Hive splitters burst into mites (unless they're crumbling because the boss died)
     if (e.type.splits && !e.crumble) {
       for (let i = 0; i < e.type.splits; i++) {
@@ -123,6 +135,15 @@ const world = {
     }
   },
   onWaveStart(n) {
+    const mut = enemies.mutator;
+    if (mut) { // MUTATOR wave: its own banner (and a tag under the score while it lasts)
+      hud.showBanner(`MUTATOR: ${mut.name}`, `Wave ${n} · ${mut.desc}`, mut.color);
+      hud.setMutator(mut);
+      sound.play('bossWarning');
+      sound.setIntensity(1);
+      return;
+    }
+    hud.setMutator(null);
     if (transition) { sound.play('waveStart'); sound.setIntensity(1); return; } // the arena banner shows instead
     const msgs = { 1: 'The Grindchoir is coming', 2: 'Ripper hounds: they lunge!', 3: 'Slag spitters: dodge the bolts', 4: 'Bulwarks: only heavy hits stagger them', 6: 'Hive splitters burst into mites', 7: 'Elites (amber crowns) incoming' };
     hud.showBanner(`WAVE ${n}`, msgs[n] || '');
@@ -136,12 +157,14 @@ const world = {
   },
   onBossKilled(boss, parts = [boss]) {
     // Reward: big heal + score bonus, a power-up, and its minions crumble
-    score += boss.points * combo.mult;
+    score += Math.round(boss.points * combo.mult * player.stats.scoreMult);
     kills += parts.length;
+    run.bosses++;
+    if (enemies.golden) goldenReward(boss);
     world.player.heal(60);
     enemies.killAllAdds();
     world.shake(0.6);
-    hud.showBanner('BOSS DOWN!', `+${boss.points * combo.mult} pts · +60 health`);
+    if (!enemies.golden) hud.showBanner('BOSS DOWN!', `+${Math.round(boss.points * combo.mult * player.stats.scoreMult)} pts · +60 health`);
     sound.play('bossDefeated');
     sound.setIntensity(1);
     powerups.onKill(boss);
@@ -159,6 +182,7 @@ const world = {
     hud.showToast(def.name + '!', def.hint, '#' + def.color.toString(16).padStart(6, '0'));
   },
   onWaveCleared(n) {
+    if (enemies.mutator) { run.mutators++; hud.setMutator(null); }
     if (isPickWave(n)) upgradeTimer = 1.3; // every 2nd wave: pause for the upgrade picker (after the banner lands)
     const bonus = 25 * n * combo.mult;
     score += bonus;
@@ -167,8 +191,26 @@ const world = {
       hud.showBanner(`WAVE ${n} CLEARED`, `+${bonus} pts · +25 health`);
     }
   },
+  mutatorFor(n) {
+    if (!isMutatorWave(n)) return null;
+    const id = world.forceMutator || rollMutator();
+    return { id, ...MUTATORS[id] };
+  },
+  goldenRoll() { return world.forceGolden || Math.random() < 1 / 20; },
+  // a bolt just whizzed past (projectiles.js): CLOSE CALL slow-mo, solo only, with a cooldown
+  onNearMiss(hero) {
+    if (coop.mode || hero !== player || closeCallCd > 0 || player.dead || state !== 'playing') return;
+    closeCall = 0.4;
+    closeCallCd = 7;
+    combo.add(2);
+    score += 50 * combo.mult;
+    hud.closeCall(`+${50 * combo.mult} pts`);
+    document.body.classList.add('closecall');
+    sound.play('slowmoIn');
+  },
 };
 const player = new Player(scene, world);
+projectiles.onNearMiss = (h) => world.onNearMiss(h);
 const enemies = new WaveManager(scene, world);
 const powerups = new PowerUps(scene, world);
 world.player = player;
@@ -191,13 +233,13 @@ function openUpgradePicker() {
   const loadout = player.loadout;
   if (coop.mode === 'host') coop.beginPicks(); // every friend picks their own card too
   hostPicking = true;
-  hud.showPicker(loadout.roll(3), loadout, (id) => {
+  hud.showPicker(loadout.maybeCurse(loadout.roll(3), enemies.wave), loadout, (id) => {
     hostPicking = false;
     loadout.apply(id);
     player.applyLoadout();
     if (id === 'patch') player.heal(player.maxHp * 0.35);
     const def = loadout.def(id);
-    hud.showToast(`TIER ${loadout.tier} TALONS`, `${def.name}${id === 'patch' ? '' : ' Lv ' + loadout.level(id)}`, '#' + def.color.toString(16).padStart(6, '0'));
+    hud.showToast(`TIER ${loadout.tier} TALONS`, def.group === 'cursed' ? `CURSED: ${def.name}` : `${def.name}${id === 'patch' ? '' : ' Lv ' + loadout.level(id)}`, '#' + def.color.toString(16).padStart(6, '0'));
     world.effects.spawnRing(player.position, player.tierColor, 3, 0.5);
     sound.play('powerup');
     state = 'playing';
@@ -242,7 +284,11 @@ function showCharacterSelect() {
 
 function startGame(id = heroId) {
   if (typeof id !== 'string') id = heroId;
-  player.setCharacter(id);
+  // shop unlocks: skin, talon colour, starting perk (solo runs; co-op keeps everyone's looks even)
+  const solo = !coop.mode;
+  player.talonBase = solo ? meta.talonColor : null;
+  player.startCard = solo ? meta.perkCard : null;
+  player.setCharacter(id, solo ? meta.skinColor : null);
   if (coop.mode === 'host') coop.setupHostGame(); // friends' heroes + co-op scaling (before wave 1)
   hud.setHeroName(player.netName ? player.netName.toUpperCase() : player.char.name, player.tint || player.char.color);
   kills = 0;
@@ -266,6 +312,10 @@ function startGame(id = heroId) {
   state = 'playing';
   revivedThisRun = false;
   hostPicking = false;
+  run = { bosses: 0, mutators: 0, jackpot: 0, awarded: 0, drops: [] };
+  closeCall = 0; closeCallCd = 0; bursts.length = 0;
+  document.body.classList.remove('closecall');
+  hud.setMutator(null);
   enemies.startWave(1);
 }
 
@@ -292,6 +342,9 @@ function startClientGame(char, tint, name = char) {
   score = 0;
   combo.reset();
   deathTimer = 0;
+  player.talonBase = null;
+  player.startCard = null;
+  run = { bosses: 0, mutators: 0, jackpot: 0, awarded: 0, drops: [] };
   player.setCharacter(char, tint);
   hud.setHeroName(name.toUpperCase(), tint || player.char.color);
   hud.hideOverlay();
@@ -317,11 +370,42 @@ const coop = new Coop({
   snapCamera: () => updateCamera(0, true),
   flashFade: () => { fadeEl.style.transition = 'none'; fadeEl.style.opacity = 0.8; requestAnimationFrame(() => { fadeEl.style.transition = 'opacity .5s'; fadeEl.style.opacity = 0; }); },
   getRun: () => ({ wave: Math.max(1, enemies.wave), score, kills }),
-  setLastRun: (r) => { lastRun = r; },
+  setLastRun: (r) => { lastRun = r; if (coop.mode === 'client') { run.awarded = 0; awardScrap({ ...r, greed: false }); } },
 });
 world.coop = coop;
 
 let lastRun = { wave: 1, score: 0, killer: null, place: null, tier: 0 }; // what the share buttons talk about
+
+// GOLDEN boss: scrap jackpot and a 40% chance at a rare cosmetic you don't own yet
+function goldenReward(boss) {
+  const jackpot = 150 + 50 * Math.min(10, boss.bossNumber || 1);
+  run.jackpot += jackpot;
+  let drop = null;
+  const missing = RARE_DROPS.filter((id) => !meta.owns(id));
+  if (missing.length && Math.random() < 0.4) {
+    drop = missing[Math.floor(Math.random() * missing.length)];
+    meta.grant(drop);
+    run.drops.push(drop);
+  }
+  meta.data.stats.goldens++; meta.save();
+  const item = drop && (meta.item('skin', drop) || meta.item('talon', drop));
+  hud.showBanner('GOLDEN JACKPOT!', `+${jackpot} scrap` + (item ? ` · RARE: ${item.name} ${meta.item('skin', drop) ? 'skin' : 'talons'} unlocked!` : ''), '#ffc23a');
+  effects.spawnRing(boss.position, 0xffc23a, 7, 1.4);
+}
+
+// Scrap for this run so far (only the part not yet paid out, so an ad revive doesn't pay twice)
+function awardScrap(r) {
+  const total = Math.round(scrapForRun(r) * (r.greed ? 1.5 : 1));
+  const gain = Math.max(0, total - run.awarded);
+  run.awarded = total;
+  meta.addScrap(gain);
+  if (!run.counted) { meta.data.stats.runs++; run.counted = true; }
+  meta.data.stats.bestWave = Math.max(meta.data.stats.bestWave, r.wave || 0);
+  meta.save();
+  run.lastGain = gain;
+  hud.showScrap(gain, meta.scrap, run.drops);
+  return gain;
+}
 
 function gameOver() {
   state = 'gameover';
@@ -335,7 +419,8 @@ function gameOver() {
   const lastDown = coop.mode === 'host' ? coop.heroes.reduce((a, h) => (h.killedBy ? h : a), player) : player;
   const killer = lastDown.killedBy ? lastDown.killedBy.killerName : null; // e.g. "the Furnace Deacon"
   lastRun = { wave: enemies.wave, score, killer, place: arena.current.place, tier: player.loadout.tier, combo: combo.best, hero: player.netName || displayName(player.char), kills,
-    team: coop.mode === 'host' ? coop.heroes.filter((h) => h !== player).map((h) => h.netName) : null };
+    team: coop.mode === 'host' ? coop.heroes.filter((h) => h !== player).map((h) => h.netName) : null,
+    bosses: run.bosses, mutators: run.mutators, jackpot: run.jackpot, greed: player.stats.scoreMult > 1 };
   upgradeTimer = 0;
   powerups.reset();
   setSlowmo(false);
@@ -349,6 +434,8 @@ function gameOver() {
   reviveOffered = !coop.mode && !revivedThisRun && ads.canRevive; // no ad revive in co-op (teammates revive you)
   if (coop.mode === 'host') coop.onGameOver(lastRun);
   reviveBtn.classList.toggle('hidden', !reviveOffered);
+  awardScrap(lastRun);
+  doubleBtn.classList.toggle('hidden', !(ads.canRevive && run.lastGain > 0)); // rewarded ad: double it (app only)
   document.getElementById('restart-hint').classList.toggle('hidden', reviveOffered);
 }
 
@@ -393,6 +480,28 @@ reviveBtn.addEventListener('click', async (e) => {
   sound.play('revive');
   sound.setIntensity(enemies.boss && !enemies.boss.dead ? 2 : 1);
 });
+
+// Rewarded ad on game over: double this run's scrap (Android app only; hidden on the website)
+const doubleBtn = document.getElementById('double-btn');
+doubleBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+doubleBtn.addEventListener('click', async (e) => {
+  e.stopPropagation();
+  if (state !== 'gameover' || restarting || !run.lastGain) return;
+  restarting = true;
+  const rewarded = await ads.showRewarded();
+  restarting = false;
+  doubleBtn.classList.add('hidden');
+  if (!rewarded) return;
+  meta.addScrap(run.lastGain);
+  hud.showScrap(run.lastGain * 2, meta.scrap, run.drops, true);
+  run.lastGain = 0;
+});
+
+// The unlock shop (title screen)
+const shop = new ShopUI(meta, SHOP, { onClose: () => hud.showTitle(best) });
+hud.refreshScrap = () => shop.refreshTitle();
+document.getElementById('shop-btn').addEventListener('click', (e) => { e.stopPropagation(); if (state === 'title') shop.open(); });
+document.getElementById('shop-btn').addEventListener('pointerdown', (e) => e.stopPropagation());
 
 // Share my score / copy it (game over screen). These must not count as "tap to restart".
 const shareBtn = document.getElementById('share-btn');
@@ -474,6 +583,23 @@ function updateCamera(dt, snap = false) {
   sun.target.position.copy(cameraTarget);
 }
 
+// VOLATILE mutator: dead enemies burst after a short fuse (a ring shows where; blink through it)
+function updateBursts(dt) {
+  for (let i = bursts.length - 1; i >= 0; i--) {
+    const b = bursts[i];
+    b.t -= dt;
+    if (b.t > 0) continue;
+    bursts.splice(i, 1);
+    effects.spawnRing(b.pos, 0xffb040, 2.4, 0.35);
+    effects.spawnSparks(b.pos.clone().setY(0.8), 0xff8a1e, 8, 7);
+    world.shake(0.12);
+    const dmg = 9 * (1 + 0.07 * (enemies.wave - 1));
+    for (const h of world.teamOf(player)) {
+      if (!h.dead && Math.hypot(h.position.x - b.pos.x, h.position.z - b.pos.z) < 2.1) h.takeDamage(dmg, { killerName: 'a volatile burst' }, { hazard: true });
+    }
+  }
+}
+
 // ---------- The game loop ----------
 const clock = new THREE.Clock();
 updateCamera(0, true);
@@ -491,7 +617,10 @@ function frame() {
   // SLOW-MO: ease the world's speed towards 35% (Sarrow always uses the real dt)
   timeScale += (powerups.timeScale - timeScale) * (1 - Math.exp(-10 * dt));
   if (Math.abs(timeScale - powerups.timeScale) < 0.01) timeScale = powerups.timeScale;
-  const worldDt = dt * timeScale;
+  GOLD_TIME.value += dt;
+  closeCallCd = Math.max(0, closeCallCd - dt);
+  if (closeCall > 0) { closeCall -= dt; if (closeCall <= 0) { document.body.classList.remove('closecall'); sound.play('slowmoOut'); } }
+  const worldDt = dt * timeScale * (closeCall > 0 ? 0.3 : 1); // CLOSE CALL: the world drops to 30% for 0.4s
   if (state === 'playing') setSlowmo(powerups.timeScale < 1);
 
   if (coop.mode === 'client') {
@@ -505,6 +634,7 @@ function frame() {
       projectiles.update(worldDt, world.heroes || player, arena, effects);
       arena.update(worldDt, player, world, true);
       powerups.update(dt);
+      updateBursts(worldDt);
       if (coop.mode === 'host') coop.hostSim(dt);
       combo.update(worldDt);
       if (upgradeTimer > 0) {
@@ -520,7 +650,7 @@ function frame() {
     // paused while the player picks an upgrade (nothing moves)
   } else {
     // title screen: Enter or J also starts a run
-    if (state === 'title' && (input.wasPressed('start') || input.wasPressed('attack'))) showCharacterSelect();
+    if (state === 'title' && !shop.isOpen && (input.wasPressed('start') || input.wasPressed('attack'))) showCharacterSelect();
     if (state === 'gameover') { enemies.update(dt); projectiles.update(dt, player, arena, effects); } // let things settle
     arena.update(dt, player, world, false);
   }
@@ -548,6 +678,6 @@ frame();
 const LOCAL_DEV = !IS_NATIVE && ['localhost', '127.0.0.1'].includes(location.hostname);
 if (LOCAL_DEV) {
   import('./dev.local.js')
-    .then((m) => m.install({ player, enemies, world, arena, powerups, projectiles, effects, hud, sound, ads, startGame, snapCamera: () => updateCamera(0, true), getScore: () => score, combo }))
+    .then((m) => m.install({ player, enemies, world, arena, powerups, projectiles, effects, hud, sound, ads, startGame, snapCamera: () => updateCamera(0, true), getScore: () => score, combo, meta }))
     .catch(() => {}); // no dev file = no helpers, that's fine
 }

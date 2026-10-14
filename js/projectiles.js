@@ -37,6 +37,7 @@ export class Projectiles {
     p.damage = damage;
     p.size = size;
     p.source = source;
+    p.graze = null;
   }
 
   update(dt, player, arena, effects) {
@@ -53,8 +54,16 @@ export class Projectiles {
       }
       // hit the player? (takeDamage returns false while blinking, so the bolt flies on)
       for (const h of heroes) {
-        if (!done && !h.dead && Math.hypot(pos.x - h.position.x, pos.z - h.position.z) < 0.3 * p.size + h.radius) {
+        if (done || h.dead) continue;
+        const d = Math.hypot(pos.x - h.position.x, pos.z - h.position.z), hitR = 0.3 * p.size + h.radius;
+        if (d < hitR) {
           if (h.takeDamage(p.damage, p.source)) done = true;
+          else p.graze = null; // blinked through it: that's skill, not a close call
+        } else if (d < hitR + 0.6 && h.state !== 'dash' && p.graze !== false) {
+          p.graze = h; // within a hair: if it flies on past without hitting, it's a CLOSE CALL
+        } else if (p.graze === h && d >= hitR + 0.6) {
+          p.graze = false; // only once per bolt
+          this.onNearMiss?.(h);
         }
       }
       if (done) {

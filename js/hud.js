@@ -89,12 +89,13 @@ export class Hud {
     const box = $('upgrade-cards');
     box.innerHTML = '';
     cards.forEach((id, i) => {
-      const def = id === 'patch' ? FALLBACK : UPGRADES[id];
+      const def = loadout.def(id);
+      const cursed = def.group === 'cursed';
       const lv = loadout.level(id);
       const b = document.createElement('button');
-      b.className = 'ucard';
+      b.className = 'ucard' + (cursed ? ' cursed' : '');
       b.style.setProperty('--c', hex(def.color));
-      const lvl = id === 'patch' ? `Taken ${lv}x` : (lv === 0 ? `<b>NEW</b> · Lv 1/${def.max}` : `Lv ${lv} → <b>${lv + 1}</b>/${def.max}`);
+      const lvl = cursed ? `<b>CURSED</b> · ${def.bane}` : id === 'patch' ? `Taken ${lv}x` : (lv === 0 ? `<b>NEW</b> · Lv 1/${def.max}` : `Lv ${lv} → <b>${lv + 1}</b>/${def.max}`);
       b.innerHTML = `<span class="key">${i + 1}</span><div class="icon"></div><div class="ubody"><div class="group">${GROUP_LABELS[def.group]}</div><div class="uname"></div><div class="effect"></div><div class="lvl">${lvl}</div></div>`;
       b.querySelector('.icon').textContent = def.icon;
       b.querySelector('.uname').textContent = def.name;
@@ -228,12 +229,37 @@ export class Hud {
     }
   }
 
-  showBanner(text, sub = '') {
+  showBanner(text, sub = '', color = null) {
+    this.banner.style.setProperty('--bc', color || '');
+    this.banner.classList.toggle('tinted', !!color);
     this.bannerText.textContent = text;
     this.bannerSub.textContent = sub;
     this.banner.classList.remove('show');
     void this.banner.offsetWidth; // trick to restart the CSS animation
     this.banner.classList.add('show');
+  }
+
+  // MUTATOR tag under the score (null = clear it; undefined = leave it alone)
+  setMutator(mut) {
+    if (mut === undefined) return;
+    const el = $('mutator-tag');
+    el.classList.toggle('hidden', !mut);
+    if (mut) { el.textContent = mut.name; el.style.setProperty('--c', mut.color); }
+  }
+
+  // Game over: "+123 SCRAP" (and any rare drops)
+  showScrap(gain, total, drops = [], doubled = false) {
+    const el = $('gameover-scrap');
+    el.innerHTML = `<b>+${gain} SCRAP</b>${doubled ? ' <i>DOUBLED!</i>' : ''} <span>· you have ${total.toLocaleString()}</span>` +
+      (drops.length ? `<div class="rare">Rare drop: ${drops.map((d) => d[0].toUpperCase() + d.slice(1)).join(', ')}! (equip it in the shop)</div>` : '');
+    el.classList.remove('hidden');
+  }
+
+  // CLOSE CALL: its own callout, low and centred so it never fights the wave banner
+  closeCall(sub) {
+    const el = $('closecall');
+    el.querySelector('span').textContent = sub;
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
   }
 
   flashDamage() {
@@ -244,6 +270,7 @@ export class Hud {
 
   showTitle(best) {
     $('best-text').textContent = best.score > 0 ? `Best: ${best.score.toLocaleString()} pts (wave ${best.wave})` : '';
+    this.refreshScrap?.();
     this.overlay.classList.remove('hidden');
     this.titlePanel.classList.remove('hidden');
     this.gameoverPanel.classList.add('hidden');
@@ -257,6 +284,8 @@ export class Hud {
       `<b>${hero}</b> reached <b>wave ${wave}</b>${place ? ` in ${place}` : ''} · <b>${kills}</b> kills · best combo <b>${bestCombo}</b><br>` +
       (killer ? `<span class="killer">Killed by ${killer}</span><br>` : '') + build +
       (newBest ? '<b style="color:#3ff6e0">NEW BEST SCORE!</b>' : `Best: ${best.score.toLocaleString()} pts (wave ${best.wave})`);
+    $('gameover-scrap').classList.add('hidden');
+    this.setMutator(null);
     this.overlay.classList.remove('hidden');
     this.titlePanel.classList.add('hidden');
     this.gameoverPanel.classList.remove('hidden');

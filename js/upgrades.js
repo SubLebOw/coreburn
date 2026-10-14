@@ -63,7 +63,20 @@ export const UPGRADES = {
   regen:    { name: 'Core Recharge', group: 'core', icon: '✚', color: 0x3ff6a0, max: 6, desc: () => '+17.5% health regen' },
 };
 export const FALLBACK = { id: 'patch', name: 'Reactor Patch', group: 'core', icon: '⛨', color: 0xc8c8c8, max: Infinity, desc: () => '+3 max health and heal 35%' };
-export const GROUP_LABELS = { talons: 'TALONS', overdrive: 'OVERDRIVE', blink: 'BLINK', core: 'CORE' };
+export const GROUP_LABELS = { talons: 'TALONS', overdrive: 'OVERDRIVE', blink: 'BLINK', core: 'CORE', cursed: 'CURSED' };
+
+// CURSED CARDS: from wave 10, about 1 pick in 3 swaps one card for a cursed one. A big boon WITH a
+// real drawback. Each curse can only be taken once. They still give the weapon tier like any card.
+export const CURSES = {
+  bloodPact: { name: 'Blood Pact', group: 'cursed', icon: '☠', color: 0xd02a5a, max: 1, boon: '+25% talon damage', bane: '-20% max health' },
+  overclock: { name: 'Overclocked Core', group: 'cursed', icon: '⚡', color: 0xa040ff, max: 1, boon: '-30% blink & overdrive cooldowns', bane: 'Core recharge (regen) stops' },
+  greed:     { name: 'Greed Engine', group: 'cursed', icon: '¤', color: 0xe0b020, max: 1, boon: '+50% score and scrap', bane: 'Enemies deal +15% damage to you' },
+  heavy:     { name: 'Leaden Talons', group: 'cursed', icon: '⚒', color: 0x8a4a2a, max: 1, boon: '+35% talon damage', bane: '-12% move speed' },
+  glass:     { name: 'Glass Heart', group: 'cursed', icon: '◇', color: 0x6ad0ff, max: 1, boon: '+20% crit chance', bane: 'Take +20% damage' },
+};
+for (const c of Object.values(CURSES)) c.desc = () => c.boon;
+export const CURSE_FROM_WAVE = 10;
+export const CURSE_CHANCE = 0.35;
 
 export class Loadout {
   constructor() { this.reset(); }
@@ -77,7 +90,8 @@ export class Loadout {
   }
 
   level(id) { return id === 'patch' ? this.patches : (this.levels[id] || 0); }
-  def(id) { return id === 'patch' ? FALLBACK : UPGRADES[id]; }
+  def(id) { return id === 'patch' ? FALLBACK : (UPGRADES[id] || CURSES[id]); }
+  static isCurse(id) { return !!CURSES[id]; }
 
   // 3 different random cards that aren't maxed yet (Reactor Patch fills any gaps)
   roll(count = 3, rng = Math.random) {
@@ -88,10 +102,19 @@ export class Loadout {
     return hand;
   }
 
+  // Maybe swap the last card for a cursed one (wave >= 10, ~35% of picks, curses you don't have yet)
+  maybeCurse(hand, wave, rng = Math.random) {
+    if (wave < CURSE_FROM_WAVE || rng() >= CURSE_CHANCE) return hand;
+    const open = Object.keys(CURSES).filter((id) => !this.level(id));
+    if (!open.length) return hand;
+    hand[hand.length - 1] = open[Math.floor(rng() * open.length)];
+    return hand;
+  }
+
   apply(id) {
     this.tier++;
     if (id === 'patch') this.patches++;
-    else this.levels[id] = Math.min(UPGRADES[id].max, this.level(id) + 1);
+    else this.levels[id] = Math.min(this.def(id).max, this.level(id) + 1);
     this.version++;
     this.recompute();
   }
@@ -122,8 +145,16 @@ export class Loadout {
       speed: 1 + 0.03 * L('speed'),
       maxHpPct: 0.075 * L('maxHp'),
       maxHpFlat: 3 * this.patches,
-      regen: 1 + 0.175 * L('regen'),
+      regen: (1 + 0.175 * L('regen')) * (L('overclock') ? 0 : 1),
+      scoreMult: L('greed') ? 1.5 : 1,
+      hurtMult: (L('greed') ? 1.15 : 1) * (L('glass') ? 1.2 : 1),
     };
+    // cursed cards
+    const s = this.stats;
+    if (L('bloodPact')) { s.dmg *= 1.25; s.maxHpPct -= 0.2; }
+    if (L('heavy')) { s.dmg *= 1.35; s.speed *= 0.88; }
+    if (L('glass')) s.crit += 0.2;
+    if (L('overclock')) { s.dashCd *= 0.7; s.spinCd *= 0.7; }
   }
 
   // Expected single-target damage multiplier from perks alone (for balancing / the simulator)
@@ -135,6 +166,7 @@ export class Loadout {
   // e.g. [{ id, name, icon, color, level }]
   get picked() {
     const list = Object.keys(UPGRADES).filter((id) => this.level(id) > 0).map((id) => ({ id, ...UPGRADES[id], level: this.level(id) }));
+    for (const id of Object.keys(CURSES)) if (this.level(id)) list.push({ id, ...CURSES[id], level: 1 });
     if (this.patches) list.push({ ...FALLBACK, level: this.patches });
     return list;
   }

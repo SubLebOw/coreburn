@@ -17,6 +17,7 @@ import { NetHost, NetClient, normalizeCode, MAX_PLAYERS } from './net.js';
 import { Player } from './player.js';
 import { Enemy } from './enemy.js';
 import { bossForNumber } from './bosses.js';
+import { makeGolden } from './golden.js';
 import { waveStats } from './waves.js';
 import { CHARACTERS, CHARACTER_ORDER, DUPLICATE_TINTS, displayName } from './characters.js';
 import { GAME_VERSION } from './version.js';
@@ -309,7 +310,7 @@ export class Coop {
     const shake = world.shake;
     world.shake = (a) => { if (a >= 0.25) rec(['shk', a]); shake(a); };
     const banner = hud.showBanner.bind(hud);
-    hud.showBanner = (t, s) => { rec(['ban', t, s]); banner(t, s); };
+    hud.showBanner = (t, s, c) => { rec(['ban', t, s, c]); banner(t, s, c); };
     world.onArenaStrike = (pos) => rec(['bolt', ser(pos)]);
     this.origBanner = banner;
     this.arena = arena;
@@ -407,7 +408,7 @@ export class Coop {
       h: this.heroes.map((h) => [h.slot, r2(h.position.x), r2(h.position.z), r2(h.facing), h.state, h.comboStep, Math.ceil(h.hp), h.maxHp, h.dead ? 1 : 0, r2(h.reviveProgress || 0), h.loadout.tier,
         powerups.listFor(h).map((p) => [p.type, r2(p.left), p.seconds, p.hits])]),
       e: enemies.list.filter((e) => e.nid).map((e) => e.isBoss
-        ? [e.nid, 'B', r2(e.position.x), r2(e.position.z), r2(e.facing), e.state, (e.flashTimer > 0 ? 2 : 0) | (e.dead ? 4 : 0), e.bossNumber, e.part, r2(e.stateTime), e.attack || '', e.hidden ? 1 : 0, r2(e.telegraphTime || 1), r2(e.rootY || 0)]
+        ? [e.nid, 'B', r2(e.position.x), r2(e.position.z), r2(e.facing), e.state, (e.flashTimer > 0 ? 2 : 0) | (e.dead ? 4 : 0) | (e.golden ? 8 : 0), e.bossNumber, e.part, r2(e.stateTime), e.attack || '', e.hidden ? 1 : 0, r2(e.telegraphTime || 1), r2(e.rootY || 0)]
         : [e.nid, e.typeName, r2(e.position.x), r2(e.position.z), r2(e.facing), e.state, (e.elite ? 1 : 0) | (e.flashTimer > 0 ? 2 : 0) | (e.dead ? 4 : 0) | (e.stun > 0 ? 8 : 0), r2(e.stateTime)]),
       p: projectiles.list.filter((p) => p.life > 0).map((p) => [r2(p.mesh.position.x), r2(p.mesh.position.z), p.mesh.material.color.getHex(), p.size]),
       pu: powerups.pickups.map((p) => [p.id, p.type, r2(p.obj.position.x), r2(p.obj.position.z)]),
@@ -758,7 +759,7 @@ export class Coop {
         case 'fx': effects[ev[1]](...ev.slice(2).map(deser)); break;
         case 'snd': sound.play(ev[1], ev[2]); break;
         case 'shk': world.shake(ev[1] * 0.7); break;
-        case 'ban': hud.showBanner(ev[1], ev[2]); break;
+        case 'ban': hud.showBanner(ev[1], ev[2], ev[3]); hud.setMutator(/^MUTATOR/.test(ev[1]) ? { name: ev[1].slice(9), color: ev[3] } : (/CLEARED|BOSS/.test(ev[1]) ? null : undefined)); break;
         case 'bolt': this.ctx.arena.strikeVisual(deser(ev[1])); break;
         case 'cmb': this.comboView.events.push(...ev[1]); break;
       }
@@ -774,6 +775,7 @@ export class Coop {
       const parts = entry.spawn({ scene, world, bossNumber, tier, stats: waveStats(wave), spot: () => pos.clone() });
       const part = parts[es[8]] || parts[0];
       parts.forEach((p) => { if (p !== part) p.dispose(); });
+      if (es[6] & 8) makeGolden(part);
       return this.registerPuppet(es[0], part, pos);
     }
     const e = new Enemy(scene, es[1], pos, { hpMult: 1, dmgMult: 1, speedMult: 1, elite: !!(es[6] & 1) }, world);

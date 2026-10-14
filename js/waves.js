@@ -15,6 +15,7 @@
 import * as THREE from 'three';
 import { Enemy } from './enemy.js';
 import { bossForNumber } from './bosses.js';
+import { makeGolden } from './golden.js';
 
 const SCREEN_CAP = 14;        // regular enemies alive at once (not counting mites/summons)
 const HARD_CAP = 24;          // (co-op: 30)          // absolute limit including splitter mites and boss summons
@@ -55,6 +56,8 @@ export class WaveManager {
     this.waveActive = false;
     this.breakTimer = 0;
     this.bosses = [];   // usually one boss, two for the Forge Twins
+    this.golden = false;
+    this.mutator = null;
     this.bossTimer = 0;
     this.nextNid = this.nextNid || 0;
   }
@@ -68,7 +71,7 @@ export class WaveManager {
     if (!alive.length || alive.every((b) => b.state === 'intro')) return null;
     let hp = 0, maxHp = 0;
     for (const b of this.bosses) { hp += Math.max(0, b.hp); maxHp += b.maxHp; }
-    return { name: this.bossDef.name, hp, maxHp };
+    return { name: this.golden ? this.bossDef.name.replace(/^(THE )?/, (m) => m + 'GOLDEN ') : this.bossDef.name, hp, maxHp, golden: this.golden };
   }
 
   // Called by a boss when it dies. The fight is won when every part is down.
@@ -83,6 +86,14 @@ export class WaveManager {
     this.wave = n;
     this.stats = waveStats(n);
     this.stats.hpMult *= this.world.coopHp || 1; // co-op: tougher enemies
+    // MUTATOR wave? (see mutators.js; main.js decides which one)
+    const mut = this.mutator = isBossWave(n) ? null : (this.world.mutatorFor?.(n) || null);
+    if (mut) {
+      this.stats.hpMult *= mut.hp || 1;
+      this.stats.dmgMult *= mut.dmg || 1;
+      this.stats.speedMult *= mut.speed || 1;
+      this.stats.eliteChance = Math.min(0.85, this.stats.eliteChance + (mut.elite || 0));
+    }
     this.queue = [];
     this.waveActive = true;
     this.spawnTimer = 0.8;
@@ -101,7 +112,7 @@ export class WaveManager {
       return;
     }
 
-    const total = Math.round((4 + 2 * n) * (this.world.coopCount || 1)); // co-op: more enemies
+    const total = Math.round((4 + 2 * n) * (this.world.coopCount || 1) * (mut?.count || 1)); // co-op / SWARM: more enemies
     const pool = UNLOCKS.filter((u) => n >= u.wave);
     const totalWeight = pool.reduce((s, u) => s + u.weight, 0);
     for (let i = 0; i < total; i++) {
@@ -174,7 +185,13 @@ export class WaveManager {
     this.bosses = this.bossEntry.spawn({
       scene: this.scene, world: this.world, bossNumber: this.bossNumber, tier: this.bossTier, stats: this.stats, spot,
     });
-    this.bosses.forEach((b, i) => { b.nid = ++this.nextNid; b.part = i; b.maxHp *= this.world.coopBossHp || 1; b.hp = b.maxHp; });
+    // GOLDEN boss (about 1 in 20): gold look, 1.5x health, 3x points, a scrap jackpot and maybe a rare skin
+    this.golden = !!this.world.goldenRoll?.(this.bossNumber);
+    this.bosses.forEach((b, i) => {
+      b.nid = ++this.nextNid; b.part = i;
+      b.maxHp *= (this.world.coopBossHp || 1) * (this.golden ? 1.5 : 1); b.hp = b.maxHp;
+      if (this.golden) makeGolden(b);
+    });
     for (const b of this.bosses) {
       this.list.push(b);
       this.world.effects.spawnRing(b.position, 0xff5a20, 5, 1.2);

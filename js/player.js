@@ -139,6 +139,7 @@ export class Player {
     this.damageMult = 1;              // 2 while FURY is active
     this.powers = {};                 // active power-ups (type -> { time, max, hits })
     this.loadout.reset();
+    if (this.startCard) { this.loadout.levels[this.startCard] = 1; this.loadout.version++; this.loadout.recompute(); } // shop starting perk
     this.applyLoadout();
     this.hp = this.maxHp;
     this.dashCharges = this.maxCharges;
@@ -492,7 +493,7 @@ export class Player {
     this.prevCharges = this.maxCharges = charges;
     // talons: longer, glowier, and colour-cycle with the tier
     const tier = this.loadout.tier;
-    this.tierColor = tierColor(tier, this.char.blade); // starts at the hero's own talon colour
+    this.tierColor = tierColor(tier, this.talonBase || this.char.blade); // starts at the hero's own talon colour
     const len = 1 + Math.min(24, tier) * 0.025, m = this.model;
     for (const b of m.blades) { b.scale.y = m.bladeLen * len; b.position.y = m.bladeBase - m.bladeLen / 2 * len; }
     for (const g of this.model.halos) {
@@ -530,6 +531,7 @@ export class Player {
     if (this.invulnTimer > 0) return false;              // just revived
     if (this.world.powerups && this.world.powerups.absorb(opts, this)) return false; // SHIELD
     if (this.state === 'spin') amount *= 0.5;             // overdrive = tougher
+    amount *= this.stats.hurtMult || 1;                   // cursed cards (Greed Engine, Glass Heart)
     this.hp -= amount;
     this.hurtTimer = 0.15;
     this.timeSinceHit = 0;

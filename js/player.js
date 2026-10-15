@@ -7,6 +7,7 @@
 //   ORIN    chaining arc tether/ Magnet Grapple (yank / pull) / Hymn Engine (vortex + drones)
 // Also: core recharge (regen), weapon tier + upgrade cards (upgrades.js), power-ups (powerups.js).
 import * as THREE from 'three';
+import { decorateSkin } from './cosmetics.js';
 import { RULES } from './rules.js';
 import { Loadout, tierColor } from './upgrades.js';
 import { CHARACTERS } from './characters.js';
@@ -97,8 +98,18 @@ export class Player {
   // The arcs, rings and bubble ride on whichever hero model is in use
   attachExtras() {
     this.model.root.add(this.slashArc, this.spinRing, this.marker, this.bubble, this.guard);
-    this.marker.material.color.setHex(this.tint || this.char.color);
+    this.marker.material.color.setHex(this.idColor || this.tint || this.char.color);
+    // co-op: a second hero of the same kind gets a bright coloured ring of its own (not a body recolour)
+    if (this.idColor) {
+      if (!this.idRing) {
+        this.idRing = new THREE.Mesh(new THREE.RingGeometry(0.86, 1.02, 32), new THREE.MeshBasicMaterial({ color: this.idColor, transparent: true, opacity: 0.85, depthWrite: false }));
+        this.idRing.rotation.x = -Math.PI / 2; this.idRing.position.y = 0.035;
+      }
+      this.idRing.material.color.setHex(this.idColor);
+      this.model.root.add(this.idRing);
+    } else if (this.idRing) this.idRing.parent?.remove(this.idRing);
   }
+  setIdColor(c) { this.idColor = c || null; this.attachExtras(); }
 
   // Switch hero (character select). tint = co-op duplicate colour, or null.
   setCharacter(id, tint = null) {
@@ -108,6 +119,7 @@ export class Player {
     this.char = c;
     this.tint = tint;
     this.skinGlow = null;
+    this.skinId = null;
     this.model = c.build(tint);
     this.scene.add(this.model.root);
     this.attachExtras();
@@ -118,13 +130,16 @@ export class Player {
   }
 
   // Swap the look without touching health/position (ARENA SKINS between arenas). glow = core colour
-  reskin(tint = null, glow = null) {
-    if (tint === this.tint && glow === this.skinGlow) return false;
+  reskin(tint = null, glow = null, skin = null) {
+    const sid = skin ? skin.id : null;
+    if (tint === this.tint && glow === this.skinGlow && sid === (this.skinId ?? null)) return false;
+    this.skinId = sid;
     const pos = this.model.root.position.clone(), rot = this.model.root.rotation.y;
     this.scene.remove(this.model.root);
     this.tint = tint; this.skinGlow = glow;
     this.model = this.char.build(tint);
     if (glow !== null && this.model.core) this.model.core.material.color.setHex(glow);
+    decorateSkin(this.model, skin, this.char.id); // ARENA SKINS: materials + themed attachments
     this.model.root.position.copy(pos); this.model.root.rotation.y = rot;
     this.scene.add(this.model.root);
     this.attachExtras();

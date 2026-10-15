@@ -23,6 +23,7 @@ import { meta } from './meta.js';
 import { waveStats } from './waves.js';
 import { CHARACTERS, CHARACTER_ORDER, DUPLICATE_TINTS, displayName } from './characters.js';
 import { GAME_VERSION } from './version.js';
+import { cleanLook } from './progress.js';
 
 const SNAP_RATE = 15;   // host -> friends, per second
 const INPUT_RATE = 20;  // friend -> host, per second
@@ -162,7 +163,7 @@ export class Coop {
     this.myChar = id;
     localStorage.setItem('coreburn-hero', id);
     if (this.mode === 'host') { this.roster[0].char = id; this.rosterChanged(); }
-    else if (this.mode === 'client') this.net.send({ t: 'sel', char: id });
+    else if (this.mode === 'client') this.net.send({ t: 'sel', char: id, look: this.ctx.myLook() });
     this.renderRoster();
   }
 
@@ -191,9 +192,40 @@ export class Coop {
     }
   }
 
+  // roster as sent over the wire: hero + each player's cosmetics/skin look
+  rosterOut() {
+    if (this.roster[0] && this.mode === 'host') this.roster[0].look = this.ctx.myLook();
+    return this.roster.map(({ slot, char, look }) => ({ slot, char, look }));
+  }
+  lookOf(slot) { const r = this.roster.find((x) => x.slot === slot); return r ? r.look : null; }
+  // (re)dress every friend's hero from their look (arena changes, look updates)
+  dressOthers() {
+    if (this.mode === 'host') { for (const h of this.heroes || []) if (h !== this.ctx.player) this.ctx.dressHero(h, cleanLook(this.lookOf(h.slot))); }
+    else for (const h of this.puppets ? this.puppets.values() : []) this.ctx.dressHero(h, cleanLook(this.lookOf(h.slot)));
+  }
+  updateWardrobes(dt) {
+    const list = this.mode === 'host' ? this.heroes : (this.puppets ? [...this.puppets.values()] : null);
+    for (const h of list || []) if (h !== this.ctx.player && h.wardrobe) h.wardrobe.update(dt);
+  }
+  // you changed your cosmetics / skin setting: tell everyone
+  sendLook() {
+    if (!this.net) return;
+    const look = this.ctx.myLook();
+    if (this.mode === 'host') {
+      if (this.roster[0]) this.roster[0].look = look;
+      if (this.inGame) this.net.broadcast({ t: 'look', slot: 0, look }); else this.rosterChanged();
+    } else if (this.mode === 'client') this.net.send({ t: 'look', look });
+  }
+  gotLook(slot, look) {
+    const r = this.roster.find((x) => x.slot === slot); if (!r) return;
+    r.look = cleanLook(look);
+    const h = this.mode === 'host' ? this.heroBySlot(slot) : this.puppets && this.puppets.get(slot);
+    if (h && h !== this.ctx.player) this.ctx.dressHero(h, r.look);
+  }
+
   rosterChanged() {
     assignLooks(this.roster);
-    this.net.broadcast({ t: 'lobby', code: this.code, z: RULES.z, roster: this.roster.map(({ slot, char }) => ({ slot, char })) });
+    this.net.broadcast({ t: 'lobby', code: this.code, z: RULES.z, roster: this.rosterOut() });
     this.renderRoster();
   }
 
@@ -204,7 +236,7 @@ export class Coop {
         if (this.inGame || this.roster.length >= MAX_PLAYERS) { this.net.send(conn, { t: 'bye', reason: this.inGame ? 'That game has already started.' : 'That room is full.' }); return; }
         const slot = this.nextSlot++;
         conn.slot = slot;
-        this.roster.push({ slot, char: CHARACTERS[msg.char] ? msg.char : 'sarrow', conn });
+        this.roster.push({ slot, char: CHARACTERS[msg.char] ? msg.char : 'sarrow', conn, look: cleanLook(msg.look) });
         this.net.send(conn, { t: 'welcome', slot });
         this.rosterChanged();
         this.status('');
@@ -213,7 +245,12 @@ export class Coop {
       }
       case 'sel': {
         const r = this.roster.find((x) => x.slot === conn.slot);
-        if (r && CHARACTERS[msg.char] && !this.inGame) { r.char = msg.char; this.rosterChanged(); }
+        if (r && CHARACTERS[msg.char] && !this.inGame) { r.char = msg.char; if (msg.look) r.look = cleanLook(msg.look); this.rosterChanged(); }
+        break;
+      }
+      case 'look': { // a friend changed cosmetics: keep it, redraw them, pass it on
+        this.gotLook(conn.slot, msg.look);
+        if (this.inGame) this.net.broadcast({ t: 'look', slot: conn.slot, look: this.lookOf(conn.slot) }); else this.rosterChanged();
         break;
       }
       case 'in': {
@@ -256,6 +293,7 @@ export class Coop {
   removeHero(h) {
     this.ctx.scene.remove(h.model.root);
     for (const t of h.trail) this.ctx.scene.remove(t.mesh);
+    h.wardrobe?.dispose();
     this.heroes = this.heroes.filter((x) => x !== h);
     this.dropTag(h);
   }
@@ -271,15 +309,17 @@ export class Coop {
     const { scene, world, player } = this.ctx;
     this.inGame = true;
     this.net.locked = true;
-    if (this.heroes) for (const h of this.heroes) if (h !== player) { scene.remove(h.model.root); for (const t of h.trail) scene.remove(t.mesh); }
+    if (this.heroes) for (const h of this.heroes) if (h !== player) { scene.remove(h.model.root); for (const t of h.trail) scene.remove(t.mesh); h.wardrobe?.dispose(); }
     assignLooks(this.roster);
     const me = this.roster[0];
-    player.setCharacter(me.char, me.tint);
+    player.setCharacter(me.char, null);
+    player.setIdColor(me.tint); // duplicates: coloured ring + tag, bodies keep their own skin
     player.slot = 0;
     player.netName = me.name;
     this.heroes = [player];
     this.roster.slice(1).forEach((r, i) => {
-      const h = new Player(scene, world, r.char, r.tint);
+      const h = new Player(scene, world, r.char, null);
+      h.setIdColor(r.tint);
       h.slot = r.slot;
       h.netName = r.name;
       h.netInput = new RemoteInput();
@@ -301,7 +341,7 @@ export class Coop {
     this.snapTimer = 0;
     this.fx = [];
     this.installRecorders();
-    this.net.broadcast({ t: 'start', z: RULES.z, roster: this.roster.map(({ slot, char }) => ({ slot, char })), pos: this.heroes.map((h) => [h.slot, r2(h.position.x), r2(h.position.z)]) });
+    this.net.broadcast({ t: 'start', z: RULES.z, roster: this.rosterOut(), pos: this.heroes.map((h) => [h.slot, r2(h.position.x), r2(h.position.z)]) });
     // the enemies scale was read by startWave(1) already in startGame? No: startGame calls this first.
   }
 
@@ -502,8 +542,8 @@ export class Coop {
 
   cleanupGame() {
     const { world, player, scene } = this.ctx;
-    for (const h of this.heroes || []) if (h !== player) { scene.remove(h.model.root); for (const t of h.trail) scene.remove(t.mesh); }
-    for (const p of this.puppets ? this.puppets.values() : []) { scene.remove(p.model.root); for (const t of p.trail) scene.remove(t.mesh); }
+    for (const h of this.heroes || []) if (h !== player) { scene.remove(h.model.root); for (const t of h.trail) scene.remove(t.mesh); h.wardrobe?.dispose(); }
+    for (const p of this.puppets ? this.puppets.values() : []) { scene.remove(p.model.root); for (const t of p.trail) scene.remove(t.mesh); p.wardrobe?.dispose(); }
     for (const t of this.tags.values()) t.remove();
     this.tags.clear();
     this.puppets = null;
@@ -547,7 +587,7 @@ export class Coop {
       this.net = net;
       this.mode = 'client';
       this.code = code;
-      net.send({ t: 'hello', v: GAME_VERSION, char: this.myChar });
+      net.send({ t: 'hello', v: GAME_VERSION, char: this.myChar, look: this.ctx.myLook() });
       this.status('Connected! Waiting for the host…');
     } catch (e) {
       this.status(e.message, true);
@@ -567,6 +607,7 @@ export class Coop {
         this.status('');
         break;
       case 'start': this.clientStart(m); break;
+      case 'look': if (m.slot !== this.mySlot) this.gotLook(m.slot, m.look); break;
       case 's': this.latest = m; this.applySnapshot(m); break;
       case 'tp': {
         this.epoch = m.ep;
@@ -578,7 +619,7 @@ export class Coop {
       case 'picked': this.ctx.hud.hidePicker(); this.clientApplyPick(m.id); break;
       case 'resume': this.ctx.hud.hidePicker(); if (this.ctx.getState() === 'upgrade') this.ctx.setState('playing'); break;
       case 'toast': this.ctx.sound.play('powerup'); this.ctx.hud.showToast(m.text, m.sub, m.color); break;
-      case 'left': { const p = this.puppets && this.puppets.get(m.slot); if (p) { this.ctx.hud.showBanner(`${p.netName} LEFT`, ''); this.ctx.scene.remove(p.model.root); this.dropTag(p); this.puppets.delete(m.slot); } break; }
+      case 'left': { const p = this.puppets && this.puppets.get(m.slot); if (p) { this.ctx.hud.showBanner(`${p.netName} LEFT`, ''); this.ctx.scene.remove(p.model.root); p.wardrobe?.dispose(); this.dropTag(p); this.puppets.delete(m.slot); } break; }
       case 'over': this.clientGameOver(m.run); break;
       case 'tolobby':
         this.inGame = false;
@@ -609,7 +650,8 @@ export class Coop {
     this.puppets = new Map();
     for (const r of this.roster) {
       if (r.slot === this.mySlot) continue;
-      const h = new Player(scene, world, r.char, r.tint);
+      const h = new Player(scene, world, r.char, null);
+      h.setIdColor(r.tint);
       h.slot = r.slot;
       h.netName = r.name;
       h.target = new THREE.Vector3();
@@ -618,6 +660,7 @@ export class Coop {
       h.syncModel();
       this.puppets.set(r.slot, h);
     }
+    this.ctx.applyLook(); // everyone's cosmetics + arena skins
     this.epoch = 1;
     this.inputTimer = 0;
     this.pending = { a: false, d: false, s: false };
@@ -903,7 +946,7 @@ export class Coop {
         tag.className = 'ntag';
         $('hud').appendChild(tag);
         this.tags.set(h, tag);
-        tag.style.setProperty('--c', '#' + (h.tint || h.char.color).toString(16).padStart(6, '0'));
+        tag.style.setProperty('--c', '#' + (h.idColor || h.char.color).toString(16).padStart(6, '0'));
       }
       const down = this.mode === 'host' ? h.dead : (h === this.ctx.player ? h.dead : h.netDead);
       const rv = h.reviveProgress || 0;

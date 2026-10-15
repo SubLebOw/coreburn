@@ -38,7 +38,7 @@ import { UPGRADES } from './upgrades.js';
 import { RanksUI } from './ranks-ui.js';
 import { RULES, setRules } from './rules.js';
 import { rotation } from './bosses.js';
-import { progress, xpForRun, ARENA_SKINS } from './progress.js';
+import { progress, xpForRun, ARENA_SKINS, skinFor } from './progress.js';
 import { Wardrobe } from './cosmetics.js';
 import { CosmeticsUI } from './cosmetics-ui.js';
 
@@ -254,11 +254,24 @@ const world = {
 const player = new Player(scene, world);
 // COSMETICS (level-up unlocks) + ARENA SKINS on the local hero
 const wardrobe = new Wardrobe(scene, progress);
+// What co-op friends need to draw you (equipped items, skin setting, scrap-shop colour)
+const myLook = () => progress.look(meta.skinColor ?? null);
+// Dress any hero from a look (yours or a friend's): arena skin, else their shop colour, then cosmetics
+function dressHero(h, look) {
+  if (!h) return;
+  const mine = h === player;
+  look = look || (mine ? myLook() : null);
+  if (!look) return;
+  const skin = skinFor(h.char.id, arena.current.index, RULES.z, look.sm);
+  h.reskin(skin ? skin.tint : (look.sc ?? null), skin ? skin.glow : null, skin);
+  if (mine) wardrobe.dress(player);
+  else { h.wardrobe = h.wardrobe || new Wardrobe(scene, progress); h.wardrobe.dress(h, (look.eq && look.eq[h.char.id]) || {}); }
+}
+let lookArena = -1;
 function applyLook() {
-  const skin = coop.mode ? null : progress.arenaSkinFor(player.char.id, arena.current.index, RULES.z);
-  const tint = skin ? skin.tint : (coop.mode ? player.tint : meta.skinColor);
-  player.reskin(tint ?? null, skin ? skin.glow : null);
-  wardrobe.dress(player);
+  lookArena = arena.current.index;
+  dressHero(player, myLook());
+  if (coop.mode) coop.dressOthers();
 }
 world.applyLook = () => applyLook();
 projectiles.onNearMiss = (h) => world.onNearMiss(h);
@@ -367,8 +380,9 @@ function startGame(id = heroId) {
   player.startCard = solo && mode === 'endless' ? meta.perkCard : null; // shop perks: normal runs only (fair boards)
   if (mode === 'daily') player.startCard = dailyStartCard(seed(), Object.keys(UPGRADES).filter((u) => UPGRADES[u].max > 1 && !UPGRADES[u].heroes)); // same for everyone
   player.setCharacter(id, solo ? meta.skinColor : null);
+  player.setIdColor(null);
   if (coop.mode === 'host') coop.setupHostGame(); // friends' heroes + co-op scaling (before wave 1)
-  hud.setHeroName(player.netName ? player.netName.toUpperCase() : player.char.name, player.tint || player.char.color);
+  hud.setHeroName(player.netName ? player.netName.toUpperCase() : player.char.name, player.idColor || player.tint || player.char.color);
   kills = 0;
   score = 0;
   combo.reset();
@@ -430,8 +444,8 @@ function startClientGame(char, tint, name = char) {
   player.talonBase = null;
   player.startCard = null;
   run = { bosses: 0, mutators: 0, jackpot: 0, awarded: 0, drops: [] };
-  player.setCharacter(char, tint);
-  wardrobe.dress(player);
+  player.setCharacter(char, null);
+  player.setIdColor(tint); // co-op duplicates: coloured ring + name tag instead of a body recolour
   hud.setHeroName(name.toUpperCase(), tint || player.char.color);
   hud.hideOverlay();
   state = 'playing';
@@ -461,6 +475,9 @@ const coop = new Coop({
   getRun: () => ({ wave: Math.max(1, enemies.wave), score, kills }),
   setLastRun: (r) => { lastRun = r; if (coop.mode === 'client') { run.awarded = 0; awardScrap({ ...r, greed: false }); awardXp({ wave: r.wave, kills: r.kills || 0, bosses: r.bosses || 0 }); } },
   onRulesChanged: () => world.onRulesChanged?.(),
+  myLook: () => myLook(),
+  dressHero: (h, look) => dressHero(h, look),
+  applyLook: () => applyLook(),
 });
 world.coop = coop;
 
@@ -713,12 +730,12 @@ nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveName(e
 // COSMETICS screen (title + hero select)
 const cosmeticsUI = new CosmeticsUI(progress, {
   onClose: () => { if (state === 'select') showCharacterSelect(); },
-  onChange: () => { if (state !== 'playing') applyLook(); },
+  onChange: () => { if (state !== 'playing') applyLook(); coop.sendLook?.(); },
 });
-for (const id of ['cos-btn', 'sel-cos-btn']) {
+for (const id of ['cos-btn', 'sel-cos-btn', 'cp-cos']) {
   const el = document.getElementById(id);
   el.addEventListener('pointerdown', (e) => e.stopPropagation());
-  el.addEventListener('click', (e) => { e.stopPropagation(); if (state === 'title' || state === 'select') cosmeticsUI.open(state === 'select' ? heroId : player.char.id); });
+  el.addEventListener('click', (e) => { e.stopPropagation(); if (state === 'title' || state === 'select' || state === 'lobby') cosmeticsUI.open(state === 'select' ? heroId : state === 'lobby' ? (coop.myChar || player.char.id) : player.char.id); });
 }
 
 // RULES: CLASSIC (the original game, the default) or COREBURNZ (the remix). Saved; leaderboards,
@@ -868,6 +885,8 @@ updateCamera(0, true);
 function frame() {
   requestAnimationFrame(frame);
   wardrobe.update(Math.min(0.05, 1 / 60));
+  if (coop.mode) coop.updateWardrobes(Math.min(0.05, 1 / 60));
+  if (state === 'playing' && arena.current && arena.current.index !== lookArena) applyLook(); // arena changed (incl. co-op clients)
   let dt = Math.min(clock.getDelta(), 1 / 20); // avoid huge jumps if the tab was in the background
 
   // hitstop: freeze the action for a split second on big hits
@@ -943,6 +962,6 @@ frame();
 const LOCAL_DEV = !IS_NATIVE && ['localhost', '127.0.0.1'].includes(location.hostname);
 if (LOCAL_DEV) {
   import('./dev.local.js')
-    .then((m) => m.install({ player, enemies, world, arena, powerups, projectiles, effects, hud, sound, ads, startGame, snapCamera: () => updateCamera(0, true), getScore: () => score, combo, meta, twitch }))
+    .then((m) => m.install({ player, enemies, world, progress, arena, powerups, projectiles, effects, hud, sound, ads, startGame, snapCamera: () => updateCamera(0, true), getScore: () => score, combo, meta, twitch }))
     .catch(() => {}); // no dev file = no helpers, that's fine
 }

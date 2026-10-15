@@ -379,3 +379,8 @@ Classic is the default and is unchanged. Pick **COREBURNZ** under the title (the
 - Each level from 2 to 25 unlocks one cosmetic for a hero (hat, mask, cape, aura, trail, banner). Open them from **COSMETICS** on the menu or from hero select.
 - Arena skins: each of the 4 heroes has one skin per arena (20 in total). The setting has three options: on by default in CoreBurnZ, ALWAYS or OFF. Skins are solo-only, because co-op uses its own duplicate tints.
 - Balance: `node scripts/sim-ttk.mjs --z` models the tougher Z bosses.
+
+### Co-op looks (v1.13.0)
+- Each player's equipped cosmetics, arena-skin setting and scrap-shop colour are sent when they join, when they change hero, and whenever they change them (also mid-game). Everyone sees everyone's look, including arena skins, which now work in co-op too.
+- If two players pick the same hero, the second one gets a coloured ring on the floor and a matching name tag. Their body is no longer recoloured.
+- Arena skins now change more than the colours: armour gets a tint and an inner glow, plus themed pieces for each arena (scrap plates, molten seams, ice shards, neon trim with a halo, a lightning rod with sparks). These are only a few extra boxes, with no lights or textures, so they stay cheap on phones.

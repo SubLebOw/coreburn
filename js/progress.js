@@ -70,10 +70,12 @@ export class Progress {
   }
   // 'z' = arena skins in CoreBurnZ only (default), 'all' = every mode, 'off'
   setArenaSkins(v) { this.data.arenaSkins = v; this.save(); }
-  arenaSkinFor(hero, arenaIndex, z) {
-    const m = this.data.arenaSkins;
-    if (m === 'off' || (m === 'z' && !z)) return null;
-    return (ARENA_SKINS[hero] || [])[arenaIndex] || null;
+  arenaSkinFor(hero, arenaIndex, z) { return skinFor(hero, arenaIndex, z, this.data.arenaSkins); }
+  // What co-op friends need to draw you: owned + equipped items for every hero, and the skin setting
+  look(scrapTint = null) {
+    const eq = {};
+    for (const h of HERO_IDS) { eq[h] = {}; for (const [slot, id] of Object.entries(this.equipped(h))) { const it = COSMETICS.find((c) => c.id === id); if (it && this.owns(it)) eq[h][slot] = id; } }
+    return { eq, sm: this.data.arenaSkins, sc: scrapTint };
   }
   // Add XP; returns { gained, levels: [new levels], unlocks: [items], scrap }
   addXp(amount) {
@@ -94,3 +96,22 @@ export class Progress {
   }
 }
 export const progress = typeof localStorage !== 'undefined' ? new Progress() : null;
+
+// Arena skin for a hero in an arena under a skin setting ('z' | 'all' | 'off')
+export function skinFor(hero, arenaIndex, z, mode = 'z') {
+  if (mode === 'off' || (mode !== 'all' && !z)) return null;
+  return (ARENA_SKINS[hero] || [])[arenaIndex] || null;
+}
+// A look that came over the network: keep only known items for the right hero/slot
+export function cleanLook(l) {
+  const out = { eq: {}, sm: 'z', sc: null };
+  if (!l || typeof l !== 'object') return out;
+  if (['z', 'all', 'off'].includes(l.sm)) out.sm = l.sm;
+  if (Number.isInteger(l.sc) && l.sc >= 0 && l.sc <= 0xffffff) out.sc = l.sc;
+  for (const h of HERO_IDS) {
+    out.eq[h] = {};
+    const src = l.eq && typeof l.eq[h] === 'object' ? l.eq[h] : {};
+    for (const slot of SLOTS) { const it = COSMETICS.find((c) => c.id === src[slot]); if (it && it.hero === h && it.slot === slot) out.eq[h][slot] = it.id; }
+  }
+  return out;
+}

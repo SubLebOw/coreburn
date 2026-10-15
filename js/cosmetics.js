@@ -83,14 +83,16 @@ export class Wardrobe {
     this.tick = 0; this.last = null;
   }
   // (Re)dress the hero with what's equipped for their character
-  dress(player) {
-    this.player = player;
+  // eq = { slot: id } from a co-op friend (already cleaned); omit for your own equipped + owned items
+  dress(player, eq = null) {
+    this.player = player; this.remote = !!eq;
     for (const p of this.parts) p.parent?.remove(p);
     this.parts = []; this.cape = this.aura = this.banner = null; this.trailColor = null;
-    const eq = this.progress.equipped(player.char.id);
+    const mine = !eq;
+    eq = eq || this.progress.equipped(player.char.id);
     for (const slot of Object.keys(eq)) {
       const item = COSMETICS.find((c) => c.id === eq[slot]);
-      if (!item || !this.progress.owns(item)) continue;
+      if (!item || item.hero !== player.char.id || (mine && !this.progress.owns(item))) continue;
       if (slot === 'trail') { this.trailColor = item.glow; continue; }
       const g = new THREE.Group();
       const where = BUILD[slot](item, g);
@@ -104,6 +106,7 @@ export class Wardrobe {
   update(dt) {
     const p = this.player; if (!p) return;
     const t = performance.now() / 1000;
+    animateSkin(p.model, t);
     const moving = this.last ? this.last.distanceToSquared(p.position) > 1e-5 : false;
     if (this.cape) this.cape.rotation.x = 0.12 + (moving ? 0.35 + Math.sin(t * 9) * 0.08 : Math.sin(t * 2) * 0.04);
     if (this.aura) this.aura.rotation.y += dt * 1.2;
@@ -121,8 +124,106 @@ export class Wardrobe {
     for (const s of this.trail) if (s.life > 0) { s.life -= dt; s.m.material.opacity = Math.max(0, s.life / 0.45) * 0.7; s.m.scale.setScalar(0.06 + 0.2 * s.life); if (s.life <= 0) s.m.visible = false; }
     this.last = (this.last || new THREE.Vector3()).copy(p.position);
   }
+  dispose() { this.clearTrail(); for (const s of this.trail) this.scene.remove(s.m); for (const p of this.parts) p.parent?.remove(p); this.parts = []; this.player = null; }
   clearTrail() { for (const s of this.trail) { s.life = 0; s.m.visible = false; } }
 }
 
 // a little turntable preview for the Cosmetics screen
 export function previewColor(item) { return '#' + item.color.toString(16).padStart(6, '0'); }
+
+// ---------- ARENA SKINS: body colours + materials + small themed attachments ----------
+// A handful of extra boxes and material tweaks per skin (no lights, no textures) so it stays cheap on phones.
+const SIZE = { sarrow: 1, zaleks: 1.3, iskra: 0.88, orin: 1.1 };
+const THEME = {
+  slag:      { emissive: 0x000000, ei: 0,    rough: true },
+  foundry:   { emissive: 0xff4a10, ei: 0.22 },
+  tundra:    { emissive: 0x6ab8ff, ei: 0.16 },
+  cathedral: { emissive: 0x9a2aff, ei: 0.12 },
+  rooftop:   { emissive: 0x30405a, ei: 0.1 },
+};
+export function decorateSkin(model, skin, hero) {
+  if (!skin) return;
+  const th = THEME[skin.arena] || THEME.slag;
+  const tint = new THREE.Color(skin.tint);
+  // materials: stronger colour wash on the armour + a themed inner glow
+  model.root.traverse((o) => {
+    const m = o.material;
+    if (!m || !m.isMeshLambertMaterial || m.userData.skinned) return;
+    m.userData.skinned = true;
+    m.color.lerp(tint, 0.25);
+    if (th.ei) { m.emissive = new THREE.Color(th.emissive); m.emissiveIntensity = th.ei; }
+    if (th.rough) m.color.multiplyScalar(0.85);
+  });
+  const k = SIZE[hero] || 1;
+  const g = new THREE.Group(); g.name = 'skinfx'; model.body.add(g);
+  const acc = glowMat(skin.glow), dark = lam(new THREE.Color(skin.tint).multiplyScalar(0.55));
+  const fx = { kind: skin.arena, bits: [] };
+  switch (skin.arena) {
+    case 'slag': { // bolted scrap plates on the shoulders and chest, rivets in the accent colour
+      const rust = lam(0x6a4a2e), steel = lam(0x7a7f86);
+      for (const s of [-1, 1]) {
+        box(g, s < 0 ? rust : steel, 0.34 * k, 0.1, 0.4 * k, s * 0.44 * k, 1.78 * k, 0, 0, s * 0.35);
+        box(g, acc, 0.05, 0.05, 0.05, s * 0.44 * k, 1.85 * k, 0.12 * k).castShadow = false;
+      }
+      box(g, steel, 0.26 * k, 0.22 * k, 0.05, -0.17 * k, 1.2 * k, 0.22 * k, 0, 0.12);
+      box(g, rust, 0.2 * k, 0.16 * k, 0.05, 0.18 * k, 0.95 * k, 0.22 * k, 0, -0.2);
+      for (const x of [-0.25, -0.09]) box(g, acc, 0.04, 0.04, 0.03, x * k, 1.28 * k, 0.25 * k).castShadow = false;
+      break;
+    }
+    case 'foundry': { // molten seams and a glowing back vent
+      const lava = glowMat(0xff7a1a);
+      for (const y of [0.95, 1.2, 1.5]) box(g, lava, 0.7 * k, 0.035, 0.44 * k, 0, y * k, 0).castShadow = false;
+      for (const s of [-1, 1]) box(g, lava, 0.05, 0.4 * k, 0.05, s * 0.3 * k, 1.35 * k, 0.21 * k).castShadow = false;
+      const vent = box(g, glowMat(skin.glow, 0.85), 0.3 * k, 0.3 * k, 0.06, 0, 1.4 * k, -0.24 * k); vent.castShadow = false;
+      fx.bits.push(vent);
+      break;
+    }
+    case 'tundra': { // ice shards sprouting from the shoulders and the back
+      const ice = new THREE.MeshLambertMaterial({ color: 0xd8f4ff, emissive: 0x4aa0ff, emissiveIntensity: 0.35, transparent: true, opacity: 0.9 });
+      const geo = new THREE.ConeGeometry(0.1, 0.55, 5);
+      const put = (x, y, z, rz, rx, sc = 1) => { const c = new THREE.Mesh(geo, ice); c.position.set(x * k, y * k, z * k); c.rotation.set(rx, 0, rz); c.scale.setScalar(sc * k); g.add(c); };
+      for (const s of [-1, 1]) { put(s * 0.42, 1.86, 0, -s * 0.5, 0); put(s * 0.5, 1.8, -0.08, -s * 0.9, -0.2, 0.7); }
+      put(-0.1, 1.55, -0.26, 0.3, -0.9, 0.9); put(0.12, 1.3, -0.26, -0.25, -1.0, 0.7);
+      box(g, glowMat(0xbff4ff, 0.5), 0.72 * k, 0.05, 0.46 * k, 0, 1.06 * k, 0).castShadow = false; // frosted belt
+      break;
+    }
+    case 'cathedral': { // neon trim along the armour edges
+      const neon = glowMat(skin.glow), neon2 = glowMat(skin.tint);
+      for (const s of [-1, 1]) {
+        box(g, neon, 0.03, 0.66 * k, 0.03, s * 0.34 * k, 1.36 * k, 0.21 * k).castShadow = false;
+        box(g, neon2, 0.03, 0.66 * k, 0.03, s * 0.34 * k, 1.36 * k, -0.21 * k).castShadow = false;
+      }
+      box(g, neon, 0.7 * k, 0.03, 0.03, 0, 1.7 * k, 0.21 * k).castShadow = false;
+      box(g, neon2, 0.7 * k, 0.03, 0.03, 0, 1.02 * k, 0.21 * k).castShadow = false;
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.025, 4, 20), neon); halo.position.set(0, 2.5 * k, -0.05); halo.rotation.x = Math.PI / 2; model.body.add(halo); g.add(halo);
+      fx.bits.push(halo);
+      break;
+    }
+    case 'rooftop': { // a lightning rod on the back and sparks that crackle round the body
+      box(g, lam(0x8a8f96), 0.04, 0.9 * k, 0.04, 0.18 * k, 2.0 * k, -0.22 * k);
+      box(g, glowMat(skin.glow), 0.08, 0.08, 0.08, 0.18 * k, 2.48 * k, -0.22 * k).castShadow = false;
+      const spark = glowMat(skin.glow);
+      for (let i = 0; i < 5; i++) { const b = box(g, spark, 0.07, 0.18, 0.04, 0, 1.3 * k, 0); b.castShadow = false; b.userData.ph = i * 1.256; fx.bits.push(b); }
+      fx.k = k;
+      break;
+    }
+  }
+  g.userData.fx = fx;
+  model.skinFx = fx;
+}
+// per-frame flicker for skins that move (sparks, vents, halos)
+export function animateSkin(model, t) {
+  const fx = model && model.skinFx; if (!fx) return;
+  if (fx.kind === 'rooftop') {
+    for (const b of fx.bits) {
+      const a = t * 3 + b.userData.ph, on = Math.sin(t * 23 + b.userData.ph * 7) > -0.2;
+      b.visible = on;
+      b.position.set(Math.cos(a) * 0.55 * fx.k, (1.0 + ((t * 0.9 + b.userData.ph) % 1.2)) * fx.k, Math.sin(a) * 0.55 * fx.k);
+      b.rotation.z = Math.sin(t * 31 + b.userData.ph) * 1.2;
+    }
+  } else if (fx.kind === 'foundry') {
+    for (const b of fx.bits) b.material.opacity = 0.6 + 0.35 * Math.sin(t * 4);
+  } else if (fx.kind === 'cathedral') {
+    for (const b of fx.bits) b.rotation.z = t * 1.5;
+  }
+}

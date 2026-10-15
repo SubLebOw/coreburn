@@ -14,6 +14,7 @@
 // everyone is down. Score and combo are shared; upgrade picks and power-ups are per player.
 import { applyAffixVisuals } from './affixes.js';
 import { cleanMastery } from './mastery.js';
+import { synergiesFor, showSynergyPopup } from './synergy.js';
 import * as THREE from 'three';
 import { NetHost, NetClient, normalizeCode, MAX_PLAYERS } from './net.js';
 import { Player } from './player.js';
@@ -357,6 +358,11 @@ export class Coop {
     this.snapTimer = 0;
     this.fx = [];
     this.installRecorders();
+    // CoreBurnZ SYNERGIES: the host works out the team bonuses, applies them to everyone and tells friends
+    const syn = RULES.z ? synergiesFor(this.heroes.map((h) => h.char.id)) : [];
+    for (const h of this.heroes) { h.loadout.synergy = syn; if (h !== player) { h.loadout.recompute(); h.applyLoadout(); h.hp = h.maxHp; } }
+    this.synergy = syn;
+    if (syn.length) setTimeout(() => { if (this.mode !== 'host' || !this.inGame) return; showSynergyPopup(syn); this.ctx.sound.play('powerup'); this.net.broadcast({ t: 'syn', names: syn }); }, 2200);
     this.net.broadcast({ t: 'start', z: RULES.z, roster: this.rosterOut(), pos: this.heroes.map((h) => [h.slot, r2(h.position.x), r2(h.position.z)]) });
     // the enemies scale was read by startWave(1) already in startGame? No: startGame calls this first.
   }
@@ -635,6 +641,7 @@ export class Coop {
       case 'pick': this.clientPick(m.cards, m.boss); break;
       case 'picked': this.ctx.hud.hidePicker(); this.clientApplyPick(m.id); break;
       case 'resume': this.ctx.hud.hidePicker(); if (this.ctx.getState() === 'upgrade') this.ctx.setState('playing'); break;
+      case 'syn': this.synergy = m.names; showSynergyPopup(m.names); this.ctx.sound.play('powerup'); break; // CoreBurnZ synergy popup
       case 'toast': this.ctx.sound.play('powerup'); this.ctx.hud.showToast(m.text, m.sub, m.color); break;
       case 'left': { const p = this.puppets && this.puppets.get(m.slot); if (p) { this.ctx.hud.showBanner(`${p.netName} LEFT`, ''); this.ctx.scene.remove(p.model.root); p.wardrobe?.dispose(); this.dropTag(p); this.puppets.delete(m.slot); } break; }
       case 'over': this.clientGameOver(m.run); break;

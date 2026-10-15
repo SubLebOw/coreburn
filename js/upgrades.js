@@ -19,6 +19,7 @@
 // This file has no Three.js in it, so tools (like the time-to-kill simulator) can import it too.
 
 import { RULES, Z_TUNING } from './rules.js';
+import { applySynergies } from './synergy.js';
 
 export const WEAPON_TIER_STEP = 0.28; // = 0.14 enemy health per wave x 2 waves per pick
 export const PICK_EVERY = 2;          // waves between upgrade picks
@@ -311,6 +312,7 @@ export class Loadout {
     if (M('nLong')) s.stepRange *= 1.15;
     if (M('nFanM')) s.starFan += 1;
     if (M('nClone')) { s.cloneTime += 2; s.cloneDmg += 0.1; }
+    if (RULES.z && this.synergy?.length) applySynergies(s, this.synergy); // CoreBurnZ co-op synergies (synergy.js)
   }
 
   // Expected single-target damage multiplier from perks alone (for balancing / the simulator)

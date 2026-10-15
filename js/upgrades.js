@@ -93,9 +93,9 @@ export const UPGRADES = {
   nEdge:    { name: 'Shadow Edge', heroes: N, group: 'mobility', icon: '◐', color: 0x8a7aff, max: 5, desc: () => '+25% Shadow Step damage, +8% step reach' },
   nTwin:    { name: 'Twin Shadows', heroes: N, group: 'mobility', icon: '⇉', color: 0x9a8aff, max: 1, desc: () => 'Shadow Step +1 charge' },
   nShade:   { name: 'Lingering Shade', heroes: N, group: 'ultimate', icon: '♊', color: 0x6a5aff, max: 4, desc: () => 'Shadow Clone lasts +1s' },
-  nReturn:  { name: 'Returning Edge', heroes: N, group: 'mobility', icon: '↺', color: 0x7a6aff, max: 1, desc: () => 'After Shadow Step, stars stay in the enemies you cut, then fly back to you after 1.5s, hitting everything on the way (+damage the longer they stayed in)' },
-  nReturnMore:{ name: 'Edge Storm', heroes: N, needs: 'nReturn', group: 'mobility', icon: '⟲', color: 0x6a5aee, max: 2, desc: () => '+1 extra returning star per enemy cut, +15% return damage' },
-  nReturnCd:{ name: 'Homecoming', heroes: N, needs: 'nReturn', group: 'mobility', icon: '↻', color: 0x8a7aee, max: 3, desc: () => 'Each return hit takes 0.15s off Shadow Step cooldown' },
+  nReturn:  { name: 'Returning Edge', heroes: N, group: 'mobility', icon: '↺', color: 0x7a6aff, max: 1, desc: () => 'After Shadow Step, stars stay in the enemies you cut, fly back after 2s hitting everything on the way (+damage the longer they stayed in), then orbit you for 2s cutting what they touch' },
+  nReturnMore:{ name: 'Edge Storm', heroes: N, needs: 'nReturn', group: 'mobility', icon: '⟲', color: 0x6a5aee, max: 2, desc: () => '+1 extra returning (and orbiting) star per enemy cut, +15% return damage' },
+  nReturnCd:{ name: 'Homecoming', heroes: N, needs: 'nReturn', group: 'mobility', icon: '↻', color: 0x8a7aee, max: 3, desc: () => 'Return and orbit hits take 0.15s off Shadow Step cooldown (max 0.5s per second)' },
   nMirror:  { name: 'Perfect Mirror', heroes: N, group: 'ultimate', icon: '⧉', color: 0xb0a0ff, max: 4, desc: () => 'Clone hits +5% harder (of your damage)' },
   oVortex:  { name: 'Deep Vortex', heroes: O, group: 'ultimate', icon: '◉', color: 0xff5070, max: 5, desc: () => '+10% vortex radius and pull' },
 };

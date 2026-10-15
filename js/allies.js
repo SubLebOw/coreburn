@@ -9,6 +9,8 @@
 import * as THREE from 'three';
 import { CHARACTERS } from './characters.js';
 
+// Returning Edge: stuck 2s, fly home, orbit 2s (hit each enemy at most every 0.45s for 30% of the return hit)
+const RET_TIME = 2.0, ORBIT_TIME = 2.0, ORBIT_R = 1.7, ORBIT_HIT_CD = 0.45, ORBIT_DMG = 0.3, REFUND_CAP = 0.5;
 const NEEDLES = 80, STARS = 100, DECOYS = 6, DRONES = 12, VORTEXES = 3, CLONES = 4;
 
 export class Allies {
@@ -158,6 +160,15 @@ export class Allies {
       this.fireNeedle(o, c.position, new THREE.Vector3(Math.sin(a2), 0, Math.cos(a2)), nd.damage * 0.3 * c.pct, opts);
     }
   }
+  // HOMECOMING: return + orbit hits shave the Step cooldown, but at most REFUND_CAP s per second (no abuse)
+  retRefund(o) {
+    const per = o.stats?.retCd; if (!per || !(o.dashCooldown > 0)) return;
+    const now = performance.now() / 1000;
+    o.retBudget = Math.min(REFUND_CAP, (o.retBudget ?? REFUND_CAP) + (now - (o.retBudgetT ?? now)) * REFUND_CAP);
+    o.retBudgetT = now;
+    const take = Math.min(per, o.retBudget); if (take <= 0) return;
+    o.retBudget -= take; o.dashCooldown = Math.max(0.01, o.dashCooldown - take);
+  }
   // RETURNING EDGE: `per` stars stick in each enemy cut, then fly back to the owner
   embedStars(owner, hits, dmg, per) {
     if (!this.host) return;
@@ -238,6 +249,9 @@ export class Allies {
   update(dt) {
     if (!this.host) return this.clientUpdate(dt);
     const enemies = this.world.enemies.list, arena = this.world.arena;
+    const rings = new Map(); // orbiting stars per owner, evenly spaced round him
+    for (const n of this.stars) if (n.life > 0 && n.ret && n.ret.phase === 'orbit') { if (!rings.has(n.owner)) rings.set(n.owner, []); rings.get(n.owner).push(n); }
+    const spin = performance.now() / 1000 * 5.5;
     for (const n of this.needles.concat(this.stars)) {
       if (n.life <= 0) continue;
       n.life -= dt;
@@ -246,15 +260,40 @@ export class Allies {
         n.life = 9; n.ret.t += dt;
         const e = n.ret.enemy;
         if (e && !e.dead) n.mesh.position.set(e.position.x + n.ret.ox, 1.2, e.position.z + n.ret.oz);
-        if (n.ret.t >= 1.5 || !e || e.dead || !n.owner || n.owner.dead) {
+        if (n.ret.t >= RET_TIME || !e || e.dead || !n.owner || n.owner.dead) {
           n.ret.phase = 'back'; n.hitSet.clear(); n.pierce = 99;
-          n.dmg = n.ret.dmg * (1 + 0.6 * Math.min(1, n.ret.t / 1.5)); // longer stuck = harder return
+          n.dmg = n.ret.dmg * (1 + 0.6 * Math.min(1, n.ret.t / RET_TIME)); // longer stuck = harder return
         }
         continue;
       }
       if (n.ret && n.ret.phase === 'back') {
         const o = n.owner, d = new THREE.Vector3(o.position.x - n.mesh.position.x, 0, o.position.z - n.mesh.position.z);
-        if (d.length() < 0.8 || o.dead) { n.life = 0.0001; } else n.vel.copy(d.normalize().multiplyScalar(26));
+        if (o.dead) n.life = 0.0001;
+        else if (d.length() < 1.7) { // home: join the ring round Kagero
+          n.ret.phase = 'orbit'; n.ret.t = 0; n.ret.cd = new Map(); n.vel.set(0, 0, 0);
+          n.ret.ang = Math.atan2(n.mesh.position.x - o.position.x, n.mesh.position.z - o.position.z);
+          n.ret.odmg = n.ret.dmg * ORBIT_DMG;
+        } else n.vel.copy(d.normalize().multiplyScalar(26));
+      }
+      if (n.ret && n.ret.phase === 'orbit') { // ORBIT: a spinning ring of stars for 2s, then gone
+        const o = n.owner, r = n.ret;
+        r.t += dt; n.life = 9;
+        if (!o || o.dead || r.t >= ORBIT_TIME) { n.life = 0; n.mesh.visible = false; n.ret = null; n.clone = false; continue; }
+        const ring = rings.get(o) || [n], k = Math.max(0, ring.indexOf(n));
+        r.ang = spin + k * Math.PI * 2 / ring.length;
+        n.mesh.position.set(o.position.x + Math.sin(r.ang) * ORBIT_R, 1.1 + 0.12 * Math.sin(r.ang * 2), o.position.z + Math.cos(r.ang) * ORBIT_R);
+        n.mesh.rotation.y += dt * 18;
+        if (n.mesh.scale.x !== 1.6) n.mesh.scale.setScalar(1.6);
+        for (const e of enemies) {
+          if (!e.canBeHit || (r.cd.get(e) || 0) > r.t) continue;
+          if (Math.hypot(n.mesh.position.x - e.position.x, n.mesh.position.z - e.position.z) < e.radius + 0.5) {
+            r.cd.set(e, r.t + ORBIT_HIT_CD);
+            o.cloneHit = !!n.clone; o.strike(e, r.odmg, 0, 0, false, 'needle'); o.cloneHit = false;
+            this.retRefund(o);
+            this.world.effects.spawnSparks(n.mesh.position.clone(), n.color, 3, 4);
+          }
+        }
+        continue;
       }
       const pos = n.mesh.position;
       pos.addScaledVector(n.vel, dt);
@@ -266,13 +305,13 @@ export class Allies {
           if (Math.hypot(pos.x - e.position.x, pos.z - e.position.z) < e.radius + 0.35) {
             n.hitSet.add(e);
             const k = n.vel.clone().normalize().multiplyScalar(2);
-            if (n.owner) { n.owner.cloneHit = !!n.clone; n.owner.strike(e, n.dmg, k.x, k.z, false, n.kind); n.owner.cloneHit = false; if (n.ret && n.owner.stats.retCd) n.owner.dashCooldown = Math.max(0.01, n.owner.dashCooldown - n.owner.stats.retCd); }
+            if (n.owner) { n.owner.cloneHit = !!n.clone; n.owner.strike(e, n.dmg, k.x, k.z, false, n.kind); n.owner.cloneHit = false; if (n.ret) this.retRefund(n.owner); }
             this.world.effects.spawnSparks(pos.clone(), n.color, 3, 4);
             if (n.pierce-- <= 0) { done = true; break; }
           }
         }
       }
-      if (done) { n.life = 0; n.mesh.visible = false; n.ret = null; n.clone = false; }
+      if (done) { n.life = 0; n.mesh.visible = false; n.ret = null; n.clone = false; n.mesh.scale.setScalar(1); }
     }
     for (const c of this.clones) {
       if (c.life <= 0) continue;

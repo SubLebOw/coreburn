@@ -15,6 +15,7 @@
 import * as THREE from 'three';
 import { Enemy } from './enemy.js';
 import { bossForNumber } from './bosses.js';
+import { RULES, Z_TUNING } from './rules.js';
 import { makeGolden } from './golden.js';
 
 const SCREEN_CAP = 14;        // regular enemies alive at once (not counting mites/summons)
@@ -197,7 +198,7 @@ export class WaveManager {
     this.golden = !!this.world.goldenRoll?.(this.bossNumber);
     this.bosses.forEach((b, i) => {
       b.nid = ++this.nextNid; b.part = i;
-      b.maxHp *= (this.world.coopBossHp || 1) * (this.golden ? 1.5 : 1); b.hp = b.maxHp;
+      b.maxHp *= (this.world.coopBossHp || 1) * (this.golden ? 1.5 : 1) * (RULES.z ? Z_TUNING.bossHp : 1); b.hp = b.maxHp; // CoreBurnZ: +10%
       if (this.golden) makeGolden(b);
     });
     for (const b of this.bosses) {

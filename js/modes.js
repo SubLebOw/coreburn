@@ -35,11 +35,12 @@ export function weekKey(d = new Date()) {
 }
 
 // The weekly boss order: a seeded shuffle of the 7 bosses (rotation indexes 0..6)
-export function rushOrder(week = weekKey()) {
-  const rng = rngFor('rush:' + week);
-  const order = [0, 1, 2, 3, 4, 5, 6];
+// (CoreBurnZ: pool = 12, a different seed, and the first 7 of the shuffle are this week's bosses)
+export function rushOrder(week = weekKey(), pool = 7) {
+  const rng = rngFor(pool === 7 ? 'rush:' + week : `rush:z:${week}`);
+  const order = Array.from({ length: pool }, (_, i) => i);
   for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
-  return order;
+  return order.slice(0, 7);
 }
 export const RUSH_BOSSES = 7;
 // Weapon tier you'd normally have going into boss k (wave 5k): picks at waves 2,4,... before it

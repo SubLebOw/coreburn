@@ -9,6 +9,8 @@ import { CantorVell, VELL_DEF } from './boss-vell.js';
 import { Gulletworm, WORM_DEF } from './boss-worm.js';
 import { ForgeTwin, BRAND_DEF, TEMPER_DEF } from './boss-twins.js';
 import { Hymnworks, HYMNWORKS_DEF } from './boss-hymnworks.js';
+import { SisterKlaxon, KLAXON_DEF, BellowsAbbot, BELLOWS_DEF, SaintGravelmouth, GRAVEL_DEF, TitheWarden, TITHE_DEF, NailChorus, NAIL_DEF } from './boss-z.js';
+import { RULES } from './rules.js';
 
 const [DEACON, CHOIRMOTHER, RIVETJAW] = CLASSIC_BOSSES;
 
@@ -39,7 +41,21 @@ export const BOSS_ROTATION = [
   single(Hymnworks, HYMNWORKS_DEF),
 ];
 
-export function bossForNumber(bossNumber) {
-  const idx = (bossNumber - 1) % BOSS_ROTATION.length;
-  return { entry: BOSS_ROTATION[idx], tier: Math.floor((bossNumber - 1) / BOSS_ROTATION.length) };
+// COREBURNZ: the 7 originals with 5 new leaders slotted in between (12 per trip round the rotation)
+export const Z_BOSSES = [
+  single(SisterKlaxon, KLAXON_DEF),
+  single(BellowsAbbot, BELLOWS_DEF),
+  single(SaintGravelmouth, GRAVEL_DEF),
+  single(TitheWarden, TITHE_DEF),
+  single(NailChorus, NAIL_DEF),
+];
+const [D, V, C, W, R, T, H] = BOSS_ROTATION;
+const [K, B, G, TW, N] = Z_BOSSES;
+export const Z_ROTATION = [D, V, K, C, W, B, R, G, T, TW, H, N];
+export const rotation = (z = RULES.z) => (z ? Z_ROTATION : BOSS_ROTATION);
+
+export function bossForNumber(bossNumber, z = RULES.z) {
+  const rot = rotation(z);
+  const idx = (bossNumber - 1) % rot.length;
+  return { entry: rot[idx], tier: Math.floor((bossNumber - 1) / rot.length) };
 }

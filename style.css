@@ -569,3 +569,44 @@ body.touch .kslot span { display: none; }
   #gameover-panel > #go-actions { grid-row: 1 / span 8; position: static; background: none; align-self: center; }
   #gameover-panel #lb-name-row { font-size: 12px; }
 }
+
+/* ---------- CoreBurnZ (v1.12): rules toggle, boss relics, cosmetics, XP ---------- */
+.rules-row { display: flex; gap: 8px; justify-content: center; margin: 8px auto 4px; max-width: 420px; }
+.rules-row button { flex: 1; padding: 9px 6px; font: inherit; font-weight: 900; letter-spacing: 2px; font-size: 15px; color: #9ab; background: #161b20; border: 2px solid #333; border-radius: 10px; cursor: pointer; touch-action: manipulation; }
+.rules-row button small { display: block; font-size: 10px; letter-spacing: 1px; font-weight: 700; opacity: .8; }
+.rules-row button.on[data-z="0"] { color: #3ff6e0; border-color: #3ff6e0; background: #12262a; }
+.rules-row button.on[data-z="1"] { color: #ffc23a; border-color: #ffc23a; background: #2a2210; box-shadow: 0 0 16px #ffc23a55; }
+.rules-row button:disabled { cursor: default; opacity: .75; }
+#rules-desc { max-width: 420px; margin: 2px auto 6px; line-height: 1.35; }
+body.zmode #title-panel h1::after { content: 'Z'; color: #ffc23a; text-shadow: 0 4px 0 #8a3b12, 0 0 24px #ffc23a88; margin-left: 4px; }
+.big-btn.cos { display: block; margin: 10px auto 0; background: #241a2e; color: #e0a0ff; border-color: #e0a0ff; font-size: 18px; box-shadow: 0 4px 0 #6a3a8a; }
+.big-btn.cos small { display: block; font-size: 11px; letter-spacing: 1px; opacity: .85; font-weight: 700; }
+#lvl-bar { display: flex; align-items: center; gap: 8px; justify-content: center; margin: 8px auto 0; max-width: 300px; font-size: 12px; font-weight: 900; letter-spacing: 2px; color: #e0a0ff; }
+#lvl-bar i, .xp-line i { flex: 1; height: 8px; background: #222; border-radius: 4px; overflow: hidden; display: block; }
+#lvl-bar i b, .xp-line i b { display: block; height: 100%; background: linear-gradient(90deg, #a050ff, #e0a0ff); }
+#gameover-xp { margin: 4px auto 6px; max-width: 340px; }
+.xp-line { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #e0a0ff; letter-spacing: 1px; }
+.xp-line em { color: #ffc23a; font-style: normal; font-weight: 900; }
+.xp-unlock { margin-top: 4px; font-size: 13px; color: #ffc23a; font-weight: 900; letter-spacing: 1px; }
+.xp-unlock b { color: var(--c, #fff); } .xp-unlock span { font-size: 10px; opacity: .7; }
+/* boss relic pick: gold */
+#upgrade-overlay.boss #upgrade-title { color: #ffc23a; text-shadow: 0 0 22px #ffc23aaa, 0 3px 0 #6a4a10; }
+#upgrade-overlay.boss #upgrade-box { border-color: #ffc23a; box-shadow: 0 0 40px #ffc23a66; }
+.ucard.relic { border-color: #ffc23a !important; background: linear-gradient(160deg, #3a2a08, #1a1406 60%) !important; box-shadow: 0 0 18px #ffc23a66, inset 0 0 22px #ffc23a33 !important; }
+.ucard.relic .group { color: #ffc23a !important; letter-spacing: 3px; }
+.ucard.relic .icon { color: #ffd870 !important; text-shadow: 0 0 14px #ffc23a; }
+/* cosmetics screen */
+#cos-panel { position: fixed; inset: 0; z-index: 45; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, #120a18, #000); padding: calc(12px + env(safe-area-inset-top)) 12px 12px; }
+#cos-panel.hidden { display: none; }
+#cos-level { color: #e0a0ff; font-size: 14px; letter-spacing: 1px; }
+#cos-items, #cos-skins { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin: 10px 0; }
+#cos-preview { grid-row: span 2; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, #2a1a3a, #0c0810); border: 2px solid #4a2a5a; border-radius: 10px; min-height: 220px; }
+#cos-preview canvas { width: 200px !important; height: 220px !important; }
+.cos-item.locked .sw { filter: grayscale(1) brightness(.5); } .cos-item.locked { opacity: .6; }
+.cos-item .sw { font-size: 20px; }
+.cos-item.nope { animation: nope .3s; }
+#cos-skinmode { margin-bottom: 8px; }
+#cos-skinmode .sp-tab { font-size: 11px; letter-spacing: 1px; }
+.sel-only { display: none; margin: 8px auto 0; }
+#upgrade-overlay.select .sel-only { display: block; }
+@media (max-width: 520px) { #cos-items, #cos-skins { grid-template-columns: repeat(2, 1fr); } #cos-preview { grid-column: span 2; grid-row: auto; min-height: 200px; } .rules-row button { font-size: 13px; letter-spacing: 1px; } }

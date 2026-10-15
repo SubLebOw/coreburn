@@ -89,13 +89,15 @@ export class Hud {
   }
 
   // The upgrade picker. cards = ids from Loadout.roll(); onPick(id) is called once.
-  showPicker(cards, loadout, onPick) {
+  showPicker(cards, loadout, onPick, boss = false) {
     const hex = (c) => '#' + c.toString(16).padStart(6, '0');
     const tc = hex(tierColor(loadout.tier + 1));
-    $('upgrade-title').textContent = 'CHOOSE AN UPGRADE';
+    $('upgrade-title').textContent = boss ? 'BOSS RELIC' : 'CHOOSE AN UPGRADE';
     $('upgrade-hint').textContent = 'Press 1, 2 or 3 · or click a card';
     this.upgradeOverlay.classList.remove('select');
-    $('upgrade-sub').innerHTML = `Weapon <b style="--c:${tc}">Tier ${loadout.tier} → ${loadout.tier + 1}</b> · base damage x${weaponMult(loadout.tier + 1).toFixed(2)} · plus your pick:`;
+    this.upgradeOverlay.classList.toggle('boss', boss); // CoreBurnZ: gold boss relic pick
+    $('upgrade-sub').innerHTML = boss ? 'A rare relic torn from the fallen boss. One per boss kill (no weapon tier).'
+      : `Weapon <b style="--c:${tc}">Tier ${loadout.tier} → ${loadout.tier + 1}</b> · base damage x${weaponMult(loadout.tier + 1).toFixed(2)} · plus your pick:`;
     const box = $('upgrade-cards');
     box.innerHTML = '';
     cards.forEach((id, i) => {
@@ -103,10 +105,10 @@ export class Hud {
       const cursed = def.group === 'cursed';
       const lv = loadout.level(id);
       const b = document.createElement('button');
-      b.className = 'ucard' + (cursed ? ' cursed' : '');
+      b.className = 'ucard' + (cursed ? ' cursed' : '') + (def.group === 'boss' ? ' relic' : '');
       b.style.setProperty('--c', hex(def.color));
-      const lvl = cursed ? `<b>CURSED</b> · ${def.bane}` : id === 'patch' ? `Taken ${lv}x` : (lv === 0 ? `<b>NEW</b> · Lv 1/${def.max}` : `Lv ${lv} → <b>${lv + 1}</b>/${def.max}`);
-      b.innerHTML = `<span class="key">${i + 1}</span><div class="icon"></div><div class="ubody"><div class="group">${def.group === 'cursed' ? GROUP_LABELS.cursed : groupLabel(def.group, HERO_STATS[loadout.hero]?.abilities)}</div><div class="uname"></div><div class="effect"></div><div class="lvl">${lvl}</div></div>`;
+      const lvl = def.group === 'boss' ? (lv ? `Relic ${lv} → <b>${lv + 1}</b>/${def.max}` : '<b>RARE</b> · boss relic') : cursed ? `<b>CURSED</b> · ${def.bane}` : id === 'patch' ? `Taken ${lv}x` : (lv === 0 ? `<b>NEW</b> · Lv 1/${def.max}` : `Lv ${lv} → <b>${lv + 1}</b>/${def.max}`);
+      b.innerHTML = `<span class="key">${i + 1}</span><div class="icon"></div><div class="ubody"><div class="group">${def.group === 'cursed' || def.group === 'boss' ? GROUP_LABELS[def.group] : groupLabel(def.group, HERO_STATS[loadout.hero]?.abilities)}</div><div class="uname"></div><div class="effect"></div><div class="lvl">${lvl}</div></div>`;
       b.querySelector('.icon').textContent = def.icon;
       b.querySelector('.uname').textContent = def.name;
       b.querySelector('.effect').textContent = def.desc(lv);
@@ -138,6 +140,7 @@ export class Hud {
   showSelect(chars, current, onPick) {
     const hex = (c) => '#' + c.toString(16).padStart(6, '0');
     $('upgrade-title').textContent = 'CHOOSE YOUR HERO';
+    this.upgradeOverlay.classList.remove('boss');
     $('upgrade-sub').textContent = 'Same 3 buttons, 4 different kits. Pick one for this run:';
     $('upgrade-hint').textContent = `Press 1-${chars.length} · ← → and Enter · or click a hero`;
     const box = $('upgrade-cards');
@@ -363,6 +366,16 @@ export class Hud {
     this.gameoverPanel.classList.add('hidden');
   }
 
+  // ACCOUNT XP on the game over screen: +XP, the level bar, and anything that just unlocked
+  showXp(res, progress) {
+    const el = $('gameover-xp');
+    const need = 150 + 75 * (progress.level - 1);
+    const unlocks = res.unlocks.map((u) => `<div class="xp-unlock" style="--c:#${u.color.toString(16).padStart(6, '0')}">UNLOCKED · <b></b> <span>${u.hero.toUpperCase()} ${u.slot.toUpperCase()}</span></div>`).join('');
+    el.innerHTML = `<div class="xp-line"><b>+${res.gained} XP</b> · LEVEL ${progress.level}${res.levels.length ? ' <em>LEVEL UP!</em>' : ''}<i><b style="width:${Math.round(100 * progress.xp / need)}%"></b></i></div>${unlocks}${res.scrap ? `<div class="xp-unlock">+${res.scrap} scrap (all cosmetics unlocked)</div>` : ''}`;
+    el.querySelectorAll('.xp-unlock b').forEach((b, i) => { b.textContent = res.unlocks[i].name; });
+    el.classList.remove('hidden');
+  }
+
   showGameOver(score, wave, kills, best, newBest, killer = null, place = null, loadout = null, bestCombo = 0, hero = 'Sarrow') {
     const build = loadout && loadout.tier > 0
       ? `<span class="build">Weapon tier ${loadout.tier} · ${loadout.picked.map((p) => `${p.name} ${p.level}`).join(', ')}</span><br>` : '';
@@ -372,6 +385,7 @@ export class Hud {
       (killer ? `<span class="killer">Killed by ${killer}</span><br>` : '') + build +
       (newBest ? '<b style="color:#3ff6e0">NEW BEST SCORE!</b>' : `Best: ${best.score.toLocaleString()} pts (wave ${best.wave})`);
     $('gameover-scrap').classList.add('hidden');
+    $('gameover-xp').classList.add('hidden');
     $('gameover-mode').classList.add('hidden');
     $('lb-result').classList.add('hidden');
     $('lb-name-row').classList.add('hidden');

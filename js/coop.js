@@ -17,6 +17,7 @@ import { NetHost, NetClient, normalizeCode, MAX_PLAYERS } from './net.js';
 import { Player } from './player.js';
 import { Enemy } from './enemy.js';
 import { bossForNumber } from './bosses.js';
+import { RULES, setRules } from './rules.js';
 import { makeGolden } from './golden.js';
 import { meta } from './meta.js';
 import { waveStats } from './waves.js';
@@ -82,6 +83,11 @@ export class Coop {
     $('cp-code').addEventListener('input', (e) => { e.target.value = normalizeCode(e.target.value); });
     $('cp-code').addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') this.join(e.target.value); });
     $('cp-start').addEventListener('click', () => this.hostStart());
+    // RULES: the host picks CLASSIC or COREBURNZ for the room; friends see it in the lobby
+    for (const b of document.querySelectorAll('#cp-rules button')) b.addEventListener('click', () => {
+      if (this.mode !== 'host') return;
+      setRules(b.dataset.z === '1'); this.ctx.onRulesChanged?.(); this.rosterChanged();
+    });
     $('cp-leave').addEventListener('click', () => this.leave());
     for (const el of [this.panel]) el.addEventListener('pointerdown', (e) => e.stopPropagation());
     const heroes = $('cp-heroes');
@@ -130,6 +136,7 @@ export class Coop {
   }
 
   renderRoster() {
+    for (const b of document.querySelectorAll('#cp-rules button')) { b.classList.toggle('on', (b.dataset.z === '1') === RULES.z); b.disabled = this.mode !== 'host'; }
     const list = $('cp-roster');
     list.innerHTML = '';
     for (let i = 0; i < MAX_PLAYERS; i++) {
@@ -186,7 +193,7 @@ export class Coop {
 
   rosterChanged() {
     assignLooks(this.roster);
-    this.net.broadcast({ t: 'lobby', code: this.code, roster: this.roster.map(({ slot, char }) => ({ slot, char })) });
+    this.net.broadcast({ t: 'lobby', code: this.code, z: RULES.z, roster: this.roster.map(({ slot, char }) => ({ slot, char })) });
     this.renderRoster();
   }
 
@@ -294,7 +301,7 @@ export class Coop {
     this.snapTimer = 0;
     this.fx = [];
     this.installRecorders();
-    this.net.broadcast({ t: 'start', roster: this.roster.map(({ slot, char }) => ({ slot, char })), pos: this.heroes.map((h) => [h.slot, r2(h.position.x), r2(h.position.z)]) });
+    this.net.broadcast({ t: 'start', z: RULES.z, roster: this.roster.map(({ slot, char }) => ({ slot, char })), pos: this.heroes.map((h) => [h.slot, r2(h.position.x), r2(h.position.z)]) });
     // the enemies scale was read by startWave(1) already in startGame? No: startGame calls this first.
   }
 
@@ -437,12 +444,12 @@ export class Coop {
   }
 
   // ---------- Upgrade picks (every 2 waves, each player picks their own) ----------
-  beginPicks() {
+  beginPicks(boss = false) {
     this.pickTimer = 0;
     for (const h of this.heroes) {
       if (h === this.ctx.player) continue;
-      h.pendingPick = h.loadout.roll(3);
-      this.net.send(this.connOf(h), { t: 'pick', cards: h.pendingPick });
+      h.pendingPick = boss ? h.loadout.rollBoss(3) : h.loadout.roll(3); // CoreBurnZ boss relic pick
+      this.net.send(this.connOf(h), { t: 'pick', cards: h.pendingPick, boss });
     }
   }
 
@@ -450,6 +457,7 @@ export class Coop {
     h.loadout.apply(id);
     h.applyLoadout();
     if (id === 'patch') h.heal(h.maxHp * 0.35);
+    if (id === 'bHeart') h.heal(h.maxHp);
     h.pendingPick = null;
     h.lastPick = id;
     this.ctx.effects.spawnRing(h.position, h.tierColor, 3, 0.5);
@@ -554,6 +562,7 @@ export class Coop {
       case 'lobby':
         this.roster = assignLooks(m.roster);
         this.code = m.code;
+        if (setRules(!!m.z) !== false) this.ctx.onRulesChanged?.();
         if (this.ctx.getState() === 'lobby' || !this.inGame) this.showLobby();
         this.status('');
         break;
@@ -565,7 +574,7 @@ export class Coop {
         if (me) { this.ctx.player.position.set(me[1], 0, me[2]); this.ctx.player.slide.set(0, 0, 0); this.ctx.snapCamera(); }
         break;
       }
-      case 'pick': this.clientPick(m.cards); break;
+      case 'pick': this.clientPick(m.cards, m.boss); break;
       case 'picked': this.ctx.hud.hidePicker(); this.clientApplyPick(m.id); break;
       case 'resume': this.ctx.hud.hidePicker(); if (this.ctx.getState() === 'upgrade') this.ctx.setState('playing'); break;
       case 'toast': this.ctx.sound.play('powerup'); this.ctx.hud.showToast(m.text, m.sub, m.color); break;
@@ -583,6 +592,7 @@ export class Coop {
 
   clientStart(m) {
     const { scene, world } = this.ctx;
+    setRules(!!m.z); this.ctx.onRulesChanged?.(); // the host's rule set (CLASSIC / COREBURNZ)
     this.roster = assignLooks(m.roster);
     this.inGame = true;
     this.panel.classList.add('hidden');
@@ -619,14 +629,14 @@ export class Coop {
     this.lastHp = player.hp;
   }
 
-  clientPick(cards) {
+  clientPick(cards, boss = false) {
     this.ctx.setState('upgrade');
     const loadout = this.ctx.player.loadout;
     this.ctx.hud.showPicker(cards, loadout, (id) => {
       this.net.send({ t: 'pick', id });
       this.clientApplyPick(id);
       this.ctx.hud.showBanner('WAITING FOR TEAMMATES', 'The fight resumes when everyone has picked');
-    });
+    }, boss);
   }
 
   clientApplyPick(id) {
@@ -634,7 +644,8 @@ export class Coop {
     player.loadout.apply(id);
     player.applyLoadout();
     const def = player.loadout.def(id);
-    this.ctx.hud.showToast(`TIER ${player.loadout.tier} TALONS`, def.name, '#' + def.color.toString(16).padStart(6, '0'));
+    if (id === 'bHeart') player.heal?.(player.maxHp);
+    this.ctx.hud.showToast(def.group === 'boss' ? 'BOSS RELIC' : `TIER ${player.loadout.tier} TALONS`, def.name, '#' + def.color.toString(16).padStart(6, '0'));
     this.ctx.effects.spawnRing(player.position, player.tierColor, 3, 0.5);
     this.ctx.sound.play('powerup');
   }
@@ -642,8 +653,8 @@ export class Coop {
   clientGameOver(run) {
     const { hud, player } = this.ctx;
     this.ctx.setState('gameover');
-    this.ctx.setLastRun(run);
     hud.showGameOver(run.score, run.wave, run.kills, { score: 0, wave: 0 }, false, run.killer, run.place, player.loadout, run.combo, run.hero);
+    this.ctx.setLastRun(run); // scrap + XP (shown on the game over screen)
     $('restart-hint').classList.remove('hidden');
     $('restart-hint').innerHTML = 'Waiting for the host to start the next run…';
     $('restart-btn').classList.add('hidden');

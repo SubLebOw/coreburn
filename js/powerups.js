@@ -9,6 +9,7 @@
 //   MAGNET     10s   pulls pickups in from far away, and every kill drops a +5 heal orb
 //   ARC TALONS 10s   your slashes and blinks chain lightning to 3 nearby enemies
 import * as THREE from 'three';
+import { RULES, Z_TUNING } from './rules.js';
 
 export const POWERUPS = {
   slowmo: { label: 'SLOW', name: 'SLOW-MO', color: 0x3cf0e0, duration: 5, weight: 1.2, hint: 'Time slows down!' },
@@ -165,7 +166,7 @@ export class PowerUps {
     const hit = new Set([target]);
     let from = target;
     for (let i = 0; i < 3; i++) {
-      let best = null, bestD = 6;
+      let best = null, bestD = 6 * (RULES.z ? Z_TUNING.arcRange : 1); // CoreBurnZ: +50% chain range
       for (const e of this.world.enemies.list) {
         if (!e.canBeHit || hit.has(e)) continue;
         const d = e.position.distanceTo(from.position);

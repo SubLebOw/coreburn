@@ -3,6 +3,7 @@
 // Shows the online top 20 when online leaderboards are set up, otherwise your best runs on this device.
 import { CHARACTERS, CHARACTER_ORDER } from './characters.js';
 import { dailyKey, weekKey } from './modes.js';
+import { RULES } from './rules.js';
 const $ = (id) => document.getElementById(id);
 const TABS = [['global', 'GLOBAL'], ['hero', 'HEROES'], ['daily', 'DAILY'], ['rush', 'BOSS RUSH']];
 
@@ -28,11 +29,13 @@ export class RanksUI {
     if (r.ok) $('rk-name').value = r.name;
   }
 
+  // shows the boards of the rule set picked on the title screen (CLASSIC or COREBURNZ)
   board() {
-    if (this.tab === 'hero') return 'hero:' + this.hero;
-    if (this.tab === 'daily') return 'daily:' + dailyKey();
-    if (this.tab === 'rush') return 'rush:' + weekKey();
-    return 'global';
+    const z = RULES.z ? 'z:' : '';
+    if (this.tab === 'hero') return z + 'hero:' + this.hero;
+    if (this.tab === 'daily') return z + 'daily:' + dailyKey();
+    if (this.tab === 'rush') return z + 'rush:' + weekKey();
+    return z + 'global';
   }
 
   tabs(el, list, cur, onPick) {
@@ -56,7 +59,7 @@ export class RanksUI {
     list.innerHTML = '<div class="rk-empty">Loading…</div>';
     const { rows, source } = await this.lb.top(board);
     if (this.board() !== board) return; // tab changed while loading
-    $('rk-source').textContent = source === 'online' ? 'ONLINE' : 'ON THIS DEVICE';
+    $('rk-source').textContent = (RULES.z ? 'COREBURNZ · ' : 'CLASSIC · ') + (source === 'online' ? 'ONLINE' : 'ON THIS DEVICE');
     const label = this.tab === 'daily' ? `Daily challenge ${dailyKey()} (UTC)` : this.tab === 'rush' ? `Weekly boss rush ${weekKey()} · new bosses order every Monday (UTC)` : '';
     list.innerHTML = label ? `<div class="rk-label">${label}</div>` : '';
     if (!rows.length) list.innerHTML += `<div class="rk-empty">No runs yet${this.tab === 'daily' ? ' today' : this.tab === 'rush' ? ' this week' : ''}. Go set one!</div>`;

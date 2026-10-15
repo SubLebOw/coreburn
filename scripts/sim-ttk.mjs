@@ -129,13 +129,16 @@ function kit(id, l, scen) {
 }
 function this_perk(s) { return (1 + 0.8 * s.crit) * (1 + s.twin * 0.8); }
 
+// --z: CoreBurnZ bosses have +10% hp, and 5 of the 12 rotation slots are the Grindchoir bosses
+// (avg base hp 720 vs the 650 classic yardstick). Applies equally to every hero.
+const Z_BOSS = process.argv.includes('--z') ? 1.1 * (7 / 12 + (5 / 12) * (720 / 650)) : 1;
 function scenario(id, n, scen) {
   const l = build(id, picksBefore(n));
   const k = kit(id, l, scen);
   const hm = hpMult(n);
   // enemy hp: standard wave = (4 + 2n) bodies, capped crowd of 14 alive; elite-heavy = 45% elites (x2.2 hp);
   const bodies = Math.min(4 + 2 * n, 60);
-  const hp = scen === 'boss' ? 650 * (1 + 0.45 * (Math.floor(n / 10) - 1 + 1)) * hm / (1 + 0.14 * 9)
+  const hp = scen === 'boss' ? 650 * (1 + 0.45 * (Math.floor(n / 10) - 1 + 1)) * hm / (1 + 0.14 * 9) * Z_BOSS
     : bodies * 32 * hm * (scen === 'elite' ? (0.55 + 0.45 * 2.2) * 0.75 : 1);
   const clearTime = hp / (scen === 'boss' ? k.dpsST : k.dpsClear);
   const incoming = SCEN[scen].incoming * dmgMult(n) * k.exposure * (1 - k.avoid) / (k.mobility ** 0.5);

@@ -7,6 +7,7 @@
 //   ORIN    chaining arc tether/ Magnet Grapple (yank / pull) / Hymn Engine (vortex + drones)
 // Also: core recharge (regen), weapon tier + upgrade cards (upgrades.js), power-ups (powerups.js).
 import * as THREE from 'three';
+import { RULES } from './rules.js';
 import { Loadout, tierColor } from './upgrades.js';
 import { CHARACTERS } from './characters.js';
 
@@ -106,6 +107,7 @@ export class Player {
     this.scene.remove(this.model.root);
     this.char = c;
     this.tint = tint;
+    this.skinGlow = null;
     this.model = c.build(tint);
     this.scene.add(this.model.root);
     this.attachExtras();
@@ -113,6 +115,23 @@ export class Player {
     this.bladeColor = null;
     this.currentFlash = null;
     this.reset();
+  }
+
+  // Swap the look without touching health/position (ARENA SKINS between arenas). glow = core colour
+  reskin(tint = null, glow = null) {
+    if (tint === this.tint && glow === this.skinGlow) return false;
+    const pos = this.model.root.position.clone(), rot = this.model.root.rotation.y;
+    this.scene.remove(this.model.root);
+    this.tint = tint; this.skinGlow = glow;
+    this.model = this.char.build(tint);
+    if (glow !== null && this.model.core) this.model.core.material.color.setHex(glow);
+    this.model.root.position.copy(pos); this.model.root.rotation.y = rot;
+    this.scene.add(this.model.root);
+    this.attachExtras();
+    this.bladeColor = null;
+    this.currentFlash = null;
+    this.applyLoadout?.();
+    return true;
   }
 
   get name() { return this.char.name; }
@@ -209,8 +228,16 @@ export class Player {
     // Mobility and ultimate can interrupt normal movement or attacks
     const aim = moving ? dir.clone().normalize() : this.facingDir;
     // (presses are remembered for a moment, so an ultimate pressed mid-dash still comes out)
+    // CoreBurnZ: pressing the ultimate again, or any attack / ability, cancels a running ultimate
+    if (RULES.z && this.state === 'spin' && this.stateTime > 0.12 &&
+        (input.wasPressed('spin') || input.wasPressed('attack') || input.wasPressed('dash'))) {
+      this.endUlt();
+      this.ultCancelled = true;
+      if (!input.wasPressed('attack')) this.attackBuffer = 0; // a held attack doesn't fire on its own
+    }
     if (input.wasPressed('dash')) this.mobBuffer = 0.2;
-    if (input.wasPressed('spin')) this.ultBuffer = 0.35;
+    if (input.wasPressed('spin') && !this.ultCancelled) this.ultBuffer = 0.35;
+    this.ultCancelled = false;
     this.mobBuffer -= dt; this.ultBuffer -= dt;
     if (this.mobBuffer > 0 && this.dashCharges > 0 && (this.state === 'normal' || this.state === 'attack')) {
       this.mobBuffer = 0;
@@ -381,9 +408,15 @@ export class Player {
     }
   }
 
+  // the ultimate is over (or cancelled in CoreBurnZ): back to normal, tidy the visuals
+  endUlt() {
+    this.state = 'normal'; this.stateTime = 0; this.spinRing.visible = false;
+    this.model.body.rotation.y = 0; this.model.root.position.y = 0; this.model.body.position.y = 0;
+  }
+
   ultUpdate(dt, dir, moving, walk) {
     const c = this.char, s = this.stats;
-    const end = () => { this.state = 'normal'; this.spinRing.visible = false; this.model.body.rotation.y = 0; this.model.root.position.y = 0; };
+    const end = () => this.endUlt();
     switch (this.kit) {
       case 'zaleks': // a short hop, then the slam lands
         if (!this.ultDone && this.stateTime >= 0.4) { this.ultDone = true; this.seismicSlam(); }
@@ -773,6 +806,7 @@ export class Player {
     if (this.world.netClient) return; // co-op client: the host decides all damage
     const s = this.stats;
     let dmg = base * s.dmg * this.char.dmg * this.damageMult;
+    if (e.isBoss && s.bossDmg > 1) dmg *= s.bossDmg; // CoreBurnZ: Bossfang relic
     const crit = kind !== 'trail' && Math.random() < s.crit;
     if (crit) {
       dmg *= 1.8;

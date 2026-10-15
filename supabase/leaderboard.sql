@@ -41,6 +41,7 @@ create or replace function public.submit_score(
 language plpgsql security definer set search_path = public as $$
 declare
   b text;
+  nb text; -- the board without its CoreBurnZ "z:" prefix
   bosses int;
   boss_waves int;
   max_score numeric;
@@ -57,11 +58,12 @@ begin
   if last_at is not null and now() - last_at < interval '15 seconds' then return 'slow down'; end if;
 
   foreach b in array p_boards loop
-    if b !~ '^(global|hero:(sarrow|zaleks|iskra|orin)|daily:\d{4}-\d{2}-\d{2}|rush:\d{4}-W\d{2})$' then return 'bad board'; end if;
-    if b like 'hero:%' and b <> 'hero:' || p_hero then return 'bad board'; end if;
-    if b like 'daily:%' and abs(substr(b, 7)::date - today) > 1 then return 'daily closed'; end if;
-    if b like 'rush:%' then
-      if b <> 'rush:' || to_char(now() at time zone 'utc', 'IYYY-"W"IW') then return 'week closed'; end if;
+    if b !~ '^(z:)?(global|hero:(sarrow|zaleks|iskra|orin)|daily:\d{4}-\d{2}-\d{2}|rush:\d{4}-W\d{2})$' then return 'bad board'; end if; -- z: = CoreBurnZ boards
+    nb := regexp_replace(b, '^z:', '');
+    if nb like 'hero:%' and nb <> 'hero:' || p_hero then return 'bad board'; end if;
+    if nb like 'daily:%' and abs(substr(nb, 7)::date - today) > 1 then return 'daily closed'; end if;
+    if nb like 'rush:%' then
+      if nb <> 'rush:' || to_char(now() at time zone 'utc', 'IYYY-"W"IW') then return 'week closed'; end if;
       bosses := floor((p_score + 999999) / 1000000.0);
       if bosses < 0 or bosses > 7 or p_seconds < bosses * 12 then return 'implausible'; end if;
     else

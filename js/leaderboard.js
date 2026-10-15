@@ -1,6 +1,7 @@
 // leaderboard.js
 // Leaderboards: GLOBAL (best score, any hero), per HERO, DAILY challenge (per UTC day) and the
-// WEEKLY BOSS RUSH. Boards are named 'global', 'hero:sarrow', 'daily:2026-10-14', 'rush:2026-W42'.
+// WEEKLY BOSS RUSH. Boards are named 'global', 'hero:sarrow', 'daily:2026-10-14', 'rush:2026-W42'
+// (CoreBurnZ: the same names with a 'z:' prefix, e.g. 'z:global').
 //
 //  * Always: a local board on this device (your own best runs).
 //  * When LEADERBOARD_CONFIG is filled in: online boards on a free Supabase project. Scores go
@@ -22,6 +23,7 @@ export const online = !!(CFG.enabled && CFG.supabaseUrl && CFG.supabaseAnonKey);
 
 // The same rules the server uses (kept in step with supabase/leaderboard.sql)
 export function plausible(e) {
+  e = { ...e, board: e.board.replace(/^z:/, '') }; // CoreBurnZ boards follow the same rules
   if (e.board.startsWith('rush:')) {
     const bosses = Math.floor((e.score + 999999) / 1e6);
     return bosses >= 0 && bosses <= 7 && e.seconds >= bosses * 12;
@@ -52,9 +54,10 @@ export class Leaderboard {
 
   // run = { mode: 'endless'|'daily'|'rush', hero, score, wave, kills, seconds, day, week, tainted }
   boardsFor(run) {
-    if (run.mode === 'daily') return ['daily:' + run.day];
-    if (run.mode === 'rush') return ['rush:' + run.week];
-    return ['global', 'hero:' + run.hero];
+    const z = run.z ? 'z:' : ''; // CoreBurnZ runs have their own boards ('z:global', 'z:daily:...')
+    if (run.mode === 'daily') return [z + 'daily:' + run.day];
+    if (run.mode === 'rush') return [z + 'rush:' + run.week];
+    return [z + 'global', z + 'hero:' + run.hero];
   }
 
   // Save locally, then (if set up) online. Returns { local: [{ board, rank }], online: 'ok'|'off'|error }
@@ -79,7 +82,7 @@ export class Leaderboard {
     list.sort((a, b) => b.score - a.score);
     list.length = Math.min(list.length, 10);
     // keep only recent daily/rush boards (last 14) so storage stays tiny
-    const dated = Object.keys(this.local).filter((k) => /^(daily|rush):/.test(k)).sort();
+    const dated = Object.keys(this.local).filter((k) => /^(z:)?(daily|rush):/.test(k)).sort();
     while (dated.length > 14) delete this.local[dated.shift()];
     localStorage.setItem(LOCAL_KEY, JSON.stringify(this.local));
     const rank = list.indexOf(entry);

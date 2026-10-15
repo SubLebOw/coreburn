@@ -113,6 +113,7 @@
       <div id="tw-vote" class="hidden"></div>
       <div id="upgrade-cards"></div>
       <div id="upgrade-hint" class="kb-only">Press 1, 2 or 3 · or click a card</div>
+      <button id="sel-cos-btn" class="link-btn sel-only">&#127890; Cosmetics &amp; arena skins</button>
     </div>
   </div>
 
@@ -134,6 +135,8 @@
         <div id="cp-roomcode">----</div>
         <div class="cp-tip">Friends tap CO-OP, then JOIN and enter this code</div>
         <div id="cp-roster"></div>
+        <div class="cp-codelabel">RULES (host picks)</div>
+        <div id="cp-rules" class="rules-row"><button data-z="0">CLASSIC</button><button data-z="1">COREBURNZ</button></div>
         <div class="cp-codelabel">YOUR HERO</div>
         <div id="cp-heroes"></div>
         <button id="cp-start" class="big-btn">START</button>
@@ -157,6 +160,19 @@
   </div>
 
   <!-- Unlock shop: skins, talon colours, starting perks (see meta.js / shop-ui.js) -->
+  <!-- Cosmetics: level-up unlocks per hero + arena skins (progress.js / cosmetics-ui.js) -->
+  <div id="cos-panel" class="hidden">
+    <div class="sp-box">
+      <div class="sp-head"><div class="cp-title">COSMETICS</div><div id="cos-level"></div></div>
+      <div id="cos-tabs" class="sp-tabs-row"></div>
+      <div id="cos-items"></div>
+      <div class="cp-codelabel">ARENA SKINS</div>
+      <div id="cos-skins"></div>
+      <div id="cos-skinmode" class="sp-tabs-row"></div>
+      <button id="cos-close" class="big-btn">DONE</button>
+    </div>
+  </div>
+
   <div id="shop-panel" class="hidden">
     <div class="sp-box">
       <div class="sp-head"><div class="cp-title">SHOP</div><div id="sp-scrap"></div></div>
@@ -185,6 +201,8 @@
     <div class="panel" id="title-panel">
       <h1>COREBURN</h1>
       <h2>Endless Arena Brawler</h2>
+      <div id="rules-row" class="rules-row"><button data-z="0">CLASSIC<small>the original game</small></button><button data-z="1">COREBURNZ<small>remix: 12 bosses, relics</small></button></div>
+      <div id="rules-desc" class="small"></div>
       <p class="logline">The Grindchoir melts down anything with a pulse to feed its machine hymn. Sarrow, a scavenger
         with a stolen reactor core burning in his chest, has decided the song ends here.</p>
       <ul class="kb-only">
@@ -209,6 +227,8 @@
         <button id="ranks-btn" class="mode-btn">RANKS<small>leaderboards</small></button>
       </div>
       <button id="shop-btn" class="big-btn shop">SHOP <small id="shop-scrap">0 scrap</small></button>
+      <button id="cos-btn" class="big-btn cos">COSMETICS <small id="cos-sub">level 1</small></button>
+      <div id="lvl-bar"><span id="lvl-text">LEVEL 1</span><i><b id="lvl-fill"></b></i></div>
       <div class="best" id="best-text"></div>
       <div class="footer-links">
         <a href="https://sublebow.github.io/coreburn/privacy.html" target="_blank" rel="noopener">Privacy policy</a>
@@ -224,6 +244,7 @@
       <div id="gameover-score"></div>
       <p id="gameover-stats"></p>
       <div id="gameover-scrap" class="hidden"></div>
+      <div id="gameover-xp" class="hidden"></div>
       <div id="lb-result" class="hidden"></div>
       <div id="lb-name-row" class="hidden"><span>Name for leaderboards:</span><input id="lb-name" maxlength="16" autocomplete="off" spellcheck="false" placeholder="your name"><button id="lb-name-save" class="share-btn">SAVE</button><small id="lb-name-msg"></small></div>
       <div class="share-row">

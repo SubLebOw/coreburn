@@ -36,6 +36,11 @@ import { BOSS_ROTATION } from './bosses.js';
 import { Leaderboard } from './leaderboard.js';
 import { UPGRADES } from './upgrades.js';
 import { RanksUI } from './ranks-ui.js';
+import { RULES, setRules } from './rules.js';
+import { rotation } from './bosses.js';
+import { progress, xpForRun, ARENA_SKINS } from './progress.js';
+import { Wardrobe } from './cosmetics.js';
+import { CosmeticsUI } from './cosmetics-ui.js';
 
 const IS_TOUCH = isTouchDevice();
 if (IS_TOUCH) document.body.classList.add('touch'); // shows the touch controls (see style.css)
@@ -99,7 +104,11 @@ let mode = 'endless', modeKey = '', runTime = 0;
 const leaderboard = new Leaderboard();
 let closeCall = 0, closeCallCd = 0; // CLOSE CALL slow-mo (real seconds) and its cooldown
 const bursts = [];                  // VOLATILE mutator: { pos, t }
-const best = JSON.parse(localStorage.getItem('coreburn-best') || '{"score":0,"wave":0}');
+// best score: classic and CoreBurnZ are kept apart
+const bestKey = () => (RULES.z ? 'coreburn-best-z' : 'coreburn-best');
+let best = JSON.parse(localStorage.getItem(bestKey()) || '{"score":0,"wave":0}');
+const reloadBest = () => { best = JSON.parse(localStorage.getItem(bestKey()) || '{"score":0,"wave":0}'); };
+const seed = () => (RULES.z ? 'z:' : '') + modeKey; // daily seeds differ per rule set
 
 // "world" is a shared object that the player and enemies use to reach each other
 // and to trigger effects, without needing to know about main.js.
@@ -187,6 +196,7 @@ const world = {
     sound.play('bossDefeated');
     sound.setIntensity(1);
     powerups.onKill(boss);
+    if (RULES.z) { bossPicks++; if (upgradeTimer <= 0) upgradeTimer = 1.6; } // CoreBurnZ: a gold boss relic pick
   },
   // One of the Forge Twins fell; the other one gets angry
   onTwinDown(fallen, survivor) {
@@ -203,12 +213,12 @@ const world = {
   onWaveCleared(n) {
     if (mode === 'rush') { // BOSS RUSH: a pick after every boss; after the 7th, you've won
       if (n / 5 >= RUSH_BOSSES) { world.runOver = true; rushWon = true; deathTimer = 0; setTimeout(() => { if (state === 'playing') gameOver(); }, 1600); }
-      else upgradeTimer = 1.3;
+      else { upgradeTimer = Math.max(upgradeTimer, 1.3); normalPick = true; }
       return;
     }
     if (enemies.mutator) { run.mutators++; meta.data.stats.mutators++; hud.setMutator(null); }
     milestones();
-    if (isPickWave(n)) upgradeTimer = 1.3; // every 2nd wave: pause for the upgrade picker (after the banner lands)
+    if (isPickWave(n)) { upgradeTimer = Math.max(upgradeTimer, 1.3); normalPick = true; } // every 2nd wave: pause for the upgrade picker (after the banner lands)
     const bonus = 25 * n * combo.mult;
     score += bonus;
     if (!isBossWave(n)) {
@@ -218,13 +228,13 @@ const world = {
   },
   mutatorFor(n) {
     if (!isMutatorWave(n)) return null;
-    const id = world.forceMutator || rollMutator(mode === 'daily' ? rngFor(`daily:${modeKey}:mut:${n}`) : Math.random);
+    const id = world.forceMutator || rollMutator(mode === 'daily' ? rngFor(`daily:${seed()}:mut:${n}`) : Math.random);
     return { id, ...MUTATORS[id] };
   },
   onMilestoneStat(key) { meta.data.stats[key]++; milestones(); },
   goldenRoll() { return mode === 'endless' && (world.forceGolden || Math.random() < 1 / 20); }, // never in ranked modes
-  waveRng(n) { return mode === 'daily' ? rngFor(`daily:${modeKey}:wave:${n}`) : null; },
-  rushEntry(k) { return mode === 'rush' ? { entry: BOSS_ROTATION[rushOrder(modeKey)[k - 1]], tier: 0 } : null; },
+  waveRng(n) { return mode === 'daily' ? rngFor(`daily:${seed()}:wave:${n}`) : null; },
+  rushEntry(k) { return mode === 'rush' ? { entry: rotation()[rushOrder(modeKey, RULES.z ? 12 : 7)[k - 1]], tier: 0 } : null; },
   waveStep: 1,
   runOver: false,
   // a bolt just whizzed past (projectiles.js): CLOSE CALL slow-mo, solo only, with a cooldown
@@ -242,6 +252,15 @@ const world = {
   },
 };
 const player = new Player(scene, world);
+// COSMETICS (level-up unlocks) + ARENA SKINS on the local hero
+const wardrobe = new Wardrobe(scene, progress);
+function applyLook() {
+  const skin = coop.mode ? null : progress.arenaSkinFor(player.char.id, arena.current.index, RULES.z);
+  const tint = skin ? skin.tint : (coop.mode ? player.tint : meta.skinColor);
+  player.reskin(tint ?? null, skin ? skin.glow : null);
+  wardrobe.dress(player);
+}
+world.applyLook = () => applyLook();
 projectiles.onNearMiss = (h) => world.onNearMiss(h);
 const enemies = new WaveManager(scene, world);
 const powerups = new PowerUps(scene, world);
@@ -263,13 +282,17 @@ function setSlowmo(on) {
 
 // Upgrade picker: pause, show 3 cards, apply the pick (weapon tier +1 and the card's perk)
 let hostPicking = false;
+let bossPicks = 0, normalPick = false; // CoreBurnZ: boss relic picks waiting (they come first)
 function openUpgradePicker() {
+  const boss = bossPicks > 0;
+  if (!boss && !normalPick && RULES.z) return; // nothing left to pick
+  if (boss) bossPicks--; else normalPick = false;
   state = 'upgrade';
   const loadout = player.loadout;
-  if (coop.mode === 'host') coop.beginPicks(); // every friend picks their own card too
+  if (coop.mode === 'host') coop.beginPicks(boss); // every friend picks their own card too
   hostPicking = true;
-  const cardRng = mode === 'daily' ? rngFor(`daily:${modeKey}:cards:${loadout.tier}`) : Math.random;
-  const hand = loadout.maybeCurse(loadout.roll(3, cardRng), enemies.wave, cardRng);
+  const cardRng = mode === 'daily' ? rngFor(`daily:${seed()}:${boss ? 'boss' : 'cards'}:${loadout.tier}:${bossPicks}`) : Math.random;
+  const hand = boss ? loadout.rollBoss(3, cardRng) : loadout.maybeCurse(loadout.roll(3, cardRng), enemies.wave, cardRng);
   const picker = hud.showPicker(hand, loadout, (id) => {
     twitch.endVote();
     hostPicking = false;
@@ -277,14 +300,16 @@ function openUpgradePicker() {
     if (mode === 'rush') { loadout.tier = Math.max(loadout.tier, rushTierBefore(enemies.wave / 5 + 1)); loadout.recompute(); } // matched to a normal run
     player.applyLoadout();
     if (id === 'patch') player.heal(player.maxHp * 0.35);
+    if (id === 'bHeart') player.heal(player.maxHp);
     const def = loadout.def(id);
-    hud.showToast(`TIER ${loadout.tier} TALONS`, def.group === 'cursed' ? `CURSED: ${def.name}` : `${def.name}${id === 'patch' ? '' : ' Lv ' + loadout.level(id)}`, '#' + def.color.toString(16).padStart(6, '0'));
+    hud.showToast(boss ? 'BOSS RELIC' : `TIER ${loadout.tier} TALONS`, def.group === 'cursed' ? `CURSED: ${def.name}` : `${def.name}${id === 'patch' ? '' : ' Lv ' + loadout.level(id)}`, '#' + def.color.toString(16).padStart(6, '0'));
     world.effects.spawnRing(player.position, player.tierColor, 3, 0.5);
     sound.play('powerup');
     state = 'playing';
     milestones();
     if (coop.mode === 'host' && coop.picksPending) { state = 'upgrade'; coop.checkPicksDone(); }
-  });
+    if (bossPicks > 0 || normalPick) upgradeTimer = 0.45; // the next pick (boss relic, then the normal one)
+  }, boss);
   twitch.startVote(hand.length, (i) => picker.pickIndex(i)); // Streamer Mode: chat votes !1 !2 !3
 }
 
@@ -295,6 +320,7 @@ function updateTransition(dt) {
   if (!transition.swapped && transition.t >= half) {
     transition.swapped = true;
     arena.setTheme(transition.index, transition.loop);
+    applyLook(); // ARENA SKINS follow the arena
     player.position.set(0, 0, 0); // the middle of every arena is clear
     player.slide.set(0, 0, 0);
     if (coop.mode === 'host') coop.teleportAll();
@@ -339,7 +365,7 @@ function startGame(id = heroId) {
   const solo = !coop.mode;
   player.talonBase = solo ? meta.talonColor : null;
   player.startCard = solo && mode === 'endless' ? meta.perkCard : null; // shop perks: normal runs only (fair boards)
-  if (mode === 'daily') player.startCard = dailyStartCard(modeKey, Object.keys(UPGRADES).filter((u) => UPGRADES[u].max > 1 && !UPGRADES[u].heroes)); // same for everyone
+  if (mode === 'daily') player.startCard = dailyStartCard(seed(), Object.keys(UPGRADES).filter((u) => UPGRADES[u].max > 1 && !UPGRADES[u].heroes)); // same for everyone
   player.setCharacter(id, solo ? meta.skinColor : null);
   if (coop.mode === 'host') coop.setupHostGame(); // friends' heroes + co-op scaling (before wave 1)
   hud.setHeroName(player.netName ? player.netName.toUpperCase() : player.char.name, player.tint || player.char.color);
@@ -354,13 +380,14 @@ function startGame(id = heroId) {
   player.reset();
   powerups.reset();
   hud.hidePicker();
-  upgradeTimer = 0;
+  upgradeTimer = 0; bossPicks = 0; normalPick = false;
   transition = null;
   fadeEl.style.opacity = 0;
   timeScale = 1;
   setSlowmo(false);
   const cur = arena.current;
   if (cur.index !== 0 || cur.loop !== 0) arena.setTheme(0, 0); // back to the Slag Yard
+  applyLook();
   hud.hideOverlay();
   state = 'playing';
   revivedThisRun = false;
@@ -369,7 +396,7 @@ function startGame(id = heroId) {
   closeCall = 0; closeCallCd = 0; bursts.length = 0;
   document.body.classList.remove('closecall');
   hud.setMutator(null);
-  hud.setModeTag(mode === 'daily' ? `DAILY ${modeKey}` : mode === 'rush' ? `BOSS RUSH ${modeKey}` : '');
+  hud.setModeTag((RULES.z ? 'COREBURNZ ' : '') + (mode === 'daily' ? `DAILY ${modeKey}` : mode === 'rush' ? `BOSS RUSH ${modeKey}` : ''));
   if (mode === 'rush') { player.loadout.tier = rushTierBefore(1); player.loadout.version++; player.loadout.recompute(); player.applyLoadout(); player.hp = player.maxHp; }
   enemies.startWave(mode === 'rush' ? 5 : 1);
 }
@@ -389,11 +416,12 @@ function resetWorld() {
   setSlowmo(false);
   const cur = arena.current;
   if (cur.index !== 0 || cur.loop !== 0) arena.setTheme(0, 0);
+  bossPicks = 0; normalPick = false;
   if (player.dead) player.revive();
   player.position.set(0, 0, 0);
 }
 function startClientGame(char, tint, name = char) {
-  mode = 'endless'; world.waveStep = 1; world.runOver = false; hud.setModeTag('');
+  mode = 'endless'; world.waveStep = 1; world.runOver = false; hud.setModeTag(RULES.z ? 'COREBURNZ' : '');
   resetWorld();
   kills = 0;
   score = 0;
@@ -403,6 +431,7 @@ function startClientGame(char, tint, name = char) {
   player.startCard = null;
   run = { bosses: 0, mutators: 0, jackpot: 0, awarded: 0, drops: [] };
   player.setCharacter(char, tint);
+  wardrobe.dress(player);
   hud.setHeroName(name.toUpperCase(), tint || player.char.color);
   hud.hideOverlay();
   state = 'playing';
@@ -410,6 +439,8 @@ function startClientGame(char, tint, name = char) {
 const RESTART_HINT = document.getElementById('restart-hint').innerHTML;
 function showTitle() {
   state = 'title';
+  if (!coop.mode) { setRules(localStorage.getItem('coreburn-rules') === 'z'); onRulesChanged(); } // back to your own pick after co-op
+  cosmeticsUI.refreshBadge();
   hud.showTitle(best);
   document.getElementById('restart-btn').classList.remove('hidden');
   document.getElementById('restart-hint').innerHTML = RESTART_HINT;
@@ -428,7 +459,8 @@ const coop = new Coop({
   snapCamera: () => updateCamera(0, true),
   flashFade: () => { fadeEl.style.transition = 'none'; fadeEl.style.opacity = 0.8; requestAnimationFrame(() => { fadeEl.style.transition = 'opacity .5s'; fadeEl.style.opacity = 0; }); },
   getRun: () => ({ wave: Math.max(1, enemies.wave), score, kills }),
-  setLastRun: (r) => { lastRun = r; if (coop.mode === 'client') { run.awarded = 0; awardScrap({ ...r, greed: false }); } },
+  setLastRun: (r) => { lastRun = r; if (coop.mode === 'client') { run.awarded = 0; awardScrap({ ...r, greed: false }); awardXp({ wave: r.wave, kills: r.kills || 0, bosses: r.bosses || 0 }); } },
+  onRulesChanged: () => world.onRulesChanged?.(),
 });
 world.coop = coop;
 
@@ -469,17 +501,30 @@ function showNextMilestone() {
   setTimeout(showNextMilestone, 2600);
 }
 
+// ACCOUNT XP: every run in any mode; level-ups unlock cosmetics (shown on the game over screen)
+function awardXp(r = { wave: enemies.wave, kills, bosses: run.bosses }) {
+  if (run.xpDone) return;
+  run.xpDone = true;
+  const res = progress.addXp(xpForRun({ ...r, z: RULES.z, coop: !!coop.mode }));
+  if (res.scrap) meta.addScrap(res.scrap);
+  hud.showXp(res, progress);
+  cosmeticsUI.refreshBadge();
+}
+world.awardXp = awardXp;
+
 // Leaderboards: local always, online once set up (see leaderboard-config.js)
 async function submitRun() {
   const r = mode === 'rush'
     ? { mode, hero: player.char.id, score: rushScore(run.bosses, runTime), wave: enemies.wave, kills, seconds: runTime, week: modeKey }
     : { mode, hero: player.char.id, score, wave: enemies.wave, kills, seconds: runTime, day: modeKey };
-  r.tainted = LOCAL_DEV; // never submit online from a local test build
+  r.tainted = LOCAL_DEV;
+  r.z = RULES.z; // CoreBurnZ boards are separate // never submit online from a local test build
   if (mode === 'daily') { meta.data.stats.dailies++; } else if (mode === 'rush') { meta.data.stats.rushes++; if (rushWon) meta.data.stats.rushClears = (meta.data.stats.rushClears || 0) + 1; }
   milestones();
   pendingRun = r;
   const res = await leaderboard.submit(r);
   hud.showRanks(res, r, leaderboard.name, mode === 'rush' ? rushLabel : null);
+  hud.showXpAgain?.();
 }
 let pendingRun = null;
 
@@ -506,7 +551,7 @@ function gameOver() {
   if (newBest) {
     best.score = score;
     best.wave = enemies.wave;
-    localStorage.setItem('coreburn-best', JSON.stringify(best));
+    localStorage.setItem(bestKey(), JSON.stringify(best));
   }
   const lastDown = coop.mode === 'host' ? coop.heroes.reduce((a, h) => (h.killedBy ? h : a), player) : player;
   const killer = lastDown.killedBy ? lastDown.killedBy.killerName : null; // e.g. "the Furnace Deacon"
@@ -529,6 +574,7 @@ function gameOver() {
   if (coop.mode === 'host') coop.onGameOver(lastRun);
   reviveBtn.classList.toggle('hidden', !reviveOffered);
   awardScrap(lastRun);
+  awardXp();
   if (!coop.mode) submitRun();
   doubleBtn.classList.toggle('hidden', !(ads.canRevive && run.lastGain > 0)); // rewarded ad: double it (app only)
   document.getElementById('restart-hint').classList.toggle('hidden', reviveOffered);
@@ -664,6 +710,45 @@ const saveName = async (e) => {
 document.getElementById('lb-name-save').addEventListener('click', saveName);
 nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveName(e); });
 
+// COSMETICS screen (title + hero select)
+const cosmeticsUI = new CosmeticsUI(progress, {
+  onClose: () => { if (state === 'select') showCharacterSelect(); },
+  onChange: () => { if (state !== 'playing') applyLook(); },
+});
+for (const id of ['cos-btn', 'sel-cos-btn']) {
+  const el = document.getElementById(id);
+  el.addEventListener('pointerdown', (e) => e.stopPropagation());
+  el.addEventListener('click', (e) => { e.stopPropagation(); if (state === 'title' || state === 'select') cosmeticsUI.open(state === 'select' ? heroId : player.char.id); });
+}
+
+// RULES: CLASSIC (the original game, the default) or COREBURNZ (the remix). Saved; leaderboards,
+// best score and the daily are kept apart per rule set.
+const RULES_DESC = {
+  0: 'The original COREBURN, unchanged.',
+  1: 'Cancel your ultimate any time · owned cards come up more · Ultimate Coolant -10% · longer ARC chains · a gold BOSS RELIC after every boss · bosses +10% health · 5 new bosses',
+};
+function onRulesChanged() {
+  reloadBest();
+  for (const b of document.querySelectorAll('#rules-row button')) b.classList.toggle('on', (b.dataset.z === '1') === RULES.z);
+  document.getElementById('rules-desc').textContent = RULES_DESC[RULES.z ? 1 : 0];
+  document.querySelector('#title-panel .small:not(#rules-desc)')?.replaceChildren(document.createTextNode(RULES.z
+    ? 'CoreBurnZ: endless waves · 12 bosses · boss relics · a new arena every 10 waves · how far can you go?'
+    : 'Endless waves · 7 bosses · power-ups · a new arena every 10 waves · how far can you go?'));
+  if (state === 'title') hud.showTitle(best);
+  ranks.isOpen && ranks.render?.();
+}
+world.onRulesChanged = onRulesChanged;
+for (const b of document.querySelectorAll('#rules-row button')) {
+  b.addEventListener('pointerdown', (e) => e.stopPropagation());
+  b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (state !== 'title') return;
+    setRules(b.dataset.z === '1');
+    localStorage.setItem('coreburn-rules', RULES.z ? 'z' : 'classic');
+    onRulesChanged();
+  });
+}
+
 // The unlock shop (title screen)
 const shop = new ShopUI(meta, SHOP, { onClose: (fromGameOver) => { if (!fromGameOver) hud.showTitle(best); } });
 hud.refreshScrap = () => shop.refreshTitle();
@@ -698,6 +783,8 @@ document.getElementById('go-menu-btn').addEventListener('click', (e) => {
 });
 document.getElementById('start-btn').addEventListener('click', showCharacterSelect);
 document.getElementById('restart-btn').addEventListener('click', tryRestart);
+setRules(localStorage.getItem('coreburn-rules') === 'z');
+onRulesChanged();
 hud.showTitle(best);
 document.getElementById('version-text').textContent = `v${GAME_VERSION}`;
 
@@ -780,6 +867,7 @@ updateCamera(0, true);
 
 function frame() {
   requestAnimationFrame(frame);
+  wardrobe.update(Math.min(0.05, 1 / 60));
   let dt = Math.min(clock.getDelta(), 1 / 20); // avoid huge jumps if the tab was in the background
 
   // hitstop: freeze the action for a split second on big hits

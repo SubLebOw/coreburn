@@ -358,3 +358,24 @@ Title screen → **Streamer mode** → channel (default **CalebGCameron**) → *
 - **BOSS RUSH** (weekly): all 7 bosses back to back, in an order that reshuffles every Monday 00:00 UTC. An upgrade pick after each boss, with weapon tiers matched to a normal run. Ranked by bosses beaten, then fastest time.
 - **RANKS**: GLOBAL, per HERO, DAILY and BOSS RUSH boards. Name entry has a profanity filter (also catches l33t and s.p.a.c.i.n.g). Anti-cheat sanity checks run in the game AND on the server: a score must fit what the kills/waves/time could earn, waves need a minimum time, rush bosses need at least 12 s each, daily/weekly boards only take today's / this week's runs, max one submission per 15 s, and builds run on localhost never submit.
 - **Online leaderboards are OFF until a free Supabase project is connected** (until then, the boards show your best runs on this device). Setup (about 5 minutes, free tier, no card): create a project at supabase.com, run `supabase/leaderboard.sql` in its SQL Editor, then put the Project URL and the *anon public* key into `js/leaderboard-config.js` and set `enabled: true`. Free Supabase projects pause after a week with no traffic; un-pause them from the dashboard.
+
+## CoreBurnZ mode (v1.12.0)
+Classic is the default and is unchanged. Pick **COREBURNZ** under the title (the co-op host picks it in the lobby). In CoreBurnZ:
+- **Ultimate cancel**: press the ultimate again, or any attack or ability, to end it early (same buttons on phone).
+- Cards you already own come up about **1.5x** as often.
+- Ultimate-cooldown cards give **-10%** per pick (classic: -5%).
+- The ARC chain-lightning power-up reaches **50%** further.
+- Every boss kill gives a gold **BOSS RELIC** pick from its own rarer pool: Titan Heart, Cinder Crown, Bossfang, Echo Engine, Grind Aegis, Tempest Heart, Choirless Soles, Deacon's Tithe.
+- Bosses have **+10% HP**, and five new Grindchoir bosses join a 12-boss rotation:
+  - **Sister Klaxon**: a ring of bolts with a moving gap, a shriek cone that knocks you back, charges and summons.
+  - **The Bellows Abbot**: breathes in to pull you close, then blasts out a shockwave. Also slow gusts and slams.
+  - **Saint Gravelmouth**: rockfall in two waves of warning circles, a gravel-spit stream and rolling triple charges.
+  - **The Tithe-Warden**: marks follow your steps and explode, twin scale pans hit you and the mirrored spot, and it charges.
+  - **The Nail Chorus**: a three-arm nail spiral, lines of falling nails and bursts.
+- Leaderboards, best score, the daily seed and the weekly rush are kept separate for each mode (CoreBurnZ boards use a `z:` prefix).
+
+## Account level, cosmetics, arena skins
+- You earn XP in every mode: 10 per wave, 0.5 per kill and 60 per boss, with 10% extra in CoreBurnZ and in co-op. It is saved on the device (`coreburn-progress`). The game-over screen shows the XP you got and anything you unlocked.
+- Each level from 2 to 25 unlocks one cosmetic for a hero (hat, mask, cape, aura, trail, banner). Open them from **COSMETICS** on the menu or from hero select.
+- Arena skins: each of the 4 heroes has one skin per arena (20 in total). The setting has three options: on by default in CoreBurnZ, ALWAYS or OFF. Skins are solo-only, because co-op uses its own duplicate tints.
+- Balance: `node scripts/sim-ttk.mjs --z` models the tougher Z bosses.

@@ -18,6 +18,8 @@
 // Universal cards work for every hero; hero cards only show up for that hero (Loadout.hero).
 // This file has no Three.js in it, so tools (like the time-to-kill simulator) can import it too.
 
+import { RULES, Z_TUNING } from './rules.js';
+
 export const WEAPON_TIER_STEP = 0.28; // = 0.14 enemy health per wave x 2 waves per pick
 export const PICK_EVERY = 2;          // waves between upgrade picks
 export const isPickWave = (n) => n > 0 && n % PICK_EVERY === 0;
@@ -46,7 +48,7 @@ export const UPGRADES = {
   storm:    { name: 'Storm Core', group: 'attack', icon: 'ϟ', color: 0x8ab4ff, max: 6, desc: () => '+7.5% chance attacks chain lightning to 2 foes' },
   leech:    { name: 'Core Leech', group: 'attack', icon: '♥', color: 0x6aff7a, max: 6, desc: () => 'Heal +0.25 per attack hit (max 6/s)' },
   odDamage: { name: 'Ultimate Fury', group: 'ultimate', icon: '✺', color: 0xff5a2a, max: 6, desc: () => '+12.5% ultimate damage' },
-  odCool:   { name: 'Ultimate Coolant', group: 'ultimate', icon: '❄', color: 0x9ae4ff, max: 6, desc: () => '-5% ultimate cooldown' },
+  odCool:   { name: 'Ultimate Coolant', group: 'ultimate', icon: '❄', color: 0x9ae4ff, max: 6, desc: () => `-${RULES.z ? 10 : 5}% ultimate cooldown` },
   bkCool:   { name: 'Quick Recovery', group: 'mobility', icon: '⟳', color: 0x7affc8, max: 6, desc: () => '-6% mobility cooldown' },
   speed:    { name: 'Swift Step', group: 'core', icon: '»', color: 0xd0ff6a, max: 6, desc: () => '+3% move speed' },
   maxHp:    { name: 'Reinforced Core', group: 'core', icon: '⬢', color: 0x6aff9a, max: 8, desc: () => '+7.5% max health' },
@@ -87,8 +89,22 @@ export const UPGRADES = {
   oShell:   { name: 'Hymn Shell', heroes: O, group: 'ultimate', icon: '⬣', color: 0xff8a9a, max: 4, desc: () => 'Take -6% damage while your drones fly' },
   oVortex:  { name: 'Deep Vortex', heroes: O, group: 'ultimate', icon: '◉', color: 0xff5070, max: 5, desc: () => '+10% vortex radius and pull' },
 };
+// COREBURNZ BOSS CARDS: one gold pick after every boss kill (never in the normal pool). Rarer and
+// stronger; they don't raise the weapon tier (the normal picks keep the even scaling).
+export const BOSS_CARDS = {
+  bHeart:  { name: 'Titan Heart', icon: '❤', max: 2, desc: () => '+20% max health and a full heal' },
+  bCrown:  { name: 'Cinder Crown', icon: '♛', max: 2, desc: () => '+12% damage (everything)' },
+  bFang:   { name: 'Bossfang', icon: '⚔', max: 2, desc: () => '+25% damage to bosses' },
+  bEcho:   { name: 'Echo Engine', icon: '✺', max: 2, desc: () => '-12% ultimate cooldown, +15% ultimate damage' },
+  bAegis:  { name: 'Grind Aegis', icon: '⛉', max: 2, desc: () => 'Take 10% less damage' },
+  bTempest:{ name: 'Tempest Heart', icon: 'ϟ', max: 2, desc: () => '+12% chance attacks chain lightning' },
+  bSoles:  { name: 'Choirless Soles', icon: '»', max: 2, desc: () => '+6% move speed, -15% mobility cooldown' },
+  bTithe:  { name: "Deacon's Tithe", icon: '♥', max: 2, desc: () => 'Heal +0.5 per attack hit, +40% core recharge' },
+};
+for (const c of Object.values(BOSS_CARDS)) Object.assign(c, { group: 'boss', boss: true, color: 0xffc23a });
+
 export const FALLBACK = { id: 'patch', name: 'Reactor Patch', group: 'core', icon: '⛨', color: 0xc8c8c8, max: Infinity, desc: () => '+3 max health and heal 35%' };
-export const GROUP_LABELS = { attack: 'ATTACK', mobility: 'MOBILITY', ultimate: 'ULTIMATE', core: 'CORE', cursed: 'CURSED' };
+export const GROUP_LABELS = { attack: 'ATTACK', mobility: 'MOBILITY', ultimate: 'ULTIMATE', core: 'CORE', cursed: 'CURSED', boss: 'BOSS RELIC' };
 export const cardForHero = (id, hero) => { const u = UPGRADES[id]; return !!u && (!u.heroes || !hero || u.heroes.includes(hero)); };
 // The card's group label, using the hero's own ability names (e.g. "PHASE HOP" for Iskra)
 export function groupLabel(group, kit) {
@@ -121,15 +137,31 @@ export class Loadout {
   }
 
   level(id) { return id === 'patch' ? this.patches : (this.levels[id] || 0); }
-  def(id) { return id === 'patch' ? FALLBACK : (UPGRADES[id] || CURSES[id]); }
+  def(id) { return id === 'patch' ? FALLBACK : (UPGRADES[id] || CURSES[id] || BOSS_CARDS[id]); }
   static isCurse(id) { return !!CURSES[id]; }
 
   // 3 different random cards that aren't maxed yet (Reactor Patch fills any gaps)
   roll(count = 3, rng = Math.random) {
     const open = Object.keys(UPGRADES).filter((id) => cardForHero(id, this.hero) && this.level(id) < UPGRADES[id].max);
     const hand = [];
-    while (hand.length < count && open.length) hand.push(open.splice(Math.floor(rng() * open.length), 1)[0]);
+    // CoreBurnZ: cards you already own are a bit more likely (weighted draw); classic = plain random
+    const w = (id) => (RULES.z && this.level(id) > 0 ? Z_TUNING.ownedWeight : 1);
+    while (hand.length < count && open.length) {
+      if (!RULES.z) { hand.push(open.splice(Math.floor(rng() * open.length), 1)[0]); continue; } // classic, unchanged
+      let r = rng() * open.reduce((t, id) => t + w(id), 0), i = 0;
+      while (i < open.length - 1 && (r -= w(open[i])) >= 0) i++;
+      hand.push(open.splice(i, 1)[0]);
+    }
     if (hand.length < count) hand.push('patch');
+    return hand;
+  }
+
+  // CoreBurnZ: the gold boss pick (3 different boss relics you haven't maxed)
+  rollBoss(count = 3, rng = Math.random) {
+    const open = Object.keys(BOSS_CARDS).filter((id) => this.level(id) < BOSS_CARDS[id].max);
+    const hand = [];
+    while (hand.length < count && open.length) hand.push(open.splice(Math.floor(rng() * open.length), 1)[0]);
+    if (!hand.length) hand.push('patch');
     return hand;
   }
 
@@ -143,7 +175,7 @@ export class Loadout {
   }
 
   apply(id) {
-    this.tier++;
+    if (!BOSS_CARDS[id]) this.tier++; // boss relics don't raise the weapon tier
     if (id === 'patch') this.patches++;
     else this.levels[id] = Math.min(this.def(id).max, this.level(id) + 1);
     this.version++;
@@ -167,7 +199,7 @@ export class Loadout {
       spinRadius: 1 + 0.06 * L('odRadius'),
       spinDmg: 1 + 0.125 * L('odDamage'),
       spinLeech: 0.5 * L('odLeech'),
-      spinCd: 1 - 0.05 * L('odCool'),
+      spinCd: 1 - (RULES.z ? Z_TUNING.ultCoolStep : 0.05) * L('odCool'),
       dashDmg: 1 + 0.25 * L('bkDamage'),
       dashTime: 1 + 0.075 * L('bkRange'),
       dashCharges: 1 + L('bkCharge') + L('iHop'),
@@ -197,6 +229,15 @@ export class Loadout {
     if (L('heavy')) { s.dmg *= 1.35; s.speed *= 0.88; }
     if (L('glass')) s.crit += 0.2;
     if (L('overclock')) { s.dashCd *= 0.7; s.spinCd *= 0.7; }
+    // CoreBurnZ boss relics
+    s.bossDmg = 1 + 0.25 * L('bFang');
+    if (L('bHeart')) s.maxHpPct += 0.2 * L('bHeart');
+    if (L('bCrown')) s.dmg *= 1 + 0.12 * L('bCrown');
+    if (L('bEcho')) { s.spinCd *= 1 - 0.12 * L('bEcho'); s.spinDmg *= 1 + 0.15 * L('bEcho'); }
+    if (L('bAegis')) s.hurtMult *= 1 - 0.1 * L('bAegis');
+    s.storm += 0.12 * L('bTempest');
+    if (L('bSoles')) { s.speed *= 1 + 0.06 * L('bSoles'); s.dashCd *= 1 - 0.15 * L('bSoles'); }
+    s.leech += 0.5 * L('bTithe'); s.regen += 0.4 * L('bTithe');
   }
 
   // Expected single-target damage multiplier from perks alone (for balancing / the simulator)
@@ -209,6 +250,7 @@ export class Loadout {
   get picked() {
     const list = Object.keys(UPGRADES).filter((id) => this.level(id) > 0).map((id) => ({ id, ...UPGRADES[id], level: this.level(id) }));
     for (const id of Object.keys(CURSES)) if (this.level(id)) list.push({ id, ...CURSES[id], level: 1 });
+    for (const id of Object.keys(BOSS_CARDS)) if (this.level(id)) list.push({ id, ...BOSS_CARDS[id], level: this.level(id) });
     if (this.patches) list.push({ ...FALLBACK, level: this.patches });
     return list;
   }

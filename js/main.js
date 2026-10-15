@@ -42,6 +42,7 @@ import { progress, xpForRun, ARENA_SKINS, skinFor, variantById } from './progres
 import { Wardrobe } from './cosmetics.js';
 import { CosmeticsUI } from './cosmetics-ui.js';
 import { Shrine } from './shrine.js';
+import { getMastery } from './mastery.js';
 
 const IS_TOUCH = isTouchDevice();
 if (IS_TOUCH) document.body.classList.add('touch'); // shows the touch controls (see style.css)
@@ -420,6 +421,7 @@ function startGame(id = heroId) {
   allies.reset();
   enemies.reset();
   shrine.reset();
+  player.masteryNodes = RULES.z ? getMastery(id, progress.heroLevel(id)) : []; // CoreBurnZ hero mastery
   player.reset();
   powerups.reset();
   hud.hidePicker();
@@ -497,6 +499,7 @@ const coop = new Coop({
   getState: () => state,
   setState: (s) => { state = s; },
   hostPicking: () => hostPicking,
+  myMastery: (id) => (RULES.z ? getMastery(id, progress.heroLevel(id)) : []), // CoreBurnZ hero mastery (sent to the host)
   startGame,
   startClientGame,
   resetWorld,

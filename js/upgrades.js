@@ -292,6 +292,25 @@ export class Loadout {
     if (L('eHive')) { s.drones += 1; s.droneDmg *= 1.4; }
     s.halo = L('eHalo') ? 3 : 0;
     if (L('eLegion')) { s.cloneDmg += 0.15; s.cloneTime += 2; }
+    // CoreBurnZ hero masteries (mastery.js; ability changes read the flags in s.m)
+    const ms = RULES.z ? (this.mastery || []) : [], M = (id) => ms.includes(id);
+    s.m = {}; for (const id of ms) s.m[id] = 1;
+    if (M('sLong')) s.dashTime *= 1.2;
+    if (M('sKeen') || M('iSharp') || M('oOver') || M('nSharp')) s.dmg *= 1.06;
+    if (M('sDouble') || M('zDouble') || M('iExtra') || M('nDouble')) s.dashCharges += 1;
+    if (M('zPlate')) s.hurtMult *= 0.94;
+    if (M('zHeavy')) s.bashDmg *= 1.1;
+    if (M('zBastion')) s.shield *= 1.4;
+    if (M('zRampage')) { s.chargeDmg *= 1.3; s.chargeStun += 0.5; }
+    if (M('iFar')) s.hopDist *= 1.2;
+    if (M('iLord')) s.stormCount += 2;
+    if (M('oLong')) s.reach *= 1.15;
+    if (M('oBloom')) s.vortex *= 1.25;
+    if (M('oChoir')) s.drones += 1;
+    if (M('oShell')) s.shell += 0.1;
+    if (M('nLong')) s.stepRange *= 1.15;
+    if (M('nFanM')) s.starFan += 1;
+    if (M('nClone')) { s.cloneTime += 2; s.cloneDmg += 0.1; }
   }
 
   // Expected single-target damage multiplier from perks alone (for balancing / the simulator)

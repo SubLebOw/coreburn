@@ -3,6 +3,7 @@
 // the boss health bar, banners like "WAVE 2", the red damage flash, the active
 // power-ups (with timers), and the title / game over screens.
 
+import { MASTERIES, masteryPoints, spentOn, getMastery, openMasteryPanel } from './mastery.js';
 import { UPGRADES, FALLBACK, GROUP_LABELS, groupLabel, weaponMult, tierColor } from './upgrades.js';
 import { HERO_STATS } from './hero-stats.js';
 import { RULES, Z_TUNING } from './rules.js';
@@ -189,6 +190,13 @@ export class Hud {
         const next = h.max ? 'MAX LEVEL' : `next: ${heroReward(c.id, h.level + 1).join(', ')}`;
         d.innerHTML = `<span>HERO LV <b>${h.level}</b></span><i><b style="width:${h.max ? 100 : Math.round(100 * h.xp / h.need)}%"></b></i><small></small>`;
         d.querySelector('small').textContent = next;
+        const mb = document.createElement('button'); // CoreBurnZ: open this hero's mastery tree
+        mb.className = 'mbtn'; mb.dataset.hero = c.id;
+        const pts = masteryPoints(h.level), used = spentOn(c.id, getMastery(c.id, h.level));
+        mb.innerHTML = `✦ MASTERY <em>${pts - used > 0 ? pts - used + ' pt' + (pts - used > 1 ? 's' : '') + ' free' : used + '/' + pts}</em>`;
+        mb.addEventListener('pointerdown', (e) => e.stopPropagation());
+        mb.addEventListener('click', (e) => { e.stopPropagation(); openMasteryPanel(c.id, c.name, hex(c.color), h.level, () => this.showSelect(chars, chars[sel]?.id || current, onPick)); window.removeEventListener('keydown', onKey, true); });
+        d.appendChild(mb);
         b.querySelector('.ubody').insertBefore(d, b.querySelector('.kit'));
       }
       b.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -207,6 +215,7 @@ export class Hud {
       onPick(chars[i].id);
     };
     const onKey = (e) => {
+      if (document.body.classList.contains('mastery-open')) return;
       if (e.repeat) return; // a key held down from the last run must not pick a hero
       const n = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4, Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3, Numpad5: 4 }[e.code];
       if (n !== undefined) { e.preventDefault(); e.stopPropagation(); pick(n); return; }

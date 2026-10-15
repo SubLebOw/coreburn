@@ -13,6 +13,7 @@
 // a downed hero is revived by a teammate standing next to them for 3 seconds, and the run ends when
 // everyone is down. Score and combo are shared; upgrade picks and power-ups are per player.
 import { applyAffixVisuals } from './affixes.js';
+import { cleanMastery } from './mastery.js';
 import * as THREE from 'three';
 import { NetHost, NetClient, normalizeCode, MAX_PLAYERS } from './net.js';
 import { Player } from './player.js';
@@ -168,7 +169,7 @@ export class Coop {
     this.myChar = id;
     localStorage.setItem('coreburn-hero', id);
     if (this.mode === 'host') { this.roster[0].char = id; this.rosterChanged(); }
-    else if (this.mode === 'client') this.net.send({ t: 'sel', char: id, look: this.ctx.myLook() });
+    else if (this.mode === 'client') this.net.send({ t: 'sel', char: id, look: this.ctx.myLook(), mastery: this.ctx.myMastery?.(id) });
     this.renderRoster();
   }
 
@@ -241,7 +242,7 @@ export class Coop {
         if (this.inGame || this.roster.length >= MAX_PLAYERS) { this.net.send(conn, { t: 'bye', reason: this.inGame ? 'That game has already started.' : 'That room is full.' }); return; }
         const slot = this.nextSlot++;
         conn.slot = slot;
-        this.roster.push({ slot, char: CHARACTERS[msg.char] && (RULES.z || !CHARACTERS[msg.char].zOnly) ? msg.char : 'sarrow', conn, look: cleanLook(msg.look) });
+        this.roster.push({ slot, char: CHARACTERS[msg.char] && (RULES.z || !CHARACTERS[msg.char].zOnly) ? msg.char : 'sarrow', conn, look: cleanLook(msg.look), mastery: msg.mastery });
         this.net.send(conn, { t: 'welcome', slot });
         this.rosterChanged();
         this.status('');
@@ -250,7 +251,7 @@ export class Coop {
       }
       case 'sel': {
         const r = this.roster.find((x) => x.slot === conn.slot);
-        if (r && CHARACTERS[msg.char] && !this.inGame && (RULES.z || !CHARACTERS[msg.char].zOnly)) { r.char = msg.char; if (msg.look) r.look = cleanLook(msg.look); this.rosterChanged(); }
+        if (r && CHARACTERS[msg.char] && !this.inGame && (RULES.z || !CHARACTERS[msg.char].zOnly)) { r.char = msg.char; r.mastery = msg.mastery; if (msg.look) r.look = cleanLook(msg.look); this.rosterChanged(); }
         break;
       }
       case 'look': { // a friend changed cosmetics: keep it, redraw them, pass it on
@@ -337,6 +338,7 @@ export class Coop {
       h.slot = r.slot;
       h.netName = r.name;
       h.netInput = new RemoteInput();
+      h.masteryNodes = RULES.z ? cleanMastery(r.char, r.mastery) : []; h.reset(); // a friend's hero mastery (checked by the host)
       h.reported = new THREE.Vector3();
       const a = (i + 1) * (Math.PI * 2 / this.roster.length);
       h.position.set(Math.cos(a) * 1.6, 0, Math.sin(a) * 1.6);
@@ -602,7 +604,7 @@ export class Coop {
       this.net = net;
       this.mode = 'client';
       this.code = code;
-      net.send({ t: 'hello', v: GAME_VERSION, char: this.myChar, look: this.ctx.myLook() });
+      net.send({ t: 'hello', v: GAME_VERSION, char: this.myChar, look: this.ctx.myLook(), mastery: this.ctx.myMastery?.(this.myChar) });
       this.status('Connected! Waiting for the host…');
     } catch (e) {
       this.status(e.message, true);

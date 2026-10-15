@@ -173,6 +173,8 @@ export class Player {
     this.killedBy = null;
     this.damageMult = 1;              // 2 while FURY is active
     this.powers = {};                 // active power-ups (type -> { time, max, hits })
+    this.loadout.mastery = RULES.z ? (this.masteryNodes || []) : []; // CoreBurnZ hero mastery
+    this.mJobs = [];
     this.loadout.reset();
     if (this.startCard) { this.loadout.levels[this.startCard] = 1; this.loadout.version++; this.loadout.recompute(); } // shop starting perk
     this.applyLoadout();
@@ -206,6 +208,7 @@ export class Player {
 
   update(dt, input) {
     if (this.dead) { this.animateDeath(dt); return; }
+    if (this.mJobs?.length) for (let i = this.mJobs.length - 1; i >= 0; i--) { const j = this.mJobs[i]; if ((j.t -= dt) <= 0) { this.mJobs.splice(i, 1); j.run(); } } // mastery delays
 
     // ----- Timers -----
     // blink charges refill one at a time
@@ -426,7 +429,7 @@ export class Player {
         this.world.effects.spawnSparks(this.position.clone().setY(1.2), 0x3a2a6a, 14, 6);
         this.world.sfx('teleport');
         break;
-      default: this.startSpin();
+      default: this.startSpin(); if (this.stats.m?.sHeal) this.heal(this.maxHp * 0.15); // MASTERY Overdrive Mend
     }
   }
 
@@ -543,6 +546,15 @@ export class Player {
     this.dashHitSet = new Set();
     this.world.effects.spawnRing(this.position, 0x3ff6e0, 1.5, 0.3);
     this.world.sfx('blink');
+    if (this.stats.m?.sAfter) { // MASTERY Afterimage: explodes where you started
+      const p = this.position.clone(), fx = this.world.effects;
+      fx.spawnWarning(p, 2.6, 0.6); fx.spawnSparks(p.clone().setY(1), 0x3ff6e0, 8, 2);
+      this.mJobs.push({ t: 0.6, run: () => {
+        fx.spawnRing(p, 0x3ff6e0, 2.6, 0.4); fx.spawnSparks(p.clone().setY(1), 0x9ffff5, 12, 6);
+        for (const e of this.world.enemies.list) if (e.canBeHit && e.position.distanceTo(p) < 2.6 + e.radius) this.strike(e, this.char.dashDmg * this.stats.dashDmg * 1.2, 0, 0, true, 'dash');
+        this.world.sfx('hit');
+      } });
+    }
   }
 
   dashHits() {
@@ -585,7 +597,7 @@ export class Player {
       const dist = to.length();
       if (dist < 3.2 * this.stats.spinRadius * this.char.spinRadius + e.radius) {
         to.normalize();
-        const k = this.char.spinKnock;
+        const k = this.char.spinKnock * (this.stats.m?.sPull ? -0.5 : 1); // MASTERY Overdrive Pull
         this.strike(e, this.char.spinHit * this.stats.spinDmg * this.char.spinDmg, to.x * k, to.z * k, true, 'spin');
         this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0xff8040, 4);
         this.world.sfx('hit');
@@ -613,9 +625,10 @@ export class Player {
     this.world.shake(0.15);
   }
 
-  seismicSlam() {
+  seismicSlam(echo = 0) {
     const c = this.char, s = this.stats;
     const radius = c.slamRadius * s.slamRadius;
+    if (!echo && s.m?.zAfter) this.mJobs.push({ t: 0.7, run: () => { if (!this.dead) this.seismicSlam(0.6); } }); // MASTERY Aftershock
     this.world.effects.spawnRing(this.position, 0xffa030, radius, 0.6);
     this.world.effects.spawnRing(this.position, 0xff5a20, radius * 0.6, 0.45);
     this.world.shake(0.6);
@@ -627,10 +640,11 @@ export class Player {
       const d = to.length();
       if (d > radius + e.radius) continue;
       to.normalize();
-      this.strike(e, c.slamDmg * s.spinDmg * s.slamDmg, to.x * c.slamKnock, to.z * c.slamKnock, true, 'spin');
+      this.strike(e, c.slamDmg * s.spinDmg * s.slamDmg * (echo || 1), to.x * c.slamKnock, to.z * c.slamKnock, true, 'spin');
       this.stun(e, c.slamStun);
       this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0xffa030, 6);
     }
+    if (echo) return; // the aftershock is just damage
     // TAUNT: everything nearby (and any boss) comes for Zaleks; the shield soaks it
     this.tauntTimer = c.tauntTime + s.taunt;
     this.tauntRadius = c.tauntRadius;
@@ -700,10 +714,11 @@ export class Player {
     this.world.arena.resolve(this.position, this.radius);
     this.slide.set(0, 0, 0);
     this.facing = Math.atan2(direction.x, direction.z);
-    this.phaseTimer = c.hopGuard;
+    this.phaseTimer = c.hopGuard * (s.m?.iGuard ? 2 : 1); // MASTERY Phase Guard
     this.state = 'dash';
     this.stateTime = 0;
     this.world.allies?.addDecoy(this, from, c.decoyTime + s.decoy, c.decoyHits + 2 * s.decoy);
+    if (s.m?.iTwin) this.world.allies?.addDecoy(this, from.clone().add(new THREE.Vector3(-direction.z * 1.6, 0, direction.x * 1.6)), c.decoyTime + s.decoy, c.decoyHits + 2 * s.decoy); // MASTERY Twin Decoy
     this.world.effects.spawnRing(from, 0xc070ff, 1.4, 0.3);
     this.world.effects.spawnRing(this.position, 0xe8a0ff, 1.8, 0.3);
     this.world.effects.spawnSparks(this.position.clone().setY(1), 0xe8a0ff, 8);
@@ -715,6 +730,7 @@ export class Player {
     const c = this.char, s = this.stats, fx = this.world.effects;
     const from = this.position.clone();
     this.spendCharge();
+    if (s.m?.nDecoy) this.world.allies?.addDecoy(this, from, 2.5, 3); // MASTERY Shadow Decoy
     const range = c.stepRange * s.stepRange, now = this.world.allies?.now ?? 0;
     let t = null, bd = range;
     for (const e of this.world.enemies.list) { // 1) the nearest MARKED enemy in range (any direction)
@@ -852,6 +868,7 @@ export class Player {
         }
         this.strike(best, c.grappleDmg * (1 + 0.25 * s.grapple), 0, 0, true, 'dash');
         this.stun(best, c.grappleStun + 0.3 * s.grapple);
+        if (s.m?.oChainG && !this.world.netClient) this.stormChain(best, c.grappleDmg * 0.6 * s.dmg); // MASTERY Chain Grapple
         this.world.effects.spawnSparks(best.position.clone().setY(1.1), 0xff4a5a, 10);
         this.state = 'dash'; this.stateTime = 0; this.dashDir = new THREE.Vector3(); this.dashLen = 0.12;
         this.world.shake(0.2);

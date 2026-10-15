@@ -540,6 +540,12 @@ function awardXp(r = { wave: enemies.wave, kills, bosses: run.bosses }) {
   cosmeticsUI.refreshBadge();
 }
 world.awardXp = awardXp;
+// CoreBurnZ boss PHASE 2 / ENRAGE banners (the host tells co-op friends too)
+world.onBossPhase = (boss, title, sub, color) => {
+  const c = '#' + color.toString(16).padStart(6, '0');
+  hud.showBanner(title, sub, c);
+  if (coop.mode === 'host') coop.net?.broadcast?.({ t: 'toast', text: title, sub, color: c });
+};
 
 // Leaderboards: local always, online once set up (see leaderboard-config.js)
 async function submitRun() {

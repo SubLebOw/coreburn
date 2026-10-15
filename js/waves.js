@@ -16,6 +16,7 @@ import * as THREE from 'three';
 import { Enemy } from './enemy.js';
 import { bossForNumber } from './bosses.js';
 import { RULES, Z_TUNING } from './rules.js';
+import { tickBossPhase } from './boss-phases.js';
 import { makeGolden } from './golden.js';
 
 const SCREEN_CAP = 14;        // regular enemies alive at once (not counting mites/summons)
@@ -167,6 +168,7 @@ export class WaveManager {
       let t = this.world.targetFor ? this.world.targetFor(e) : player;
       if (this.world.aggro && !this.world.netClient) t = this.world.aggro(e, t); // ZALEKS' taunt, ISKRA's decoys
       e.update(dt, t, this.list);
+      if (e.isBoss && RULES.z && !this.world.netClient) tickBossPhase(e, dt); // CoreBurnZ: phase 2 + enrage
     }
 
     // remove anything whose death animation has finished

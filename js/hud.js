@@ -5,6 +5,8 @@
 
 import { UPGRADES, FALLBACK, GROUP_LABELS, groupLabel, weaponMult, tierColor } from './upgrades.js';
 import { HERO_STATS } from './hero-stats.js';
+import { RULES, Z_TUNING } from './rules.js';
+import { xpNeeded, heroReward } from './progress.js';
 
 const $ = (id) => document.getElementById(id);
 const formatSecs = (sec) => { const m = Math.floor(sec / 60), s = sec - m * 60; return `${m}:${s.toFixed(1).padStart(4, '0')}`; };
@@ -141,7 +143,7 @@ export class Hud {
     const hex = (c) => '#' + c.toString(16).padStart(6, '0');
     $('upgrade-title').textContent = 'CHOOSE YOUR HERO';
     this.upgradeOverlay.classList.remove('boss');
-    $('upgrade-sub').textContent = 'Same 3 buttons, 4 different kits. Pick one for this run:';
+    $('upgrade-sub').textContent = `Same 3 buttons, ${chars.length} different kits. Pick one for this run:`;
     $('upgrade-hint').textContent = `Press 1-${chars.length} · ← → and Enter · or click a hero`;
     const box = $('upgrade-cards');
     box.innerHTML = '';
@@ -159,7 +161,7 @@ export class Hud {
       }
       b.className = 'ucard hero';
       b.style.setProperty('--c', hex(c.color));
-      const range = { sarrow: 0.3, zaleks: 0.25, iskra: 1, orin: 0.6 }[c.id] ?? 0.5;
+      const range = { sarrow: 0.3, zaleks: 0.25, iskra: 1, orin: 0.6, ninja: 0.85 }[c.id] ?? 0.5;
       const kit = c.abilities ? ['attack', 'mobility', 'ultimate'].map((k, j) =>
         `<div class="kslot"><b>${c.abilities[k].icon} ${c.abilities[k].name}</b> <span>${['J', 'K', 'L'][j]}</span><i>${c.abilities[k].desc}</i></div>`).join('') : '';
       b.innerHTML = `<span class="key">${i + 1}</span><div class="icon">⬢</div><div class="ubody"><div class="group"></div><div class="uname"></div><div class="effect"></div>` +
@@ -167,6 +169,14 @@ export class Hud {
       b.querySelector('.group').innerHTML = `<span class="ptag">${c.tag}</span> ${c.title.toUpperCase()}`;
       b.querySelector('.uname').textContent = c.name;
       b.querySelector('.effect').textContent = c.blurb;
+      if (c.hlv) { // CoreBurnZ: this hero's own level + the next reward
+        const h = c.hlv, d = document.createElement('div');
+        d.className = 'hlvl';
+        const next = h.max ? 'MAX LEVEL' : `next: ${heroReward(c.id, h.level + 1).join(', ')}`;
+        d.innerHTML = `<span>HERO LV <b>${h.level}</b></span><i><b style="width:${h.max ? 100 : Math.round(100 * h.xp / h.need)}%"></b></i><small></small>`;
+        d.querySelector('small').textContent = next;
+        b.querySelector('.ubody').insertBefore(d, b.querySelector('.kit'));
+      }
       b.addEventListener('pointerdown', (e) => e.stopPropagation());
       b.addEventListener('click', (e) => { e.stopPropagation(); pick(i); });
       box.appendChild(b);
@@ -184,7 +194,7 @@ export class Hud {
     };
     const onKey = (e) => {
       if (e.repeat) return; // a key held down from the last run must not pick a hero
-      const n = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3 }[e.code];
+      const n = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4, Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3, Numpad5: 4 }[e.code];
       if (n !== undefined) { e.preventDefault(); e.stopPropagation(); pick(n); return; }
       const open = chars.map((c, i) => i).filter((i) => !chars[i].locked);
       const step = (d) => { sel = open[(open.indexOf(sel) + d + open.length) % open.length]; mark(); };
@@ -235,9 +245,10 @@ export class Hud {
       }
       const left = Math.round(p.left * 100) / 100;
       if (b._left !== left) { b._left = left; b.style.setProperty('--left', left); }
-      const text = p.type === 'shield' ? `${p.hits}` : `${p.seconds}`;
-      if (b._text !== text) { b._text = text; b._sec.textContent = text; }
-      b.classList.toggle('ending', p.seconds <= 2);
+      const charges = p.type === 'shield' && RULES.z; // COREBURNZ: shield charges (max 2)
+      const text = charges ? '◆'.repeat(p.hits) + '◇'.repeat(Math.max(0, Z_TUNING.shieldMax - p.hits)) : p.type === 'shield' ? `${p.hits}` : `${p.seconds}`;
+      if (b._text !== text) { b._text = text; b._sec.textContent = text; b.classList.toggle('charges', charges); if (charges) b.querySelector('.pw-label').textContent = 'SHIELD x' + p.hits; }
+      b.classList.toggle('ending', !charges && p.seconds <= 2);
     }
     for (const [type, b] of this.badges) {
       if (!seen.has(type)) { b.remove(); this.badges.delete(type); }
@@ -367,13 +378,30 @@ export class Hud {
   }
 
   // ACCOUNT XP on the game over screen: +XP, the level bar, and anything that just unlocked
-  showXp(res, progress) {
+  showXp(res, progress, heroRes = null) {
     const el = $('gameover-xp');
-    const need = 150 + 75 * (progress.level - 1);
-    const unlocks = res.unlocks.map((u) => `<div class="xp-unlock" style="--c:#${u.color.toString(16).padStart(6, '0')}">UNLOCKED · <b></b> <span>${u.hero.toUpperCase()} ${u.slot.toUpperCase()}</span></div>`).join('');
-    el.innerHTML = `<div class="xp-line"><b>+${res.gained} XP</b> · LEVEL ${progress.level}${res.levels.length ? ' <em>LEVEL UP!</em>' : ''}<i><b style="width:${Math.round(100 * progress.xp / need)}%"></b></i></div>${unlocks}${res.scrap ? `<div class="xp-unlock">+${res.scrap} scrap (all cosmetics unlocked)</div>` : ''}`;
-    el.querySelectorAll('.xp-unlock b').forEach((b, i) => { b.textContent = res.unlocks[i].name; });
+    const need = xpNeeded(progress.level);
+    const pct = need ? Math.round(100 * progress.xp / need) : 100;
+    const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    let html = `<div class="xp-line"><b>+${res.gained} XP</b> · LEVEL ${progress.level}${res.levels.length ? ' <em>LEVEL UP!</em>' : ''}<i><b style="width:${pct}%"></b></i></div>`;
+    html += res.unlocks.map((u) => `<div class="xp-unlock">UNLOCKED · <b>${esc(u)}</b></div>`).join('');
+    if (heroRes) {
+      const hi = progress.heroInfo(heroRes.hero);
+      html += `<div class="xp-line hero"><b>${esc(HERO_STATS[heroRes.hero]?.name || heroRes.hero)}</b> HERO LEVEL ${hi.level}${heroRes.levels.length ? ' <em>LEVEL UP!</em>' : ''}<i><b style="width:${hi.max ? 100 : Math.round(100 * hi.xp / hi.need)}%"></b></i></div>`;
+      html += heroRes.unlocks.map((u) => `<div class="xp-unlock hero">HERO REWARD · <b>${esc(u)}</b></div>`).join('');
+    }
+    el.innerHTML = html;
     el.classList.remove('hidden');
+  }
+
+  // RUN TIMER (mm:ss, top right)
+  setTimer(sec) {
+    this.timerValue = sec;
+    const s = Math.floor(sec);
+    if (this.last.timer === s) return;
+    this.last.timer = s;
+    const el = this.timerEl || (this.timerEl = $('run-timer'));
+    if (el) el.textContent = fmtTime(s);
   }
 
   showGameOver(score, wave, kills, best, newBest, killer = null, place = null, loadout = null, bestCombo = 0, hero = 'Sarrow') {
@@ -382,6 +410,7 @@ export class Hud {
     $('gameover-score').textContent = `${score.toLocaleString()} pts`;
     $('gameover-stats').innerHTML =
       `<b>${hero}</b> reached <b>wave ${wave}</b>${place ? ` in ${place}` : ''} · <b>${kills}</b> kills · best combo <b>${bestCombo}</b><br>` +
+      `<span class="runtime">Time <b>${fmtTime(this.timerValue || 0)}</b></span><br>` +
       (killer ? `<span class="killer">Killed by ${killer}</span><br>` : '') + build +
       (newBest ? '<b style="color:#3ff6e0">NEW BEST SCORE!</b>' : `Best: ${best.score.toLocaleString()} pts (wave ${best.wave})`);
     $('gameover-scrap').classList.add('hidden');
@@ -427,3 +456,5 @@ export class Hud {
 
   hideOverlay() { this.overlay.classList.add('hidden'); }
 }
+
+export function fmtTime(sec) { sec = Math.max(0, Math.floor(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, s = sec % 60; return (h ? h + ':' + String(m).padStart(2, '0') : String(m).padStart(2, '0')) + ':' + String(s).padStart(2, '0'); }

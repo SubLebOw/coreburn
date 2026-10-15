@@ -610,3 +610,28 @@ body.zmode #title-panel h1::after { content: 'Z'; color: #ffc23a; text-shadow: 0
 .sel-only { display: none; margin: 8px auto 0; }
 #upgrade-overlay.select .sel-only { display: block; }
 @media (max-width: 520px) { #cos-items, #cos-skins { grid-template-columns: repeat(2, 1fr); } #cos-preview { grid-column: span 2; grid-row: auto; min-height: 200px; } .rules-row button { font-size: 13px; letter-spacing: 1px; } }
+.cp-hero.hidden { display: none; }
+
+/* ---------- v1.14: run timer, hero levels, shield charges, plates ---------- */
+#run-timer { width: max-content; margin-left: auto; font-size: 13px; font-weight: 900; letter-spacing: 1px; color: #e8f6ff; opacity: .9; margin-right: 48px; font-variant-numeric: tabular-nums; }
+#run-timer::before { content: '⏱ '; opacity: .7; }
+#gameover-stats .runtime b { color: #9ae4ff; }
+.ucard .hlvl { margin: 4px 0 2px; font-size: 11px; letter-spacing: 1px; color: #d8d0ff; }
+.ucard .hlvl b { color: #fff; }
+.ucard .hlvl i { display: block; height: 4px; background: #ffffff1a; border-radius: 2px; margin: 2px 0; overflow: hidden; }
+.ucard .hlvl i b { display: block; height: 100%; background: linear-gradient(90deg, #8a7aff, #ffc23a); }
+.ucard .hlvl small { display: block; font-size: 10px; opacity: .75; letter-spacing: 0; }
+.xp-line.hero em, .xp-unlock.hero b { color: #c8c0ff; }
+.pw.charges .pw-ring { background: #7fd8ff33; }
+.pw .pips { display: block; font-size: 13px; letter-spacing: 1px; color: #7fd8ff; text-shadow: 0 0 6px #7fd8ff; }
+#lvl-bar.plate-rust { border-color: #b0603a; background: linear-gradient(90deg, #3a1c10cc, #14100ecc); }
+#lvl-bar.plate-ember { border-color: #ff7a2a; background: linear-gradient(90deg, #5a1a08cc, #1a0a04cc); box-shadow: 0 0 10px #ff7a2a55; }
+#lvl-bar.plate-frost { border-color: #9ae4ff; background: linear-gradient(90deg, #12324acc, #0a141ccc); box-shadow: 0 0 10px #9ae4ff55; }
+#lvl-bar.plate-neon { border-color: #ff4ad8; background: linear-gradient(90deg, #3a0a4acc, #0a1a2acc); box-shadow: 0 0 12px #ff4ad866; }
+#lvl-bar.plate-gold { border-color: #ffc23a; background: linear-gradient(90deg, #4a3408cc, #1a1204cc); box-shadow: 0 0 14px #ffc23a77; }
+#lvl-title { display: block; font-size: 10px; letter-spacing: 1px; color: #ffd27a; }
+.cos-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; justify-content: center; }
+.cos-chip { padding: 5px 9px; border-radius: 6px; border: 1px solid #ffffff33; background: #ffffff0d; color: #ddd; font-size: 11px; font-weight: 800; letter-spacing: 1px; cursor: pointer; }
+.cos-chip.on { border-color: #ffc23a; color: #ffc23a; background: #ffc23a1a; }
+.cos-chip.locked { opacity: .45; cursor: default; }
+.cos-chip i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }

@@ -50,7 +50,7 @@ declare
 begin
   if p_boards is null or array_length(p_boards, 1) is null or array_length(p_boards, 1) > 3 then return 'bad boards'; end if;
   if not public.coreburn_name_ok(p_name) then return 'bad name'; end if;
-  if p_hero not in ('sarrow', 'zaleks', 'iskra', 'orin') then return 'bad hero'; end if;
+  if p_hero not in ('sarrow', 'zaleks', 'iskra', 'orin', 'ninja') then return 'bad hero'; end if;
   if p_version !~ '^\d+\.\d+\.\d+$' then return 'bad version'; end if;
 
   -- rate limit: one submission per player every 15 seconds
@@ -58,7 +58,7 @@ begin
   if last_at is not null and now() - last_at < interval '15 seconds' then return 'slow down'; end if;
 
   foreach b in array p_boards loop
-    if b !~ '^(z:)?(global|hero:(sarrow|zaleks|iskra|orin)|daily:\d{4}-\d{2}-\d{2}|rush:\d{4}-W\d{2})$' then return 'bad board'; end if; -- z: = CoreBurnZ boards
+    if b !~ '^(z:)?(global|hero:(sarrow|zaleks|iskra|orin|ninja)|daily:\d{4}-\d{2}-\d{2}|rush:\d{4}-W\d{2})$' then return 'bad board'; end if; -- z: = CoreBurnZ boards
     nb := regexp_replace(b, '^z:', '');
     if nb like 'hero:%' and nb <> 'hero:' || p_hero then return 'bad board'; end if;
     if nb like 'daily:%' and abs(substr(nb, 7)::date - today) > 1 then return 'daily closed'; end if;

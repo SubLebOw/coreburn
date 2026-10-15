@@ -21,7 +21,7 @@ import { RULES, setRules } from './rules.js';
 import { makeGolden } from './golden.js';
 import { meta } from './meta.js';
 import { waveStats } from './waves.js';
-import { CHARACTERS, CHARACTER_ORDER, DUPLICATE_TINTS, displayName } from './characters.js';
+import { CHARACTERS, ALL_HEROES, DUPLICATE_TINTS, displayName } from './characters.js';
 import { GAME_VERSION } from './version.js';
 import { cleanLook } from './progress.js';
 
@@ -87,12 +87,14 @@ export class Coop {
     // RULES: the host picks CLASSIC or COREBURNZ for the room; friends see it in the lobby
     for (const b of document.querySelectorAll('#cp-rules button')) b.addEventListener('click', () => {
       if (this.mode !== 'host') return;
-      setRules(b.dataset.z === '1'); this.ctx.onRulesChanged?.(); this.rosterChanged();
+      setRules(b.dataset.z === '1'); this.ctx.onRulesChanged?.();
+      if (!RULES.z) for (const r of this.roster) if (CHARACTERS[r.char]?.zOnly) r.char = 'sarrow';
+      this.rosterChanged();
     });
     $('cp-leave').addEventListener('click', () => this.leave());
     for (const el of [this.panel]) el.addEventListener('pointerdown', (e) => e.stopPropagation());
     const heroes = $('cp-heroes');
-    for (const id of CHARACTER_ORDER) {
+    for (const id of ALL_HEROES) {
       const c = CHARACTERS[id];
       const b = document.createElement('button');
       b.className = 'cp-hero';
@@ -148,11 +150,13 @@ export class Coop {
         const c = CHARACTERS[r.char];
         row.style.setProperty('--c', '#' + (r.tint || c.color).toString(16).padStart(6, '0'));
         row.innerHTML = `<b>P${i + 1}</b><span></span><small>${i === 0 ? 'HOST' : ''}${r.slot === this.mySlot ? (i === 0 ? ' · ' : '') + 'YOU' : ''}</small>`;
-        row.querySelector('span').textContent = r.name;
+        row.querySelector('span').textContent = r.name + (r.look && r.look.t ? ` · ${r.look.t}` : ''); // their title
       } else row.innerHTML = `<b>P${i + 1}</b><span>waiting…</span>`;
       list.appendChild(row);
     }
-    for (const b of document.querySelectorAll('.cp-hero')) b.classList.toggle('sel', b.dataset.id === this.myChar);
+    // KAGERO is CoreBurnZ only: hide him in classic (and swap anyone who had him back to Sarrow)
+    if (!RULES.z && CHARACTERS[this.myChar]?.zOnly && this.mode) { this.chooseHero('sarrow'); return; }
+    for (const b of document.querySelectorAll('.cp-hero')) { b.classList.toggle('sel', b.dataset.id === this.myChar); b.classList.toggle('hidden', !!CHARACTERS[b.dataset.id].zOnly && !RULES.z); }
     const n = this.roster.length;
     const start = $('cp-start');
     start.disabled = n < 2;
@@ -236,7 +240,7 @@ export class Coop {
         if (this.inGame || this.roster.length >= MAX_PLAYERS) { this.net.send(conn, { t: 'bye', reason: this.inGame ? 'That game has already started.' : 'That room is full.' }); return; }
         const slot = this.nextSlot++;
         conn.slot = slot;
-        this.roster.push({ slot, char: CHARACTERS[msg.char] ? msg.char : 'sarrow', conn, look: cleanLook(msg.look) });
+        this.roster.push({ slot, char: CHARACTERS[msg.char] && (RULES.z || !CHARACTERS[msg.char].zOnly) ? msg.char : 'sarrow', conn, look: cleanLook(msg.look) });
         this.net.send(conn, { t: 'welcome', slot });
         this.rosterChanged();
         this.status('');
@@ -245,7 +249,7 @@ export class Coop {
       }
       case 'sel': {
         const r = this.roster.find((x) => x.slot === conn.slot);
-        if (r && CHARACTERS[msg.char] && !this.inGame) { r.char = msg.char; if (msg.look) r.look = cleanLook(msg.look); this.rosterChanged(); }
+        if (r && CHARACTERS[msg.char] && !this.inGame && (RULES.z || !CHARACTERS[msg.char].zOnly)) { r.char = msg.char; if (msg.look) r.look = cleanLook(msg.look); this.rosterChanged(); }
         break;
       }
       case 'look': { // a friend changed cosmetics: keep it, redraw them, pass it on

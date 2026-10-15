@@ -7,8 +7,9 @@
 // Solo and co-op host: simulated here and every hit goes through the owner hero's strike().
 // Co-op friends: never simulate; they draw what the host's snapshot says (serialize / applySnapshot).
 import * as THREE from 'three';
+import { CHARACTERS } from './characters.js';
 
-const NEEDLES = 80, DECOYS = 6, DRONES = 12, VORTEXES = 3;
+const NEEDLES = 80, STARS = 60, DECOYS = 6, DRONES = 12, VORTEXES = 3, CLONES = 4;
 
 export class Allies {
   constructor(scene, world) {
@@ -24,6 +25,29 @@ export class Allies {
       mesh.visible = false;
       scene.add(mesh);
       this.needles.push({ mesh, vel: new THREE.Vector3(), life: 0, owner: null, dmg: 0, pierce: 0, hitSet: new Set(), color: 0xe8a0ff, target: new THREE.Vector3() });
+    }
+    // KAGERO's shurikens: flat 4-point stars that spin (same flight code as needles)
+    const sg = new THREE.BoxGeometry(0.42, 0.05, 0.12), sg2 = new THREE.BoxGeometry(0.12, 0.05, 0.42);
+    this.stars = [];
+    for (let i = 0; i < STARS; i++) {
+      const mesh = new THREE.Group();
+      const a = new THREE.Mesh(sg, this.mat(0xc8c0ff)), b = new THREE.Mesh(sg2, a.material);
+      const hub = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.07, 0.16), this.mat(0x2a2440)); hub.rotation.y = Math.PI / 4;
+      mesh.add(a, b, hub);
+      mesh.visible = false; scene.add(mesh);
+      this.stars.push({ mesh, parts: [a, b], vel: new THREE.Vector3(), life: 0, owner: null, dmg: 0, pierce: 0, hitSet: new Set(), color: 0xc8c0ff, target: new THREE.Vector3(), star: true });
+    }
+    // KAGERO's Shadow Clone: a translucent dark copy of his model
+    this.clones = [];
+    for (let i = 0; i < CLONES; i++) {
+      const m = CHARACTERS.ninja.build(null);
+      const shade = new THREE.MeshBasicMaterial({ color: 0x2a2048, transparent: true, opacity: 0.72, depthWrite: true });
+      const glow = new THREE.MeshBasicMaterial({ color: 0xa898ff, transparent: true, opacity: 0.9 });
+      m.root.traverse((o) => { if (o.isMesh) { o.material = o.material.isMeshBasicMaterial ? glow : shade; o.castShadow = false; } });
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.7, 24), new THREE.MeshBasicMaterial({ color: 0x8a7aff, transparent: true, opacity: 0.6, depthWrite: false }));
+      ring.rotation.x = -Math.PI / 2; ring.position.y = 0.04; m.root.add(ring);
+      m.root.visible = false; scene.add(m.root);
+      this.clones.push({ m, life: 0, max: 1, owner: null, pct: 0.7, facing: 0, idle: 0, cd: 0, flick: 0, target: new THREE.Vector3(), position: new THREE.Vector3() });
     }
     // decoys: a translucent hologram pillar with a ring
     this.decoys = [];
@@ -86,18 +110,57 @@ export class Allies {
   get host() { return !this.world.netClient; }
 
   // ---------- spawning (solo / host only) ----------
-  fireNeedle(owner, from, dir, dmg, { pierce = 0, speed = 30, range = 15, color = 0xe8a0ff, kind = 'needle' } = {}) {
+  fireNeedle(owner, from, dir, dmg, { pierce = 0, speed = 30, range = 15, color = 0xe8a0ff, kind = 'needle', star = false } = {}) {
     if (!this.host) return;
-    const n = this.needles.find((x) => x.life <= 0);
+    const n = (star ? this.stars : this.needles).find((x) => x.life <= 0);
     if (!n) return;
     n.owner = owner; n.dmg = dmg; n.pierce = pierce; n.kind = kind; n.hitSet.clear();
     n.vel.set(dir.x, 0, dir.z).normalize().multiplyScalar(speed);
     n.life = range / speed;
     n.color = color;
-    n.mesh.material = this.mat(color);
+    if (n.star) for (const p of n.parts) p.material = this.mat(color); else n.mesh.material = this.mat(color);
     n.mesh.position.set(from.x, 1.1, from.z).addScaledVector(n.vel, 0.02);
     n.mesh.rotation.set(0, Math.atan2(dir.x, dir.z), 0);
     n.mesh.visible = true;
+  }
+
+  // ---------- KAGERO's Shadow Clone ----------
+  addClone(owner, time) {
+    if (!this.host) return;
+    for (const c of this.clones) if (c.owner === owner) c.life = 0; // a new clone replaces the old one
+    const c = this.clones.find((x) => x.life <= 0); if (!c) return;
+    c.owner = owner; c.life = c.max = time; c.idle = 0; c.cd = 0.3;
+    c.pct = (owner.char.clonePct || 0.7) + (owner.stats.cloneDmg || 0);
+    const off = this.cloneSpot(owner);
+    c.position.copy(off); c.facing = owner.facing;
+    c.m.root.visible = true;
+    this.world.effects.spawnRing(c.position, 0x8a7aff, 1.8, 0.35);
+  }
+  cloneSpot(o) { // stands just behind-left of its owner
+    const a = o.facing + Math.PI * 0.75;
+    return new THREE.Vector3(o.position.x + Math.sin(a) * 1.6, 0, o.position.z + Math.cos(a) * 1.6);
+  }
+  cloneOf(owner) { return this.clones.find((c) => c.owner === owner && c.life > 0); }
+  // copies a throw: same target if it has one, else the owner's facing
+  cloneThrow(owner, target) {
+    const c = this.cloneOf(owner); if (!c) return;
+    c.idle = 0; this.cloneFire(c, target);
+  }
+  cloneFire(c, target) {
+    const o = c.owner, nd = o.char.needle;
+    const aim = target ? new THREE.Vector3(target.position.x - c.position.x, 0, target.position.z - c.position.z) : new THREE.Vector3(Math.sin(o.facing), 0, Math.cos(o.facing));
+    if (aim.lengthSq() < 1e-4) return;
+    aim.normalize(); c.facing = Math.atan2(aim.x, aim.z); c.flick = 0.15;
+    this.fireNeedle(o, c.position, aim, nd.damage * c.pct, { pierce: nd.pierce + (o.stats.starPierce || 0), speed: nd.speed, range: nd.range, color: 0xa898ff, star: true });
+  }
+  // copies a Shadow Step from where it stands
+  cloneStep(owner, dir) {
+    const c = this.cloneOf(owner); if (!c) return;
+    const from = c.position.clone(), to = this.cloneSpot(owner);
+    const seg = to.clone().sub(from), len = seg.length();
+    if (len > 0.5) owner.stepCut(from, seg.divideScalar(len), len, owner.char.stepDmg * owner.stats.stepDmg * c.pct);
+    c.position.copy(to);
+    this.world.effects.spawnRing(to, 0x8a7aff, 1.4, 0.25);
   }
 
   addDecoy(owner, pos, time, hits) {
@@ -159,9 +222,10 @@ export class Allies {
   update(dt) {
     if (!this.host) return this.clientUpdate(dt);
     const enemies = this.world.enemies.list, arena = this.world.arena;
-    for (const n of this.needles) {
+    for (const n of this.needles.concat(this.stars)) {
       if (n.life <= 0) continue;
       n.life -= dt;
+      if (n.star) n.mesh.rotation.y += dt * 22;
       const pos = n.mesh.position;
       pos.addScaledVector(n.vel, dt);
       let done = n.life <= 0 || Math.abs(pos.x) > 19 || Math.abs(pos.z) > 19;
@@ -179,6 +243,24 @@ export class Allies {
         }
       }
       if (done) { n.life = 0; n.mesh.visible = false; }
+    }
+    for (const c of this.clones) {
+      if (c.life <= 0) continue;
+      c.life -= dt;
+      const o = c.owner;
+      if (!o || o.dead || c.life <= 0) { c.life = 0; c.m.root.visible = false; this.world.effects.spawnSparks(c.position.clone().setY(1), 0x3a2a6a, 8); continue; }
+      const to = this.cloneSpot(o);
+      c.position.lerp(to, Math.min(1, dt * 7));
+      arena.resolve?.(c.position, 0.4);
+      // on its own when you're not throwing: a slower throw at the nearest enemy
+      c.idle += dt; c.cd -= dt;
+      if (c.idle > 0.6 && c.cd <= 0) {
+        let best = null, bd = 12;
+        for (const e of enemies) { if (!e.canBeHit) continue; const d = e.position.distanceTo(c.position); if (d < bd) { bd = d; best = e; } }
+        if (best) { c.cd = 0.45; this.cloneFire(c, best); }
+      }
+      if (c.idle > 0.6 && c.cd > 0.2) c.facing += Math.atan2(Math.sin(o.facing - c.facing), Math.cos(o.facing - c.facing)) * Math.min(1, dt * 6);
+      this.poseClone(c, dt);
     }
     for (const d of this.decoys) {
       if (d.life <= 0) continue;
@@ -235,10 +317,23 @@ export class Allies {
     }
   }
 
+  poseClone(c, dt) {
+    const m = c.m;
+    c.flick = Math.max(0, c.flick - dt);
+    m.root.position.set(c.position.x, 0.05 + Math.sin(performance.now() / 180) * 0.05, c.position.z);
+    m.root.rotation.y = c.facing;
+    m.armR.rotation.set(c.flick > 0 ? -1.6 : -0.6, 0, -0.15);
+    m.armL.rotation.set(-0.6, 0, 0.15);
+    const fade = Math.min(1, c.life / 0.6);
+    m.root.scale.setScalar(0.92 * (0.6 + 0.4 * fade));
+  }
+
   // ---------- co-op: what friends see ----------
   serialize() {
     const r2 = this.r2, out = [];
     for (const n of this.needles) if (n.life > 0) out.push(['n', r2(n.mesh.position.x), r2(n.mesh.position.z), r2(n.mesh.rotation.y), n.color]);
+    for (const n of this.stars) if (n.life > 0) out.push(['s', r2(n.mesh.position.x), r2(n.mesh.position.z), 0, n.color]);
+    for (const c of this.clones) if (c.life > 0) out.push(['c', r2(c.position.x), r2(c.position.z), r2(c.facing), r2(c.life), c.flick > 0 ? 1 : 0]);
     for (const d of this.decoys) if (d.life > 0) out.push(['d', r2(d.position.x), r2(d.position.z), d.mat.color.getHex()]);
     for (const d of this.drones) if (d.life > 0) out.push(['r', r2(d.obj.position.x), r2(d.obj.position.z), r2(d.obj.rotation.y)]);
     for (const v of this.vortexes) if (v.life > 0) out.push(['v', r2(v.obj.position.x), r2(v.obj.position.z), r2(v.radius)]);
@@ -246,9 +341,21 @@ export class Allies {
   }
 
   applySnapshot(list) {
-    const used = { n: 0, d: 0, r: 0, v: 0 };
+    const used = { n: 0, s: 0, c: 0, d: 0, r: 0, v: 0 };
     for (const s of list || []) {
       const [k, x, z, a, b] = s;
+      if (k === 's') {
+        const n = this.stars[used.s++]; if (!n) continue;
+        if (!n.mesh.visible) n.mesh.position.set(x, 1.1, z);
+        n.target.set(x, 1.1, z); for (const p of n.parts) p.material = this.mat(b); n.mesh.visible = true; n.life = 1;
+        continue;
+      }
+      if (k === 'c') {
+        const c = this.clones[used.c++]; if (!c) continue;
+        if (!c.m.root.visible) c.position.set(x, 0, z);
+        c.target.set(x, 0, z); c.facing = a; c.life = b; c.flick = s[5] ? 0.15 : c.flick; c.m.root.visible = true;
+        continue;
+      }
       if (k === 'n') {
         const n = this.needles[used.n++]; if (!n) continue;
         if (!n.mesh.visible) n.mesh.position.set(x, 1.1, z);
@@ -266,6 +373,8 @@ export class Allies {
       }
     }
     this.needles.slice(used.n).forEach((n) => { n.life = 0; n.mesh.visible = false; });
+    this.stars.slice(used.s).forEach((n) => { n.life = 0; n.mesh.visible = false; });
+    this.clones.slice(used.c).forEach((c) => { c.life = 0; c.m.root.visible = false; });
     this.decoys.slice(used.d).forEach((d) => { d.life = 0; d.obj.visible = false; });
     this.drones.slice(used.r).forEach((d) => { d.life = 0; d.obj.visible = false; });
     this.vortexes.slice(used.v).forEach((v) => { v.life = 0; v.obj.visible = false; });
@@ -274,6 +383,8 @@ export class Allies {
   clientUpdate(dt) {
     const k = 1 - Math.exp(-14 * dt);
     for (const n of this.needles) if (n.mesh.visible) n.mesh.position.lerp(n.target, k);
+    for (const n of this.stars) if (n.mesh.visible) { n.mesh.position.lerp(n.target, k); n.mesh.rotation.y += dt * 22; }
+    for (const c of this.clones) if (c.m.root.visible) { c.position.lerp(c.target, k); this.poseClone(c, dt); }
     for (const d of this.drones) if (d.obj.visible) d.obj.position.lerp(d.target, k);
     for (const d of this.decoys) if (d.obj.visible) { d.obj.rotation.y += dt * 3; d.mat.opacity = 0.3 + 0.15 * Math.sin(performance.now() / 90); }
     for (const v of this.vortexes) if (v.obj.visible) { v.a.rotation.z -= dt * 6; v.b.rotation.z += dt * 9; }
@@ -281,6 +392,8 @@ export class Allies {
 
   reset() {
     for (const n of this.needles) { n.life = 0; n.mesh.visible = false; }
+    for (const n of this.stars) { n.life = 0; n.mesh.visible = false; }
+    for (const c of this.clones) { c.life = 0; c.m.root.visible = false; c.owner = null; }
     for (const d of this.decoys) { d.life = 0; d.obj.visible = false; }
     for (const d of this.drones) { d.life = 0; d.obj.visible = false; d.owner = null; }
     for (const v of this.vortexes) { v.life = 0; v.obj.visible = false; v.owner = null; }

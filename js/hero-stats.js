@@ -73,8 +73,27 @@ export const HERO_STATS = {
     dashCd: 3.5, dashCharges: 1, grappleRange: 9, grappleDmg: 14, grappleStun: 0.7, grappleSpeed: 26, reelDist: 5,
     ultCd: 14, vortexTime: 3, vortexRadius: 6, vortexDmg: 4, vortexTick: 0.25, drones: 2, droneTime: 10, droneDmg: 6, droneRate: 0.6, droneRange: 9,
   },
+  // KAGERO (CoreBurnZ only): ninja. Auto-aimed shurikens, Shadow Step (teleport behind / through
+  // enemies, cutting everything on the way), and Shadow Clone: a shade that copies his throws and steps.
+  ninja: {
+    id: 'ninja', name: 'KAGERO', title: 'Shadow ninja', tag: 'NINJA', color: 0x8a7aff, blade: 0xc8c0ff, zOnly: true,
+    blurb: 'Throws shurikens on the move, steps behind enemies, and fights beside his shadow clone.',
+    hp: 120, speed: 7.5, dmg: 0.8, atkSpeed: 1, armor: 0,
+    abilities: {
+      attack: { name: 'Shurikens', short: 'STAR', icon: '✴', desc: 'Spinning stars that seek the enemy you move towards and pierce 1' },
+      mobility: { name: 'Shadow Step', short: 'SHADOW<br>STEP', icon: '◐', desc: 'Teleport behind the nearest enemy ahead, cutting through everything on the way' },
+      ultimate: { name: 'Shadow Clone', short: 'SHADOW<br>CLONE', icon: '♊', desc: 'A shadow clone fights beside you, copying your throws and steps' },
+    },
+    needle: { damage: 11, rate: 0.2, speed: 26, range: 14, pierce: 1, aimRange: 13, moveWhileFiring: 0.9 },
+    dashCd: 2.6, dashCharges: 1, stepRange: 7, stepDist: 5, stepDmg: 22, stepGuard: 0.3,
+    ultCd: 13, cloneTime: 8, clonePct: 0.5,
+  },
 };
 export const CHARACTER_ORDER = ['sarrow', 'zaleks', 'iskra', 'orin'];
+// CoreBurnZ adds the ninja; classic keeps the original 4
+export const Z_HEROES = ['ninja'];
+export const ALL_HEROES = [...CHARACTER_ORDER, ...Z_HEROES];
+export const heroOrder = (z) => (z ? ALL_HEROES : CHARACTER_ORDER);
 
 // The old one-line budget (DPS x HP x mobility) is replaced by the kit simulator:
 // scripts/sim-ttk.mjs (wave-clear time + survival time per hero, per scenario).

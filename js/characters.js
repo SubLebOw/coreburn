@@ -12,9 +12,9 @@
 // numbers. They stay within ~10% of each other at every wave.
 import * as THREE from 'three';
 
-import { HERO_STATS, CHARACTER_ORDER, characterBudget } from './hero-stats.js';
-export { CHARACTER_ORDER, characterBudget };
-const BUILDERS = { sarrow: (t) => buildSarrow(t), zaleks: (t) => buildZaleks(t), iskra: (t) => buildIskra(t), orin: (t) => buildOrin(t) };
+import { HERO_STATS, CHARACTER_ORDER, ALL_HEROES, heroOrder, characterBudget } from './hero-stats.js';
+export { CHARACTER_ORDER, ALL_HEROES, heroOrder, characterBudget };
+const BUILDERS = { sarrow: (t) => buildSarrow(t), zaleks: (t) => buildZaleks(t), iskra: (t) => buildIskra(t), orin: (t) => buildOrin(t), ninja: (t) => buildNinja(t) };
 export const CHARACTERS = Object.fromEntries(Object.entries(HERO_STATS).map(([id, c]) => [id, { ...c, build: BUILDERS[id] }]));
 
 // Co-op duplicates get a colour tint so you can tell them apart
@@ -326,4 +326,63 @@ function buildOrin(tint) {
   const armL = arm(0.44), armR = arm(-0.44);
   const flashMats = [mats.plate, mats.plateDark, mats.cloth, mats.accent, mats.metal, mats.mask];
   return { root, body, head, core, legL, legR, armL, armR, flashMats, blade: mats.blade, blades, halos, bladeBase: -0.8, bladeLen: 0.62 };
+}
+
+// ---------- KAGERO (CoreBurnZ): the ninja ----------
+// A scrap-shinobi who slipped out of the choir: midnight wraps, a riveted half-mask with a violet
+// visor slit, a long tattered scarf, a shuriken bandolier and a katana-plate on his back.
+function buildNinja(tint) {
+  const mats = tintMats(tint, {
+    cloth: new THREE.MeshLambertMaterial({ color: 0x23232e }),     // midnight wraps
+    clothDark: new THREE.MeshLambertMaterial({ color: 0x14141b }),
+    accent: new THREE.MeshLambertMaterial({ color: 0x5a3ad0 }),    // violet scarf
+    metal: new THREE.MeshLambertMaterial({ color: 0x8a909a }),
+    mask: new THREE.MeshLambertMaterial({ color: 0x3a3a46 }),
+    face: new THREE.MeshBasicMaterial({ color: 0x07070b }),
+    glow: new THREE.MeshBasicMaterial({ color: 0x9a8aff }),
+    blade: new THREE.MeshBasicMaterial({ color: 0xc8c0ff, transparent: true, opacity: 0.9 }),
+  });
+  const box = boxMaker(new THREE.BoxGeometry(1, 1, 1));
+  const root = new THREE.Group(), body = new THREE.Group();
+  root.add(body);
+  function leg(x) {
+    const g = new THREE.Group(); g.position.set(x, 0.92, 0); body.add(g);
+    box(g, mats.cloth, 0.21, 0.62, 0.23, 0, -0.31, 0);
+    box(g, mats.clothDark, 0.23, 0.3, 0.3, 0, -0.77, 0.03);         // tabi boot
+    box(g, mats.accent, 0.24, 0.04, 0.31, 0, -0.6, 0.03, false);    // shin wrap
+    return g;
+  }
+  const legL = leg(0.14), legR = leg(-0.14);
+  box(body, mats.cloth, 0.5, 0.64, 0.3, 0, 1.36, 0);               // torso
+  box(body, mats.clothDark, 0.44, 0.28, 0.28, 0, 1.0, 0);
+  box(body, mats.accent, 0.54, 0.09, 0.34, 0, 1.1, 0, false);       // obi belt
+  const strap = box(body, mats.metal, 0.07, 0.78, 0.34, 0, 1.38, 0, false); strap.rotation.z = 0.7; // shuriken bandolier
+  for (const t of [-0.18, 0, 0.18]) { const st = box(body, mats.metal, 0.1, 0.1, 0.03, t * 0.9, 1.38 + t * 0.75, 0.17, false); st.rotation.z = Math.PI / 4; }
+  const sword = box(body, mats.clothDark, 0.08, 1.0, 0.06, 0.05, 1.5, -0.2); sword.rotation.z = -0.6; // katana sheath on the back
+  box(body, mats.metal, 0.14, 0.05, 0.1, -0.24, 1.86, -0.2, false).rotation.z = -0.6;
+  box(body, mats.accent, 0.44, 0.12, 0.36, 0, 1.73, 0);             // scarf collar
+  for (const sx of [-0.07, 0.08]) { const sc = box(body, mats.accent, 0.11, 0.05, 1.1, sx, 1.72, -0.58); sc.rotation.x = 0.28; }
+  const coreRing = box(body, mats.metal, 0.17, 0.17, 0.05, 0, 1.46, 0.15, false); coreRing.rotation.z = Math.PI / 4;
+  const core = box(body, mats.glow, 0.1, 0.1, 0.06, 0, 1.46, 0.17, false); core.rotation.z = Math.PI / 4;
+  const head = new THREE.Group(); head.position.set(0, 2.03, 0); body.add(head);
+  box(head, mats.cloth, 0.38, 0.4, 0.4, 0, 0, 0);                   // hood
+  box(head, mats.mask, 0.4, 0.2, 0.06, 0, -0.08, 0.2);              // riveted half-mask
+  box(head, mats.face, 0.3, 0.08, 0.04, 0, 0.07, 0.2, false);
+  box(head, mats.glow, 0.26, 0.03, 0.02, 0, 0.07, 0.215, false);    // visor slit
+  for (const s2 of [-1, 1]) box(head, mats.accent, 0.05, 0.05, 0.4, s2 * 0.1, 0.12, -0.35, false).rotation.x = 0.5; // headband tails
+  box(head, mats.accent, 0.4, 0.06, 0.42, 0, 0.12, 0, false);       // headband
+  const blades = [], halos = [];
+  function arm(x) {
+    const g = new THREE.Group(); g.position.set(x, 1.64, 0); body.add(g);
+    box(g, mats.cloth, 0.16, 0.55, 0.18, 0, -0.27, 0);
+    box(g, mats.clothDark, 0.2, 0.24, 0.22, 0, -0.64, 0);
+    box(g, mats.metal, 0.21, 0.05, 0.23, 0, -0.55, 0, false);
+    const b = box(g, mats.blade, 0.2, 0.2, 0.03, 0, -0.84, 0.06, false); b.rotation.z = Math.PI / 4; blades.push(b); // a shuriken in hand
+    const halo = box(g, new THREE.MeshBasicMaterial({ color: 0xc8c0ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }), 0.3, 0.3, 0.06, 0, -0.84, 0.06, false);
+    halo.rotation.z = Math.PI / 4; halo.visible = false; halos.push(halo);
+    return g;
+  }
+  const armL = arm(0.34), armR = arm(-0.34);
+  const flashMats = [mats.cloth, mats.clothDark, mats.accent, mats.metal, mats.mask];
+  return { root, body, head, core, legL, legR, armL, armR, flashMats, blade: mats.blade, blades, halos, bladeBase: -0.84, bladeLen: 0.2 };
 }

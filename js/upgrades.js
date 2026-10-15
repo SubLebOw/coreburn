@@ -39,7 +39,7 @@ export function tierColor(tier, base = TIER_COLOURS[0]) {
 
 // group: attack / mobility / ultimate / core. desc(level) = what the NEXT level gives.
 // heroes: only offered to those heroes (no `heroes` = a universal card every hero can roll).
-const S = ['sarrow'], Z = ['zaleks'], I = ['iskra'], O = ['orin'];
+const S = ['sarrow'], Z = ['zaleks'], I = ['iskra'], O = ['orin'], N = ['ninja'];
 export const UPGRADES = {
   // ---- universal (every hero) ----
   edge:     { name: 'Core Edge', group: 'attack', icon: '✦', color: 0xff8a3a, max: 10, desc: () => '+3.5% damage (everything)' },
@@ -87,6 +87,13 @@ export const UPGRADES = {
   oDroneDmg:{ name: 'Drone Armament', heroes: O, group: 'ultimate', icon: '✜', color: 0xff7a6a, max: 5, desc: () => '+10% drone damage' },
   oDroneTime:{ name: 'Drone Lifespan', heroes: O, group: 'ultimate', icon: '⧗', color: 0xffaa9a, max: 3, desc: () => 'Drones last +1s' },
   oShell:   { name: 'Hymn Shell', heroes: O, group: 'ultimate', icon: '⬣', color: 0xff8a9a, max: 4, desc: () => 'Take -6% damage while your drones fly' },
+  // ---- KAGERO (CoreBurnZ) ----
+  nPierce:  { name: 'Razor Stars', heroes: N, group: 'attack', icon: '✴', color: 0xc8c0ff, max: 2, desc: () => 'Shurikens pierce +1 enemy' },
+  nFan:     { name: 'Star Fan', heroes: N, group: 'attack', icon: '⋔', color: 0xa898ff, max: 2, desc: () => '+1 side shuriken each side per throw (30% damage)' },
+  nEdge:    { name: 'Shadow Edge', heroes: N, group: 'mobility', icon: '◐', color: 0x8a7aff, max: 5, desc: () => '+25% Shadow Step damage, +8% step reach' },
+  nTwin:    { name: 'Twin Shadows', heroes: N, group: 'mobility', icon: '⇉', color: 0x9a8aff, max: 1, desc: () => 'Shadow Step +1 charge' },
+  nShade:   { name: 'Lingering Shade', heroes: N, group: 'ultimate', icon: '♊', color: 0x6a5aff, max: 4, desc: () => 'Shadow Clone lasts +1s' },
+  nMirror:  { name: 'Perfect Mirror', heroes: N, group: 'ultimate', icon: '⧉', color: 0xb0a0ff, max: 4, desc: () => 'Clone copies with +10% of your damage' },
   oVortex:  { name: 'Deep Vortex', heroes: O, group: 'ultimate', icon: '◉', color: 0xff5070, max: 5, desc: () => '+10% vortex radius and pull' },
 };
 // COREBURNZ BOSS CARDS: one gold pick after every boss kill (never in the normal pool). Rarer and
@@ -202,7 +209,7 @@ export class Loadout {
       spinCd: 1 - (RULES.z ? Z_TUNING.ultCoolStep : 0.05) * L('odCool'),
       dashDmg: 1 + 0.25 * L('bkDamage'),
       dashTime: 1 + 0.075 * L('bkRange'),
-      dashCharges: 1 + L('bkCharge') + L('iHop'),
+      dashCharges: 1 + L('bkCharge') + L('iHop') + L('nTwin'),
       dashCd: 1 - 0.06 * L('bkCool'),
       trail: L('bkTrail') * 0.6,                  // trail tick = (4 + 3 x this) x damage
       speed: 1 + 0.03 * L('speed'),
@@ -221,6 +228,9 @@ export class Loadout {
       // Orin
       chains: L('oChain'), reach: 1 + 0.1 * L('oReach'), grapple: L('oGrapple'), drones: L('oDrone'),
       droneDmg: 1 + 0.1 * L('oDroneDmg'), droneTime: 1 * L('oDroneTime'), vortex: 1 + 0.1 * L('oVortex'), shell: 0.06 * L('oShell'),
+      // Kagero
+      starPierce: L('nPierce'), starFan: L('nFan'), stepDmg: 1 + 0.25 * L('nEdge'), stepRange: 1 + 0.08 * L('nEdge'),
+      cloneTime: L('nShade'), cloneDmg: 0.1 * L('nMirror'),
       hurtMult: (L('greed') ? 1.15 : 1) * (L('glass') ? 1.2 : 1),
     };
     // cursed cards

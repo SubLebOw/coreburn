@@ -3,7 +3,7 @@
 // capes, auras, talon trails and banners you've unlocked by levelling up, and see that hero's five
 // ARENA SKINS (with a spinning 3D preview). Arena skins: AUTO (CoreBurnZ only) / ALWAYS / OFF.
 import * as THREE from 'three';
-import { COSMETICS, ARENA_SKINS, SLOTS, SLOT_LABEL, HERO_IDS, xpNeeded } from './progress.js';
+import { COSMETICS, ARENA_SKINS, SLOTS, SLOT_LABEL, HERO_IDS, xpNeeded, SKIN_VARIANTS, TITLES, PLATES, ACCOUNT_MAX } from './progress.js';
 import { CHARACTERS } from './characters.js';
 import { Wardrobe } from './cosmetics.js';
 
@@ -27,7 +27,10 @@ export class CosmeticsUI {
     const lv = this.p.level, need = xpNeeded(lv);
     $('cos-sub').textContent = `level ${lv} · ${COSMETICS.filter((c) => this.p.owns(c)).length}/${COSMETICS.length} unlocked`;
     $('lvl-text').textContent = `LEVEL ${lv}`;
-    $('lvl-fill').style.width = `${Math.round(100 * this.p.xp / need)}%`;
+    $('lvl-fill').style.width = lv >= ACCOUNT_MAX ? '100%' : `${Math.round(100 * this.p.xp / need)}%`;
+    $('lvl-title').textContent = this.p.title ? this.p.title.name : '';
+    const bar = $('lvl-bar');
+    for (const pl of PLATES) bar.classList.toggle('plate-' + pl.id, this.p.plate?.id === pl.id);
   }
 
   open(hero) {
@@ -47,7 +50,8 @@ export class CosmeticsUI {
 
   render() {
     const p = this.p;
-    $('cos-level').innerHTML = `LEVEL <b>${p.level}</b> · ${p.xp}/${xpNeeded(p.level)} XP`;
+    const hi = p.heroInfo(this.hero);
+    $('cos-level').innerHTML = `LEVEL <b>${p.level}</b>${p.level >= ACCOUNT_MAX ? ' · MAX' : ` · ${p.xp}/${xpNeeded(p.level)} XP`}<br><small>${CHARACTERS[this.hero].name} HERO LV <b>${hi.level}</b>${hi.max ? ' · MAX' : ` · ${hi.xp}/${hi.need}`}</small>`;
     const tabs = $('cos-tabs'); tabs.innerHTML = '';
     for (const h of HERO_IDS) {
       const b = document.createElement('button');
@@ -65,7 +69,7 @@ export class CosmeticsUI {
       const b = document.createElement('button');
       b.className = 'sp-item cos-item' + (own ? ' owned' : ' locked') + (on ? ' on' : '');
       b.style.setProperty('--c', hex(item.color));
-      b.innerHTML = `<div class="sw">${SLOT_ICON[item.slot]}</div><div class="nm"></div><div class="ds">${SLOT_LABEL[item.slot]}</div><div class="st">${on ? 'EQUIPPED · tap to remove' : own ? 'TAP TO EQUIP' : `🔒 LEVEL ${item.level}`}</div>`;
+      b.innerHTML = `<div class="sw">${SLOT_ICON[item.slot]}</div><div class="nm"></div><div class="ds">${SLOT_LABEL[item.slot]}</div><div class="st">${on ? 'EQUIPPED · tap to remove' : own ? 'TAP TO EQUIP' : item.heroLevel ? `🔒 HERO LV ${item.heroLevel}` : `🔒 LEVEL ${item.level}`}</div>`;
       b.querySelector('.nm').textContent = item.name;
       b.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -94,6 +98,25 @@ export class CosmeticsUI {
       b.addEventListener('click', (e) => { e.stopPropagation(); p.setArenaSkins(v); this.render(); this.onChange?.(); });
       mode.appendChild(b);
     }
+    // hero skin variants, titles, name plates
+    const chip = (box, label, own, on, lockText, color, click) => {
+      const b = document.createElement('button');
+      b.className = 'cos-chip' + (own ? '' : ' locked') + (on ? ' on' : '');
+      b.innerHTML = (color != null ? `<i style="background:${hex(color)}"></i>` : '') + '<span></span>';
+      b.querySelector('span').textContent = own ? label : `🔒 ${label} · ${lockText}`;
+      b.addEventListener('click', (e) => { e.stopPropagation(); if (own) click(); });
+      box.appendChild(b);
+    };
+    const vb = $('cos-variants'); vb.innerHTML = '';
+    const curV = p.variantOf(this.hero);
+    chip(vb, 'DEFAULT', true, !curV, '', null, () => { p.setVariant(this.hero, null); this.previewVariant = null; this.render(); this.buildPreview(); this.onChange?.(); });
+    for (const v of SKIN_VARIANTS[this.hero]) chip(vb, v.name.toUpperCase(), p.owns(v), curV?.id === v.id, `HERO LV ${v.heroLevel}`, v.tint, () => { p.setVariant(this.hero, v.id); this.render(); this.buildPreview(); this.onChange?.(); });
+    const tb = $('cos-titles'); tb.innerHTML = '';
+    chip(tb, 'NO TITLE', true, !p.title, '', null, () => { p.setTitle(null); this.render(); this.refreshBadge(); this.onChange?.(); });
+    for (const t of TITLES.filter((x) => !x.hero || x.hero === this.hero)) chip(tb, t.name, p.owns(t), p.title?.id === t.id, t.hero ? `HERO LV ${t.heroLevel}` : `LV ${t.level}`, null, () => { p.setTitle(t.id); this.render(); this.refreshBadge(); this.onChange?.(); });
+    const pb = $('cos-plates'); pb.innerHTML = '';
+    chip(pb, 'PLAIN', true, !p.plate, '', null, () => { p.setPlate(null); this.render(); this.refreshBadge(); });
+    for (const pl of PLATES) chip(pb, pl.name.toUpperCase(), p.owns(pl), p.plate?.id === pl.id, `LV ${pl.level}`, null, () => { p.setPlate(pl.id); this.render(); this.refreshBadge(); });
   }
 
   // ---- a small spinning 3D preview of the hero wearing their stuff ----
@@ -125,7 +148,7 @@ export class CosmeticsUI {
     if (!this.scene) return;
     if (this.model) this.scene.remove(this.model.root);
     const c = CHARACTERS[this.hero];
-    const s = this.previewSkin;
+    const s = this.previewSkin || this.p.variantOf(this.hero);
     this.model = c.build(s ? s.tint : null);
     if (s && this.model.core) this.model.core.material.color.setHex(s.glow);
     this.scene.add(this.model.root);

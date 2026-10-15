@@ -15,7 +15,12 @@
 //   survival time   = (effective hp + 10 s of regen/shield) / (incoming dps x exposure x (1 - avoided))
 // Absolute seconds are a model; what matters is that every hero lands within ~10% of Iskra (the reference kit).
 import { Loadout, weaponMult, PICK_EVERY } from '../js/upgrades.js';
-import { HERO_STATS, CHARACTER_ORDER } from '../js/hero-stats.js';
+import { HERO_STATS, CHARACTER_ORDER as BASE_ORDER, ALL_HEROES } from '../js/hero-stats.js';
+import { RULES, Z_TUNING, zHero } from '../js/rules.js';
+// --z: CoreBurnZ rules (adds KAGERO, the Z per-hero tuning and the Z boss health)
+const ZMODE = process.argv.includes('--z');
+if (ZMODE) RULES.z = true;
+const CHARACTER_ORDER = ZMODE ? ALL_HEROES : BASE_ORDER;
 
 const hpMult = (n) => 1 + 0.14 * (n - 1);
 const dmgMult = (n) => 1 + 0.07 * (n - 1);
@@ -28,6 +33,7 @@ const HERO_CARDS = {
   sarrow: ['shock', 'bkCharge', 'arc', 'odTime', 'odRadius', 'bkDamage', 'bkTrail', 'odLeech', 'bkRange'],
   zaleks: ['zStun', 'zShield', 'zGuard', 'zQuake', 'zHammer', 'zTaunt', 'zCharge'],
   iskra: ['iPierce', 'iHop', 'iSplit', 'iStorm', 'iDecoy', 'iVolley', 'iHopRange'],
+  ninja: ['nEdge', 'nPierce', 'nMirror', 'nFan', 'nShade', 'nTwin'],
   orin: ['oDrone', 'oShell', 'oChain', 'oDroneDmg', 'oGrapple', 'oVortex', 'oShell', 'oReach', 'oDroneTime'],
 };
 function build(hero, picks) {
@@ -118,20 +124,35 @@ function kit(id, l, scen) {
       avoid = (scen === 'boss' ? 0.05 : 0.1 + 0.03 * s.grapple + 0.56 * Math.min(0.5, c.beam.lock) * (0.4 + 0.6 * crowd)) + 0.06; // pinned (tether) / yanked enemies, grapple escapes
       break;
     }
+    case 'ninja': {
+      const nd = c.needle;
+      st = nd.damage / nd.rate * 0.85;
+      const pierce = 1 + 0.55 * (nd.pierce + s.starPierce) * crowd;
+      const fan = 2 * s.starFan * 0.3 * (0.3 + 0.5 * crowd);
+      clear = st * (pierce + fan);
+      st *= 1 + fan * (scen === 'boss' ? 0.5 : 0);
+      const cloneUp = Math.min(1, (c.cloneTime + s.cloneTime) / ultCd);
+      ult = st * (c.clonePct + s.cloneDmg) * cloneUp * s.spinDmg; ultClear = clear * (c.clonePct + s.cloneDmg) * cloneUp * s.spinDmg;
+      mob = c.stepDmg * s.stepDmg / mobCd * charges * aoe(2.2);
+      uptime = 0.9;
+      exposure = 0.62;
+      avoid = (c.stepGuard + 0.15) / mobCd * charges + 0.1 * cloneUp * (scen === 'boss' ? 0.3 : 1); // step i-frames, the clone draws some aggro
+      break;
+    }
   }
-  const tierDmg = s.dmg * this_perk(s) * c.dmg;
+  const tierDmg = s.dmg * this_perk(s) * c.dmg * zHero(id).dmg;
   const dpsST = (st * uptime + ult + mob) * tierDmg;
   const dpsClear = (clear * uptime + ultClear + mob) * tierDmg;
-  const maxHp = Math.round(c.hp * (1 + s.maxHpPct)) + s.maxHpFlat;
+  const maxHp = Math.round(c.hp * zHero(id).hp * (1 + s.maxHpPct)) + s.maxHpFlat;
   const regen = 3.2 * s.regen + Math.min(6, s.leech * 4) * 0.5 + heal;
-  const mobility = (c.speed * s.speed) / HERO_STATS.sarrow.speed;
+  const mobility = (c.speed * (zHero(id).speed || 1) * s.speed) / HERO_STATS.sarrow.speed;
   return { dpsST, dpsClear, maxHp, ehp: maxHp * ehpMult, shieldPs: shieldPs * maxHp, regen, exposure, avoid: 0.55 * (1 - Math.exp(-avoid / 0.55)), mobility }; // dodges have diminishing returns
 }
 function this_perk(s) { return (1 + 0.8 * s.crit) * (1 + s.twin * 0.8); }
 
-// --z: CoreBurnZ bosses have +10% hp, and 5 of the 12 rotation slots are the Grindchoir bosses
+// --z: CoreBurnZ bosses have +15.5% hp (x1.1 x1.05), and 5 of the 12 rotation slots are the Grindchoir bosses
 // (avg base hp 720 vs the 650 classic yardstick). Applies equally to every hero.
-const Z_BOSS = process.argv.includes('--z') ? 1.1 * (7 / 12 + (5 / 12) * (720 / 650)) : 1;
+const Z_BOSS = ZMODE ? Z_TUNING.bossHp * (7 / 12 + (5 / 12) * (720 / 650)) : 1;
 function scenario(id, n, scen) {
   const l = build(id, picksBefore(n));
   const k = kit(id, l, scen);
@@ -158,8 +179,8 @@ for (const scen of Object.keys(SCEN)) {
   for (const n of WAVES) {
     const r = Object.fromEntries(CHARACTER_ORDER.map((id) => [id, scenario(id, n, scen)]));
     // v1.11: the yardstick is Iskra (the strongest kit in play); everyone is tuned up to her level
-    const avgC = REF ? r[REF].clearTime : CHARACTER_ORDER.reduce((a, id) => a + r[id].clearTime, 0) / 4;
-    const avgS = REF ? r[REF].survive : CHARACTER_ORDER.reduce((a, id) => a + r[id].survive, 0) / 4;
+    const avgC = REF ? r[REF].clearTime : CHARACTER_ORDER.reduce((a, id) => a + r[id].clearTime, 0) / CHARACTER_ORDER.length;
+    const avgS = REF ? r[REF].survive : CHARACTER_ORDER.reduce((a, id) => a + r[id].survive, 0) / CHARACTER_ORDER.length;
     const row = { scenario: `${SCEN[scen].label} w${n}` };
     for (const id of CHARACTER_ORDER) {
       row[`${id} clear`] = `${r[id].clearTime.toFixed(1)}s (${pct(r[id].clearTime, avgC)})`;

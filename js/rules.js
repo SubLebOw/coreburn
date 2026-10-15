@@ -8,6 +8,23 @@ export const Z_TUNING = {
   ownedWeight: 1.5,  // cards you already have are 1.5x as likely to be offered
   ultCoolStep: 0.10, // Ultimate Coolant: -10% per pick (classic -5%)
   arcRange: 1.5,     // ARC TALONS chain range x1.5 (6 m -> 9 m)
-  bossHp: 1.1,       // bosses +10% health
+  bossHp: 1.1 * 1.05, // bosses +10% health, then +5% more in v1.14 (x1.155 total)
+  shieldMax: 2,      // SHIELD pick-ups give a charge that blocks the next hit (max 2)
 };
+// CoreBurnZ per-hero tuning (v1.14, from the bot autoplayer + kit sim). Classic is untouched.
+export const Z_HERO = {
+  sarrow: { hp: 1.15, dmg: 1.15 },
+  zaleks: { hp: 1.4, dmg: 1.6, speed: 1.15 },
+  iskra: { hp: 1.1, dmg: 1 },
+  orin: { hp: 1, dmg: 0.88 },
+  ninja: { hp: 1, dmg: 1 },
+};
+// Classic per-hero tuning (v1.14 bot pass): weak heroes buffed up towards ORIN, nobody nerfed.
+export const C_HERO = {
+  sarrow: { hp: 1.1, dmg: 1.12 },
+  zaleks: { hp: 1.2, dmg: 1.25, speed: 1.08 },
+  iskra: { hp: 1.1, dmg: 1.1 },
+};
+const NO_TUNE = { hp: 1, dmg: 1 };
+export const zHero = (id) => (RULES.z ? Z_HERO[id] : C_HERO[id]) || NO_TUNE;
 export function setRules(z) { RULES.z = !!z; if (typeof document !== 'undefined') document.body.classList.toggle('zmode', RULES.z); }

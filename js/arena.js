@@ -274,6 +274,7 @@ export function createArena(scene, env) {
     },
 
     isClear,
+    inCrack,
 
     // The nearest spot to `pos` where something of size `radius` fits (spirals outwards)
     findClearSpot(pos, radius) {

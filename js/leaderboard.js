@@ -17,7 +17,7 @@ import { GAME_VERSION } from './version.js';
 const LOCAL_KEY = 'coreburn-boards';
 const ID_KEY = 'coreburn-player-id';
 const NAME_KEY = 'coreburn-name';
-const HEROES = ['sarrow', 'zaleks', 'iskra', 'orin'];
+const HEROES = ['sarrow', 'zaleks', 'iskra', 'orin', 'ninja']; // ninja = CoreBurnZ boards only
 
 export const online = !!(CFG.enabled && CFG.supabaseUrl && CFG.supabaseAnonKey);
 

@@ -10,6 +10,7 @@
 //   ARC TALONS 10s   your slashes and blinks chain lightning to 3 nearby enemies
 import * as THREE from 'three';
 import { RULES, Z_TUNING } from './rules.js';
+const Z_SHIELD_TIME = 1e6;
 
 export const POWERUPS = {
   slowmo: { label: 'SLOW', name: 'SLOW-MO', color: 0x3cf0e0, duration: 5, weight: 1.2, hint: 'Time slows down!' },
@@ -126,6 +127,14 @@ export class PowerUps {
   activate(type, player = this.world.player) {
     const def = POWERUPS[type];
     player.powers = player.powers || {};
+    if (type === 'shield' && RULES.z) {
+      // COREBURNZ: a SHIELD CHARGE that blocks the next hit (stacks to 2, no timer)
+      const had = player.powers.shield ? player.powers.shield.hits : 0;
+      player.powers.shield = { time: Z_SHIELD_TIME, max: Z_SHIELD_TIME, hits: Math.min(Z_TUNING.shieldMax, had + 1), charges: true };
+      player.bubble.visible = true;
+      this.world.onPowerup?.(type, { ...def, hint: `Shield charge ${player.powers.shield.hits}/${Z_TUNING.shieldMax}: blocks the next hit` }, player);
+      return;
+    }
     player.powers[type] = { time: def.duration, max: def.duration, hits: def.hits || 0 };
     if (type === 'fury') player.damageMult = 2;
     if (type === 'shield') player.bubble.visible = true;
@@ -152,6 +161,12 @@ export class PowerUps {
     if (!s) return false;
     this.world.effects.spawnRing(player.position, 0x7fd8ff, 2, 0.3);
     this.world.sfx('shieldBlock');
+    if (s.charges) { // COREBURNZ: every hit (hazards too) uses one charge
+      s.hits--;
+      this.world.effects.spawnSparks(player.position.clone().setY(1.2), 0x7fd8ff, 10, 6);
+      if (s.hits <= 0) this.end('shield', false, player);
+      return true;
+    }
     if (!opts.hazard) {
       s.hits--;
       if (s.hits <= 0) this.end('shield', false, player);
@@ -244,7 +259,7 @@ export class PowerUps {
       if (h.dead || !h.powers) continue;
       for (const type of Object.keys(h.powers)) {
         const a = h.powers[type];
-        a.time -= realDt;
+        if (!a.charges) a.time -= realDt; // COREBURNZ shield charges don't run out
         if (a.time <= 0) this.end(type, false, h);
       }
       if (h.powers.shield) h.bubble.material.opacity = 0.16 + 0.08 * Math.sin(performance.now() / 120);
@@ -256,7 +271,7 @@ export class PowerUps {
   listFor(hero) {
     return Object.entries(hero.powers || {}).map(([type, a]) => ({
       type, label: POWERUPS[type].label, color: POWERUPS[type].color,
-      left: Math.max(0, a.time / a.max), seconds: Math.ceil(a.time), hits: a.hits,
+      left: a.charges ? a.hits / Z_TUNING.shieldMax : Math.max(0, a.time / a.max), seconds: a.charges ? 99 : Math.ceil(a.time), hits: a.hits, charges: !!a.charges,
     }));
   }
 }

@@ -29,6 +29,14 @@ const UNLOCKS = [
   { type: 'bulwark', wave: 4, weight: 1.3 },
   { type: 'splitter', wave: 6, weight: 1.6 },
 ];
+// COREBURNZ ONLY: five later-stage Grindchoir types join the mix (classic never sees them)
+const Z_UNLOCKS = [
+  { type: 'thurible', wave: 12, weight: 1.1 },
+  { type: 'lancer', wave: 15, weight: 1.0 },
+  { type: 'mender', wave: 18, weight: 0.6 },
+  { type: 'grub', wave: 22, weight: 1.0 },
+  { type: 'bomber', wave: 26, weight: 1.0 },
+];
 
 export function waveStats(n) {
   return {
@@ -115,7 +123,7 @@ export class WaveManager {
     }
 
     const total = Math.round((4 + 2 * n) * (this.world.coopCount || 1) * (mut?.count || 1)); // co-op / SWARM: more enemies
-    const pool = UNLOCKS.filter((u) => n >= u.wave);
+    const pool = (RULES.z ? UNLOCKS.concat(Z_UNLOCKS) : UNLOCKS).filter((u) => n >= u.wave);
     const totalWeight = pool.reduce((s, u) => s + u.weight, 0);
     const rng = this.world.waveRng?.(n) || Math.random; // daily challenge: the same mix + elites for everyone
     this.eliteQueue = [];

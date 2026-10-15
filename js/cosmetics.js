@@ -30,6 +30,10 @@ const BUILD = {
         for (let i = -2; i <= 2; i++) box(g, gl, 0.03, 0.18 + (2 - Math.abs(i)) * 0.1, 0.03, i * 0.08, 0.36 + (2 - Math.abs(i)) * 0.05, 0.12, 0, -i * 0.15);
         box(g, m, 0.42, 0.04, 0.06, 0, 0.27, 0.12);
         break;
+      case 'ninja': { // ronin kasa: a wide flat cone hat
+        const k = new THREE.Mesh(new THREE.ConeGeometry(0.52, 0.26, 12), m); k.position.y = 0.36; g.add(k);
+        box(g, gl, 0.06, 0.06, 0.06, 0, 0.5, 0); break;
+      }
       default: // orin: choir horns
         for (const s of [-1, 1]) { const c = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.42, 8), m); c.position.set(s * 0.2, 0.42, -0.02); c.rotation.z = -s * 0.5; g.add(c); box(g, gl, 0.05, 0.05, 0.05, s * 0.3, 0.6, -0.02); }
     }
@@ -41,6 +45,7 @@ const BUILD = {
       case 'sarrow': box(g, m, 0.36, 0.16, 0.04, 0, -0.1, 0.27); box(g, m, 0.3, 0.1, 0.04, 0, -0.2, 0.25); break; // ash veil
       case 'zaleks': box(g, m, 0.4, 0.3, 0.05, 0, -0.02, 0.24); for (const y of [-0.1, 0, 0.1]) box(g, gl, 0.34, 0.03, 0.02, 0, y, 0.27); break; // grille
       case 'iskra': box(g, gl, 0.42, 0.07, 0.04, 0, 0.04, 0.26); box(g, m, 0.46, 0.03, 0.05, 0, 0.09, 0.25); break; // lace visor
+      case 'ninja': box(g, lam(0xb02a2a), 0.4, 0.2, 0.05, 0, -0.08, 0.24); for (const sx of [-1, 1]) box(g, gl, 0.05, 0.12, 0.05, sx * 0.15, -0.16, 0.27); break; // oni half-mask with fangs
       default: box(g, m, 0.26, 0.2, 0.14, 0, -0.12, 0.3); const c = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.12, 8), gl); c.rotation.x = Math.PI / 2; c.position.set(0, -0.12, 0.4); g.add(c); // hymn muzzle
     }
     return 'head';
@@ -48,7 +53,7 @@ const BUILD = {
   cape(item, g) {
     const m = lam(item.color), gl = glowMat(item.glow);
     g.position.set(0, 1.72, -0.24);
-    const len = item.hero === 'zaleks' ? 1.1 : 1.25;
+    const len = item.hero === 'zaleks' ? 1.1 : item.hero === 'ninja' ? 1.4 : 1.25;
     box(g, m, item.hero === 'zaleks' ? 0.85 : 0.6, len, 0.04, 0, -len / 2, 0);
     box(g, gl, item.hero === 'iskra' ? 0.08 : 0.6, 0.05, 0.05, 0, -len + 0.05, 0.005);
     if (item.hero === 'orin') for (const x of [-0.2, 0, 0.2]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 6), gl); p.position.set(x, -0.3, -0.04); g.add(p); }
@@ -133,7 +138,7 @@ export function previewColor(item) { return '#' + item.color.toString(16).padSta
 
 // ---------- ARENA SKINS: body colours + materials + small themed attachments ----------
 // A handful of extra boxes and material tweaks per skin (no lights, no textures) so it stays cheap on phones.
-const SIZE = { sarrow: 1, zaleks: 1.3, iskra: 0.88, orin: 1.1 };
+const SIZE = { sarrow: 1, zaleks: 1.3, iskra: 0.88, orin: 1.1, ninja: 0.92 };
 const THEME = {
   slag:      { emissive: 0x000000, ei: 0,    rough: true },
   foundry:   { emissive: 0xff4a10, ei: 0.22 },

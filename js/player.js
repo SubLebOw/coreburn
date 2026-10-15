@@ -8,7 +8,7 @@
 // Also: core recharge (regen), weapon tier + upgrade cards (upgrades.js), power-ups (powerups.js).
 import * as THREE from 'three';
 import { decorateSkin } from './cosmetics.js';
-import { RULES } from './rules.js';
+import { RULES, zHero } from './rules.js';
 import { Loadout, tierColor } from './upgrades.js';
 import { CHARACTERS } from './characters.js';
 
@@ -265,7 +265,7 @@ export class Player {
 
     this.stateTime += dt;
     this.velocity.set(0, 0, 0);
-    const walk = this.char.speed * this.stats.speed;
+    const walk = this.char.speed * (zHero(this.char.id).speed || 1) * this.stats.speed;
 
     switch (this.state) {
       case 'normal':
@@ -317,7 +317,7 @@ export class Player {
 
   attackStart(moveDir) {
     switch (this.kit) {
-      case 'iskra': this.state = 'attack'; this.stateTime = 0; break;
+      case 'iskra': case 'ninja': this.state = 'attack'; this.stateTime = 0; break;
       case 'orin': this.state = 'attack'; this.stateTime = 0; this.tether = null; break;
       default: {
         const n = this.combo.length;
@@ -328,11 +328,11 @@ export class Player {
 
   attackUpdate(dt, dir, moving, walk) {
     const k = this.kit;
-    if (k === 'iskra' || k === 'orin') {
+    if (k === 'iskra' || k === 'orin' || k === 'ninja') {
       // ranged / channelled: keep moving (a bit slower) while the button is held
-      const slow = k === 'iskra' ? this.char.needle.moveWhileFiring : this.char.beam.moveWhileFiring;
+      const slow = k !== 'orin' ? this.char.needle.moveWhileFiring : this.char.beam.moveWhileFiring;
       if (moving) this.velocity.copy(dir).multiplyScalar(walk * slow);
-      if (k === 'iskra') this.needleUpdate(dir, moving);
+      if (k !== 'orin') this.needleUpdate(dir, moving);
       else this.tetherUpdate(dir, moving, dt);
       if (this.attackBuffer <= 0 && this.fireCd <= 0) { this.state = 'normal'; this.tether = null; }
       else if (moving && !this.aimLock) this.turnTowards(Math.atan2(dir.x, dir.z), dt, 14);
@@ -359,6 +359,7 @@ export class Player {
     switch (this.kit) {
       case 'zaleks': return this.startCharge(aim);
       case 'iskra': return this.phaseHop(aim);
+      case 'ninja': return this.shadowStep(aim);
       case 'orin': return this.grapple(aim);
       default: return this.startDash(aim);
     }
@@ -371,7 +372,7 @@ export class Player {
 
   dashUpdate() {
     switch (this.kit) {
-      case 'iskra': // the hop already happened; this is just the short blink-in pose
+      case 'iskra': case 'ninja': // the hop / step already happened; this is just the short blink-in pose
         if (this.stateTime >= 0.14) this.state = 'normal';
         return;
       case 'orin':
@@ -419,6 +420,12 @@ export class Player {
         this.world.sfx('overdrive');
         break;
       case 'orin': this.hymnEngine(); break;
+      case 'ninja': // SHADOW CLONE
+        this.world.allies?.addClone(this, this.char.cloneTime + this.stats.cloneTime);
+        this.world.effects.spawnRing(this.position, 0x8a7aff, 3, 0.45);
+        this.world.effects.spawnSparks(this.position.clone().setY(1.2), 0x3a2a6a, 14, 6);
+        this.world.sfx('teleport');
+        break;
       default: this.startSpin();
     }
   }
@@ -447,6 +454,10 @@ export class Player {
       case 'orin':
         if (moving) this.velocity.copy(dir).multiplyScalar(walk * 0.5);
         if (this.stateTime >= 0.6) end();
+        return;
+      case 'ninja': // a quick hand-sign, then back to work while the clone fights
+        if (moving) this.velocity.copy(dir).multiplyScalar(walk * 0.7);
+        if (this.stateTime >= 0.35) end();
         return;
       default:
         if (moving) this.velocity.copy(dir).multiplyScalar(c.speed * 0.75 * s.speed);
@@ -655,9 +666,17 @@ export class Player {
     this.facing = Math.atan2(aim.x, aim.z);
     this.aimLock = !!t;
     const color = this.damageMult > 1 ? 0xff3a2a : this.bladeColor;
-    const opts = { pierce: nd.pierce + s.pierce, speed: nd.speed, range: nd.range, color };
+    const star = this.kit === 'ninja';
+    const opts = { pierce: nd.pierce + (star ? s.starPierce : s.pierce), speed: nd.speed, range: nd.range, color, star };
     this.world.allies?.fireNeedle(this, this.position, aim, nd.damage, opts);
-    for (let i = 1; i <= s.split; i++) {
+    if (star) {
+      for (let i = 1; i <= s.starFan; i++) for (const sgn of [-1, 1]) {
+        const a = this.facing + sgn * 0.22 * i;
+        this.world.allies?.fireNeedle(this, this.position, new THREE.Vector3(Math.sin(a), 0, Math.cos(a)), nd.damage * 0.3, opts);
+      }
+      this.world.allies?.cloneThrow(this, t); // the shadow clone copies the throw
+    }
+    for (let i = 1; i <= (star ? 0 : s.split); i++) {
       for (const sgn of [-1, 1]) {
         const a = this.facing + sgn * 0.16 * i;
         this.world.allies?.fireNeedle(this, this.position, new THREE.Vector3(Math.sin(a), 0, Math.cos(a)), nd.damage * 0.2, opts);
@@ -685,6 +704,53 @@ export class Player {
     this.world.effects.spawnRing(this.position, 0xe8a0ff, 1.8, 0.3);
     this.world.effects.spawnSparks(this.position.clone().setY(1), 0xe8a0ff, 8);
     this.world.sfx('teleport');
+  }
+
+  // KAGERO: teleport just behind the nearest enemy ahead (or a short step), cutting everything on the way
+  shadowStep(direction) {
+    const c = this.char, s = this.stats, fx = this.world.effects;
+    const from = this.position.clone();
+    this.spendCharge();
+    let t = null, bd = c.stepRange * s.stepRange;
+    for (const e of this.world.enemies.list) {
+      if (!e.canBeHit) continue;
+      const dx = e.position.x - from.x, dz = e.position.z - from.z, d = Math.hypot(dx, dz);
+      if (d > bd || d < 0.01 || (dx * direction.x + dz * direction.z) / d < 0.35) continue;
+      bd = d; t = e;
+    }
+    let to;
+    if (t) {
+      const v = new THREE.Vector3(t.position.x - from.x, 0, t.position.z - from.z).normalize();
+      to = new THREE.Vector3(t.position.x, 0, t.position.z).addScaledVector(v, t.radius + 0.9);
+    } else to = from.clone().addScaledVector(direction, c.stepDist * s.stepRange);
+    this.position.copy(to);
+    this.world.arena.resolve(this.position, this.radius);
+    this.slide.set(0, 0, 0);
+    const seg = this.position.clone().sub(from).setY(0), len = seg.length() || 1;
+    seg.divideScalar(len);
+    this.facing = t ? Math.atan2(from.x - this.position.x, from.z - this.position.z) : Math.atan2(direction.x, direction.z); // face back at the target
+    this.stepCut(from, seg, len, c.stepDmg * s.stepDmg);
+    this.phaseTimer = c.stepGuard;
+    this.state = 'dash';
+    this.stateTime = 0;
+    fx.spawnRing(from, 0x3a2a6a, 1.4, 0.3);
+    fx.spawnRing(this.position, 0x8a7aff, 1.8, 0.3);
+    for (let i = 1; i < 4; i++) fx.spawnSparks(from.clone().addScaledVector(seg, len * i / 4).setY(1), 0x5a4aa0, 3, 3); // shadow wake
+    fx.spawnSparks(this.position.clone().setY(1), 0xc8c0ff, 8);
+    this.world.sfx('teleport');
+    this.world.allies?.cloneStep(this, direction);
+  }
+  // damage everything along a step (used by Kagero and his clone)
+  stepCut(from, seg, len, dmg) {
+    for (const e of this.world.enemies.list) {
+      if (!e.canBeHit) continue;
+      const dx = e.position.x - from.x, dz = e.position.z - from.z;
+      const along = dx * seg.x + dz * seg.z;
+      if (along < -0.5 || along > len + 1.2) continue;
+      if (Math.abs(dx * seg.z - dz * seg.x) > 1.1 + e.radius) continue;
+      this.strike(e, dmg, seg.x * 6, seg.z * 6, true, 'dash');
+      this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0xc8c0ff, 4);
+    }
   }
 
   stormVolley() {
@@ -820,7 +886,7 @@ export class Player {
   strike(e, base, kx, kz, heavy, kind) {
     if (this.world.netClient) return; // co-op client: the host decides all damage
     const s = this.stats;
-    let dmg = base * s.dmg * this.char.dmg * this.damageMult;
+    let dmg = base * s.dmg * this.char.dmg * zHero(this.char.id).dmg * this.damageMult;
     if (e.isBoss && s.bossDmg > 1) dmg *= s.bossDmg; // CoreBurnZ: Bossfang relic
     const crit = kind !== 'trail' && Math.random() < s.crit;
     if (crit) {
@@ -908,7 +974,7 @@ export class Player {
   applyLoadout() {
     const s = this.stats = this.loadout.stats;
     const oldMax = this.maxHp || this.char.hp;
-    this.maxHp = Math.round(this.char.hp * (1 + s.maxHpPct)) + s.maxHpFlat;
+    this.maxHp = Math.round(this.char.hp * zHero(this.char.id).hp * (1 + s.maxHpPct)) + s.maxHpFlat;
     const charges = s.dashCharges + this.char.dashCharges - 1; // Extra Blink / Extra Hop
     if (this.hp !== undefined) this.hp = Math.min(this.maxHp, this.hp + Math.max(0, this.maxHp - oldMax));
     this.dashCooldownMax = this.char.dashCd * s.dashCd;
@@ -1043,10 +1109,10 @@ export class Player {
     this.slashArc.material.opacity = Math.max(0, this.slashArc.material.opacity - dt * 6);
 
     const kit = this.kit;
-    if (this.state === 'attack' && (kit === 'iskra' || kit === 'orin')) {
+    if (this.state === 'attack' && (kit === 'iskra' || kit === 'orin' || kit === 'ninja')) {
       // ranged: aim the arm at the target, the other arm flicks (needles) or stays raised (tether)
-      const flick = kit === 'iskra' ? Math.max(0, this.fireCd) / 0.14 : 0.3 + 0.1 * Math.sin(performance.now() / 40);
-      if (kit === 'iskra' && this.armFlip) { m.armL.rotation.set(-1.5 + flick * 0.4, 0, 0.1); m.armR.rotation.set(-0.9, 0, -0.2); }
+      const flick = kit !== 'orin' ? Math.max(0, this.fireCd) / (kit === 'ninja' ? 0.2 : 0.14) : 0.3 + 0.1 * Math.sin(performance.now() / 40);
+      if (kit !== 'orin' && this.armFlip) { m.armL.rotation.set(-1.5 + flick * 0.4, 0, 0.1); m.armR.rotation.set(-0.9, 0, -0.2); }
       else { m.armR.rotation.set(-1.5 + flick * 0.4, 0, -0.1); m.armL.rotation.set(kit === 'orin' ? -1.3 : -0.9, 0, 0.2); }
     } else if (this.state === 'attack') {
       const hit = this.combo[Math.max(0, this.comboStep - 1)] || this.combo[0];
@@ -1080,7 +1146,7 @@ export class Player {
       if (kit === 'zaleks') { // shoulder first
         m.body.rotation.x = 0.35; m.body.rotation.y = 0.5;
         m.armL.rotation.set(-0.3, 0, 0.6); m.armR.rotation.set(0.6, 0, -0.2);
-      } else if (kit === 'iskra') { // blink-in: crouched, arms spread
+      } else if (kit === 'iskra' || kit === 'ninja') { // blink-in: crouched, arms spread
         m.body.rotation.x = 0.3;
         m.armL.rotation.set(0.4, 0, 1.2); m.armR.rotation.set(0.4, 0, -1.2);
       } else if (kit === 'orin') { // reeling in on the magnet line
@@ -1102,6 +1168,8 @@ export class Player {
         m.armL.rotation.set(-1.3, 0, 0.9 + Math.sin(this.stateTime * 30) * 0.3);
         m.armR.rotation.set(-1.3, 0, -0.9 - Math.sin(this.stateTime * 30) * 0.3);
         this.spinRing.rotation.z -= dt * 10;
+      } else if (kit === 'ninja') { // hand-sign: both hands together in front of the mask
+        m.armL.rotation.set(-1.9, 0, -0.5); m.armR.rotation.set(-1.9, 0, 0.5);
       } else if (kit === 'orin') { // conducting the hymn: arms raised
         m.armL.rotation.set(-2.7, 0, 0.5); m.armR.rotation.set(-2.7, 0, -0.5);
         m.body.rotation.x = -0.15;

@@ -22,7 +22,7 @@ import { GAME_VERSION } from './version.js';
 import { shareScore, copyScore } from './share.js';
 import { IS_NATIVE } from './native.js';
 import { Combo } from './combo.js';
-import { CHARACTERS, CHARACTER_ORDER, displayName } from './characters.js';
+import { CHARACTERS, CHARACTER_ORDER, heroOrder, displayName } from './characters.js';
 import { isPickWave } from './upgrades.js';
 import { Coop } from './coop.js';
 import { meta, scrapForRun, RARE_DROPS, SHOP } from './meta.js';
@@ -38,7 +38,7 @@ import { UPGRADES } from './upgrades.js';
 import { RanksUI } from './ranks-ui.js';
 import { RULES, setRules } from './rules.js';
 import { rotation } from './bosses.js';
-import { progress, xpForRun, ARENA_SKINS, skinFor } from './progress.js';
+import { progress, xpForRun, ARENA_SKINS, skinFor, variantById } from './progress.js';
 import { Wardrobe } from './cosmetics.js';
 import { CosmeticsUI } from './cosmetics-ui.js';
 
@@ -100,7 +100,7 @@ const fadeEl = document.getElementById('fade');
 // per-run extras (Part C): scrap sources, near-miss slow-mo, volatile bursts
 let run = { bosses: 0, mutators: 0, jackpot: 0, awarded: 0, drops: [] };
 // run mode: 'endless' | 'daily' (seeded, daily board) | 'rush' (weekly boss rush). Solo only.
-let mode = 'endless', modeKey = '', runTime = 0;
+let mode = 'endless', modeKey = '', runTime = 0, runClock = 0; // runClock = the HUD run timer (pauses during picks)
 const leaderboard = new Leaderboard();
 let closeCall = 0, closeCallCd = 0; // CLOSE CALL slow-mo (real seconds) and its cooldown
 const bursts = [];                  // VOLATILE mutator: { pos, t }
@@ -263,7 +263,8 @@ function dressHero(h, look) {
   look = look || (mine ? myLook() : null);
   if (!look) return;
   const skin = skinFor(h.char.id, arena.current.index, RULES.z, look.sm);
-  h.reskin(skin ? skin.tint : (look.sc ?? null), skin ? skin.glow : null, skin);
+  const vr = !skin && look.vr ? variantById(look.vr[h.char.id]) : null; // hero-level skin variant
+  h.reskin(skin ? skin.tint : vr ? vr.tint : (look.sc ?? null), skin ? skin.glow : vr ? vr.glow : null, skin);
   if (mine) wardrobe.dress(player);
   else { h.wardrobe = h.wardrobe || new Wardrobe(scene, progress); h.wardrobe.dress(h, (look.eq && look.eq[h.char.id]) || {}); }
 }
@@ -356,8 +357,8 @@ let heroId = CHARACTERS[localStorage.getItem('coreburn-hero')] && (!CHARACTERS[l
 function showCharacterSelect() {
   state = 'select';
   hud.hideOverlay();
-  const chars = CHARACTER_ORDER.map((id) => ({ ...CHARACTERS[id], locked: CHARACTERS[id].secret && !meta.data.unlocked[id] }));
-  if (chars.find((c) => c.id === heroId)?.locked) heroId = 'sarrow';
+  const chars = heroOrder(RULES.z).map((id) => ({ ...CHARACTERS[id], locked: CHARACTERS[id].secret && !meta.data.unlocked[id], hlv: RULES.z ? progress.heroInfo(id) : null }));
+  if (!chars.find((c) => c.id === heroId) || chars.find((c) => c.id === heroId)?.locked) heroId = 'sarrow';
   hud.showSelect(chars, heroId, (id) => {
     heroId = id;
     localStorage.setItem('coreburn-hero', id);
@@ -373,7 +374,7 @@ function startGame(id = heroId) {
   world.waveStep = mode === 'rush' ? 5 : 1;
   world.runOver = false;
   rushWon = false;
-  runTime = 0;
+  runTime = 0; runClock = 0;
   // shop unlocks: skin, talon colour, starting perk (solo runs; co-op keeps everyone's looks even)
   const solo = !coop.mode;
   player.talonBase = solo ? meta.talonColor : null;
@@ -435,6 +436,7 @@ function resetWorld() {
   player.position.set(0, 0, 0);
 }
 function startClientGame(char, tint, name = char) {
+  runClock = 0;
   mode = 'endless'; world.waveStep = 1; world.runOver = false; hud.setModeTag(RULES.z ? 'COREBURNZ' : '');
   resetWorld();
   kills = 0;
@@ -522,9 +524,12 @@ function showNextMilestone() {
 function awardXp(r = { wave: enemies.wave, kills, bosses: run.bosses }) {
   if (run.xpDone) return;
   run.xpDone = true;
-  const res = progress.addXp(xpForRun({ ...r, z: RULES.z, coop: !!coop.mode }));
+  const xp = xpForRun({ ...r, z: RULES.z, coop: !!coop.mode });
+  const res = progress.addXp(xp);
+  const heroRes = RULES.z ? progress.addHeroXp(player.char.id, xp) : null; // HERO LEVELS: CoreBurnZ runs
   if (res.scrap) meta.addScrap(res.scrap);
-  hud.showXp(res, progress);
+  if (heroRes?.scrap) meta.addScrap(heroRes.scrap);
+  hud.showXp(res, progress, heroRes);
   cosmeticsUI.refreshBadge();
 }
 world.awardXp = awardXp;
@@ -939,6 +944,8 @@ function frame() {
     arena.update(dt, player, world, false);
   }
 
+  if (state === 'playing' && !world.runOver && !(player.dead && !coop.mode)) runClock += dt; // RUN TIMER
+  hud.setTimer(runClock);
   if (coop.mode === 'host') coop.hostNet(dt, state); // snapshots to friends
   if (state !== 'upgrade') effects.update(worldDt);
   updateCamera(dt);
@@ -962,6 +969,6 @@ frame();
 const LOCAL_DEV = !IS_NATIVE && ['localhost', '127.0.0.1'].includes(location.hostname);
 if (LOCAL_DEV) {
   import('./dev.local.js')
-    .then((m) => m.install({ player, enemies, world, progress, arena, powerups, projectiles, effects, hud, sound, ads, startGame, snapCamera: () => updateCamera(0, true), getScore: () => score, combo, meta, twitch }))
+    .then((m) => m.install({ player, enemies, world, progress, allies, arena, powerups, projectiles, effects, hud, sound, ads, startGame, snapCamera: () => updateCamera(0, true), getScore: () => score, combo, meta, twitch, input, getState: () => state, getLastRun: () => lastRun, getMode: () => mode, bursts }))
     .catch(() => {}); // no dev file = no helpers, that's fine
 }

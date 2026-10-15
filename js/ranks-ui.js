@@ -1,7 +1,7 @@
 // ranks-ui.js
 // The RANKS panel (title screen): GLOBAL, per HERO, DAILY (today) and BOSS RUSH (this week).
 // Shows the online top 20 when online leaderboards are set up, otherwise your best runs on this device.
-import { CHARACTERS, CHARACTER_ORDER } from './characters.js';
+import { CHARACTERS, heroOrder } from './characters.js';
 import { dailyKey, weekKey } from './modes.js';
 import { RULES } from './rules.js';
 const $ = (id) => document.getElementById(id);
@@ -53,7 +53,7 @@ export class RanksUI {
     this.tabs($('rk-tabs'), TABS, this.tab, (id) => { this.tab = id; });
     const sub = $('rk-sub');
     sub.classList.toggle('hidden', this.tab !== 'hero');
-    if (this.tab === 'hero') this.tabs(sub, CHARACTER_ORDER.map((id) => [id, CHARACTERS[id].name]), this.hero, (id) => { this.hero = id; });
+    if (this.tab === 'hero') this.tabs(sub, heroOrder(RULES.z).map((id) => [id, CHARACTERS[id].name]), this.hero, (id) => { this.hero = id; });
     const board = this.board();
     const list = $('rk-list');
     list.innerHTML = '<div class="rk-empty">Loading…</div>';

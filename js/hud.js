@@ -107,10 +107,10 @@ export class Hud {
       const cursed = def.group === 'cursed';
       const lv = loadout.level(id);
       const b = document.createElement('button');
-      b.className = 'ucard' + (cursed ? ' cursed' : '') + (def.group === 'boss' ? ' relic' : '');
+      b.className = 'ucard' + (cursed ? ' cursed' : '') + (def.group === 'boss' ? ' relic' : '') + (def.group === 'evolved' ? ' evolved' : '');
       b.style.setProperty('--c', hex(def.color));
-      const lvl = def.group === 'boss' ? (lv ? `Relic ${lv} → <b>${lv + 1}</b>/${def.max}` : '<b>RARE</b> · boss relic') : cursed ? `<b>CURSED</b> · ${def.bane}` : id === 'patch' ? `Taken ${lv}x` : (lv === 0 ? `<b>NEW</b> · Lv 1/${def.max}` : `Lv ${lv} → <b>${lv + 1}</b>/${def.max}`);
-      b.innerHTML = `<span class="key">${i + 1}</span><div class="icon"></div><div class="ubody"><div class="group">${def.group === 'cursed' || def.group === 'boss' ? GROUP_LABELS[def.group] : groupLabel(def.group, HERO_STATS[loadout.hero]?.abilities)}</div><div class="uname"></div><div class="effect"></div><div class="lvl">${lvl}</div></div>`;
+      const lvl = def.group === 'evolved' ? `<b>EVOLUTION</b> · ${def.needs.map((n) => loadout.def(n).name).join(' + ')}` : def.group === 'boss' ? (lv ? `Relic ${lv} → <b>${lv + 1}</b>/${def.max}` : '<b>RARE</b> · boss relic') : cursed ? `<b>CURSED</b> · ${def.bane}` : id === 'patch' ? `Taken ${lv}x` : (lv === 0 ? `<b>NEW</b> · Lv 1/${def.max}` : `Lv ${lv} → <b>${lv + 1}</b>/${def.max}`);
+      b.innerHTML = `<span class="key">${i + 1}</span><div class="icon"></div><div class="ubody"><div class="group">${def.group === 'cursed' || def.group === 'boss' || def.group === 'evolved' ? GROUP_LABELS[def.group] : groupLabel(def.group, HERO_STATS[loadout.hero]?.abilities)}</div><div class="uname"></div><div class="effect"></div><div class="lvl">${lvl}</div></div>`;
       b.querySelector('.icon').textContent = def.icon;
       b.querySelector('.uname').textContent = def.name;
       b.querySelector('.effect').textContent = def.desc(lv);

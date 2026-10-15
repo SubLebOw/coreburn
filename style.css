@@ -713,3 +713,9 @@ body.zmode .m-icon span { color: #ffc23a; }
 .m-icons { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 #title-panel .m-brand h1 { font-size: clamp(32px, 9.5vw, 56px); letter-spacing: 4px; white-space: nowrap; }
 body.zmode #title-panel .m-brand h1 { font-size: clamp(30px, 8.6vw, 52px); }
+/* v1.19: EVOLVED cards */
+.ucard.evolved { --c: #ffc23a; border-color: #ffc23a !important; background: linear-gradient(160deg, #3a2a08ee, #1a1206ee) !important; box-shadow: 0 0 22px #ffc23a66, inset 0 0 18px #ffc23a22 !important; animation: evoGlow 1.6s ease-in-out infinite; }
+.ucard.evolved .group { color: #ffc23a; letter-spacing: 3px; }
+.ucard.evolved .uname { color: #ffe39a; }
+.ucard.evolved .lvl b { color: #ffc23a; }
+@keyframes evoGlow { 50% { box-shadow: 0 0 34px #ffc23aaa, inset 0 0 24px #ffc23a33; } }

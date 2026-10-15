@@ -912,7 +912,7 @@ export class Player {
     if (e.isBoss && s.bossDmg > 1) dmg *= s.bossDmg; // CoreBurnZ: Bossfang relic
     const crit = kind !== 'trail' && Math.random() < s.crit;
     if (crit) {
-      dmg *= 1.8;
+      dmg *= s.critMult || 1.8;
       this.world.effects.spawnSparks(e.position.clone().setY(1.4), 0xfff27a, 5, 8);
     }
     e.hit(dmg, kx, kz, heavy);
@@ -923,7 +923,7 @@ export class Player {
       this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0x9ab8ff, 4);
     }
     // healing (capped per second so it can't make you unkillable)
-    if (attack && s.leech > 0 && !this.cloneHit) this.leechHeal(s.leech, 6); // the clone's hits don't heal you
+    if (attack && s.leech > 0 && !this.cloneHit) this.leechHeal(s.leech, s.leechCap || 6); // the clone's hits don't heal you
     if (kind === 'spin' && s.spinLeech > 0) this.leechHeal(s.spinLeech, 10);
     if (attack) {
       this.world.onTalonHit?.(e, dmg, this); // ARC TALONS power-up

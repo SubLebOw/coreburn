@@ -114,7 +114,23 @@ export const BOSS_CARDS = {
 for (const c of Object.values(BOSS_CARDS)) Object.assign(c, { group: 'boss', boss: true, color: 0xffc23a });
 
 export const FALLBACK = { id: 'patch', name: 'Reactor Patch', group: 'core', icon: '⛨', color: 0xc8c8c8, max: Infinity, desc: () => '+3 max health and heal 35%' };
-export const GROUP_LABELS = { attack: 'ATTACK', mobility: 'MOBILITY', ultimate: 'ULTIMATE', core: 'CORE', cursed: 'CURSED', boss: 'BOSS RELIC' };
+// COREBURNZ EVOLUTIONS: max BOTH cards in `needs` and the pair can fuse into one gold EVOLVED card
+// (offered as the first card of your next pick). One level, never in classic.
+const EV = (o) => ({ group: 'evolved', color: 0xffc23a, max: 1, ...o, desc: () => o.text });
+export const EVOLUTIONS = {
+  eNova:   EV({ name: 'Supernova Edge', icon: '✹', needs: ['edge', 'crit'], text: 'Crits hit for x2.6 instead of x1.8, +10% crit chance' }),
+  eUndying:EV({ name: 'Undying Core', icon: '✚', needs: ['leech', 'regen'], text: '+50% health regen and lifesteal can heal twice as fast' }),
+  eThunder:EV({ name: 'Thunder Twins', icon: 'ϟ', needs: ['twin', 'storm'], text: '+15% Twin Strike and +15% Storm chain chance' }),
+  eApex:   EV({ name: 'Apex Ultimate', icon: '✺', needs: ['odDamage', 'odCool'], text: 'Ultimate +30% damage and -20% cooldown' }),
+  eJugg:   EV({ name: 'Juggernaut Core', icon: '⬢', needs: ['maxHp', 'speed'], text: '+25% max health and take 10% less damage' }),
+  eComet:  EV({ name: 'Comet Blink', icon: '☄', heroes: S, needs: ['bkDamage', 'bkTrail'], text: 'Blink +60% damage and its trail burns twice as hard' }),
+  eWorld:  EV({ name: 'Worldbreaker', icon: '⚒', heroes: Z, needs: ['zHammer', 'zQuake'], text: 'Slam +50% damage and +30% radius, hammer +25% damage' }),
+  eTempest:EV({ name: 'Endless Tempest', icon: '⁂', heroes: I, needs: ['iStorm', 'iVolley'], text: 'Needle storm +3 needles per volley and lasts 2s longer' }),
+  eHive:   EV({ name: 'Hive Choir', icon: '❂', heroes: O, needs: ['oDroneDmg', 'oDroneTime'], text: '+1 drone and drones deal +40% damage' }),
+  eHalo:   EV({ name: 'Star Halo', icon: '✴', heroes: N, needs: ['nReturn', 'nFan'], text: 'A permanent ring of 3 shurikens orbits you, cutting anything close' }),
+  eLegion: EV({ name: 'Shadow Legion', icon: '⧉', heroes: N, needs: ['nShade', 'nMirror'], text: 'Shadow Clone +15% of your damage and lasts 2s longer' }),
+};
+export const GROUP_LABELS = { evolved: 'EVOLVED', attack: 'ATTACK', mobility: 'MOBILITY', ultimate: 'ULTIMATE', core: 'CORE', cursed: 'CURSED', boss: 'BOSS RELIC' };
 export const cardForHero = (id, hero) => { const u = UPGRADES[id]; return !!u && (!u.heroes || !hero || u.heroes.includes(hero)); };
 // The card's group label, using the hero's own ability names (e.g. "PHASE HOP" for Iskra)
 export function groupLabel(group, kit) {
@@ -148,7 +164,7 @@ export class Loadout {
   }
 
   level(id) { return id === 'patch' ? this.patches : (this.levels[id] || 0); }
-  def(id) { return id === 'patch' ? FALLBACK : (UPGRADES[id] || CURSES[id] || BOSS_CARDS[id]); }
+  def(id) { return id === 'patch' ? FALLBACK : (UPGRADES[id] || CURSES[id] || BOSS_CARDS[id] || EVOLUTIONS[id]); }
   static isCurse(id) { return !!CURSES[id]; }
 
   // 3 different random cards that aren't maxed yet (Reactor Patch fills any gaps)
@@ -164,7 +180,19 @@ export class Loadout {
       hand.push(open.splice(i, 1)[0]);
     }
     if (hand.length < count) hand.push('patch');
+    const evo = this.evolutionReady(); // CoreBurnZ: an evolution takes the first slot
+    if (evo) hand[0] = evo;
     return hand;
+  }
+
+  // the first evolution whose two cards are both maxed (and not taken yet)
+  evolutionReady() {
+    if (!RULES.z) return null;
+    for (const [id, e] of Object.entries(EVOLUTIONS)) {
+      if (this.level(id) || (e.heroes && this.hero && !e.heroes.includes(this.hero))) continue;
+      if (e.needs.every((n) => this.level(n) >= UPGRADES[n].max)) return id;
+    }
+    return null;
   }
 
   // CoreBurnZ: the gold boss pick (3 different boss relics you haven't maxed)
@@ -252,6 +280,18 @@ export class Loadout {
     s.storm += 0.12 * L('bTempest');
     if (L('bSoles')) { s.speed *= 1 + 0.06 * L('bSoles'); s.dashCd *= 1 - 0.15 * L('bSoles'); }
     s.leech += 0.5 * L('bTithe'); s.regen += 0.4 * L('bTithe');
+    // CoreBurnZ evolutions
+    s.critMult = L('eNova') ? 2.6 : 1.8; if (L('eNova')) s.crit += 0.1;
+    s.leechCap = L('eUndying') ? 12 : 6; if (L('eUndying')) s.regen *= 1.5;
+    if (L('eThunder')) { s.twin += 0.15; s.storm += 0.15; }
+    if (L('eApex')) { s.spinDmg *= 1.3; s.spinCd *= 0.8; }
+    if (L('eJugg')) { s.maxHpPct += 0.25; s.hurtMult *= 0.9; }
+    if (L('eComet')) { s.dashDmg *= 1.6; s.trail *= 2; }
+    if (L('eWorld')) { s.slamDmg *= 1.5; s.slamRadius *= 1.3; s.bashDmg *= 1.25; }
+    if (L('eTempest')) { s.stormCount += 3; s.stormTime += 2; }
+    if (L('eHive')) { s.drones += 1; s.droneDmg *= 1.4; }
+    s.halo = L('eHalo') ? 3 : 0;
+    if (L('eLegion')) { s.cloneDmg += 0.15; s.cloneTime += 2; }
   }
 
   // Expected single-target damage multiplier from perks alone (for balancing / the simulator)

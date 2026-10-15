@@ -276,6 +276,16 @@ export class Allies {
     if (!this.host) return this.clientUpdate(dt);
     this.drawMarks(this.markList());
     const enemies = this.world.enemies.list, arena = this.world.arena;
+    // STAR HALO evolution: keep a permanent ring of shurikens round each owner who has it
+    for (const o of (this.world.heroes || [this.world.player])) {
+      if (!o || o.dead || !(o.stats?.halo > 0)) continue;
+      const have = this.stars.filter((n) => n.life > 0 && n.ret && n.ret.perm && n.owner === o).length;
+      for (let i = have; i < o.stats.halo; i++) {
+        const n = this.stars.find((x) => x.life <= 0); if (!n) break;
+        this.fireNeedle(o, o.position, new THREE.Vector3(1, 0, 0), 0, { star: true, color: 0xffd27a });
+        n.ret = { phase: 'orbit', perm: true, t: 0, cd: new Map(), ang: 0, odmg: 0 }; n.vel.set(0, 0, 0);
+      }
+    }
     const rings = new Map(); // orbiting stars per owner, evenly spaced round him
     for (const n of this.stars) if (n.life > 0 && n.ret && n.ret.phase === 'orbit') { if (!rings.has(n.owner)) rings.set(n.owner, []); rings.get(n.owner).push(n); }
     const spin = performance.now() / 1000 * 5.5;
@@ -305,7 +315,8 @@ export class Allies {
       if (n.ret && n.ret.phase === 'orbit') { // ORBIT: a spinning ring of stars for 2s, then gone
         const o = n.owner, r = n.ret;
         r.t += dt; n.life = 9;
-        if (!o || o.dead || r.t >= ORBIT_TIME) { n.life = 0; n.mesh.visible = false; n.ret = null; n.clone = false; continue; }
+        if (r.perm) { r.odmg = (o.char?.needle?.damage || 9) * 0.6; if (!(o.stats?.halo > 0)) r.t = ORBIT_TIME; else if (r.t > 1e4) r.t = 0; r.cd.forEach((v, k) => { if (k.dead) r.cd.delete(k); }); }
+        if (!o || o.dead || (!r.perm || !(o.stats?.halo > 0)) && r.t >= ORBIT_TIME) { n.life = 0; n.mesh.visible = false; n.ret = null; n.clone = false; continue; }
         const ring = rings.get(o) || [n], k = Math.max(0, ring.indexOf(n));
         r.ang = spin + k * Math.PI * 2 / ring.length;
         n.mesh.position.set(o.position.x + Math.sin(r.ang) * ORBIT_R, 1.1 + 0.12 * Math.sin(r.ang * 2), o.position.z + Math.cos(r.ang) * ORBIT_R);

@@ -88,7 +88,7 @@ export const UPGRADES = {
   oDroneTime:{ name: 'Drone Lifespan', heroes: O, group: 'ultimate', icon: '⧗', color: 0xffaa9a, max: 3, desc: () => 'Drones last +1s' },
   oShell:   { name: 'Hymn Shell', heroes: O, group: 'ultimate', icon: '⬣', color: 0xff8a9a, max: 4, desc: () => 'Take -6% damage while your drones fly' },
   // ---- KAGERO (CoreBurnZ) ----
-  nPierce:  { name: 'Razor Stars', heroes: N, group: 'attack', icon: '✴', color: 0xc8c0ff, max: 2, desc: () => 'Shurikens pierce +1 enemy' },
+  nPierce:  { name: 'Razor Stars', heroes: N, group: 'attack', icon: '✴', color: 0xc8c0ff, max: 2, desc: () => 'Shurikens ricochet +1 more time' },
   nFan:     { name: 'Star Fan', heroes: N, group: 'attack', icon: '⋔', color: 0xa898ff, max: 2, desc: () => '+1 side shuriken each side per throw (30% damage)' },
   nEdge:    { name: 'Shadow Edge', heroes: N, group: 'mobility', icon: '◐', color: 0x8a7aff, max: 5, desc: () => '+25% Shadow Step damage, +8% step reach' },
   nTwin:    { name: 'Twin Shadows', heroes: N, group: 'mobility', icon: '⇉', color: 0x9a8aff, max: 1, desc: () => 'Shadow Step +1 charge' },

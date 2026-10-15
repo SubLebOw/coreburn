@@ -667,15 +667,19 @@ export class Player {
     this.aimLock = !!t;
     const color = this.damageMult > 1 ? 0xff3a2a : this.bladeColor;
     const star = this.kit === 'ninja';
-    const opts = { pierce: nd.pierce + (star ? s.starPierce : s.pierce), speed: nd.speed, range: nd.range, color, star };
-    this.world.allies?.fireNeedle(this, this.position, aim, nd.damage, opts);
+    const opts = { pierce: nd.pierce + (star ? 0 : s.pierce), speed: nd.speed, range: nd.range, color, star, bounce: star ? nd.bounce + s.starPierce : 0 };
     if (star) {
-      for (let i = 1; i <= s.starFan; i++) for (const sgn of [-1, 1]) {
-        const a = this.facing + sgn * 0.22 * i;
-        this.world.allies?.fireNeedle(this, this.position, new THREE.Vector3(Math.sin(a), 0, Math.cos(a)), nd.damage * 0.3, opts);
+      // KAGERO: every 4th throw is a FINISHER (a wide gold fan that ricochets once more)
+      this.throwN = (this.throwN || 0) + 1;
+      const fin = this.throwN % this.char.finisherEvery === 0;
+      this.world.allies?.throwStars(this, this.position, this.facing, nd.damage, opts, s.starFan, fin);
+      this.world.allies?.cloneThrow(this, t, fin); // the shadow clone copies the throw
+      if (fin) { this.world.effects.spawnRing(this.position, 0xffd27a, 2.2, 0.25); this.world.sfx('zap'); }
+      else if (this.throwN % this.char.finisherEvery === this.char.finisherEvery - 1) { // TELL: the next throw is the finisher
+        this.world.effects.spawnRing(this.position, 0xffd27a, 1.1, 0.4);
+        this.world.effects.spawnSparks(this.position.clone().setY(1.3), 0xffd27a, 6, 3);
       }
-      this.world.allies?.cloneThrow(this, t); // the shadow clone copies the throw
-    }
+    } else this.world.allies?.fireNeedle(this, this.position, aim, nd.damage, opts);
     for (let i = 1; i <= (star ? 0 : s.split); i++) {
       for (const sgn of [-1, 1]) {
         const a = this.facing + sgn * 0.16 * i;
@@ -711,8 +715,15 @@ export class Player {
     const c = this.char, s = this.stats, fx = this.world.effects;
     const from = this.position.clone();
     this.spendCharge();
-    let t = null, bd = c.stepRange * s.stepRange;
-    for (const e of this.world.enemies.list) {
+    const range = c.stepRange * s.stepRange, now = this.world.allies?.now ?? 0;
+    let t = null, bd = range;
+    for (const e of this.world.enemies.list) { // 1) the nearest MARKED enemy in range (any direction)
+      if (!e.canBeHit || !(e.markT > now)) continue;
+      const d = Math.hypot(e.position.x - from.x, e.position.z - from.z);
+      if (d < bd && d > 0.01) { bd = d; t = e; }
+    }
+    const marked = !!t;
+    if (!t) for (const e of this.world.enemies.list) { // 2) else the nearest enemy ahead (old rule, now longer reach)
       if (!e.canBeHit) continue;
       const dx = e.position.x - from.x, dz = e.position.z - from.z, d = Math.hypot(dx, dz);
       if (d > bd || d < 0.01 || (dx * direction.x + dz * direction.z) / d < 0.35) continue;
@@ -730,6 +741,12 @@ export class Player {
     seg.divideScalar(len);
     this.facing = t ? Math.atan2(from.x - this.position.x, from.z - this.position.z) : Math.atan2(direction.x, direction.z); // face back at the target
     this.stepCut(from, seg, len, c.stepDmg * s.stepDmg);
+    if (marked) { // consume the mark: bonus hit + part of the cooldown back (once per 1.2s)
+      t.markT = 0;
+      if (t.canBeHit) this.strike(t, c.stepDmg * s.stepDmg * c.markBonus, 0, 0, true, 'dash');
+      fx.spawnRing(t.position, 0xff4ad8, 1.6, 0.3);
+      if (now - (this.markRefundAt ?? -9) >= c.markRefundCd && this.dashCooldown > 0) { this.markRefundAt = now; this.dashCooldown *= 1 - c.markRefund; }
+    }
     this.phaseTimer = c.stepGuard;
     this.state = 'dash';
     this.stateTime = 0;

@@ -127,13 +127,16 @@ function kit(id, l, scen) {
     case 'ninja': {
       const nd = c.needle;
       st = nd.damage / nd.rate * 0.85;
-      const pierce = 1 + 0.55 * (nd.pierce + s.starPierce) * crowd;
+      // v1.17: ricochet (2 + Razor Stars bounces, -20% each) + every 4th throw a 7-star finisher fan
+      const b = nd.bounce + s.starPierce; let bounceSum = 0; for (let i = 1; i <= b; i++) bounceSum += Math.pow(nd.bounceFall, i);
+      const ric = 1 + 0.7 * bounceSum * crowd;
       const fan = 2 * s.starFan * 0.3 * (0.3 + 0.5 * crowd);
-      clear = st * (pierce + fan);
-      st *= 1 + fan * (scen === 'boss' ? 0.5 : 0);
+      const finST = 1 + (1.2 - 1) / 4, finClear = 1 + ((1.2 + 6 * 0.4 * (0.25 + 0.6 * crowd)) - 1) / 4;
+      clear = st * (ric + fan) * finClear;
+      st *= (1 + fan * (scen === 'boss' ? 0.5 : 0)) * finST;
       const cloneUp = Math.min(1, (c.cloneTime + s.cloneTime) / ultCd);
       ult = st * (c.clonePct + s.cloneDmg) * cloneUp * s.spinDmg; ultClear = clear * (c.clonePct + s.cloneDmg) * cloneUp * s.spinDmg;
-      mob = c.stepDmg * s.stepDmg / mobCd * charges * aoe(2.2);
+      mob = c.stepDmg * s.stepDmg * (1 + c.markBonus * 0.8) / (mobCd * 0.75) * charges * aoe(2.2); // marks: bonus hit + cooldown refunds
       uptime = 0.9;
       exposure = 0.62;
       avoid = (c.stepGuard + 0.15) / mobCd * charges + 0.1 * cloneUp * (scen === 'boss' ? 0.3 : 1); // step i-frames, the clone draws some aggro

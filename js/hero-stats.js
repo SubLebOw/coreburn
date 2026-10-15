@@ -80,12 +80,13 @@ export const HERO_STATS = {
     blurb: 'Throws shurikens on the move, steps behind enemies, and fights beside his shadow clone.',
     hp: 120, speed: 7.5, dmg: 0.8, atkSpeed: 1, armor: 0,
     abilities: {
-      attack: { name: 'Shurikens', short: 'STAR', icon: '✴', desc: 'Spinning stars that seek the enemy you move towards and pierce 1' },
-      mobility: { name: 'Shadow Step', short: 'SHADOW<br>STEP', icon: '◐', desc: 'Teleport behind the nearest enemy ahead, cutting through everything on the way' },
+      attack: { name: 'Shurikens', short: 'STAR', icon: '✴', desc: 'Stars ricochet to 2 more enemies and MARK what they hit. Every 4th throw is a wide finisher fan' },
+      mobility: { name: 'Shadow Step', short: 'SHADOW<br>STEP', icon: '◐', desc: 'Long-range teleport to the nearest MARKED enemy: consumes the mark for bonus damage and half your cooldown back' },
       ultimate: { name: 'Shadow Clone', short: 'SHADOW<br>CLONE', icon: '♊', desc: 'A 5s shadow clone copies all your moves and upgrades at 45% damage' },
     },
-    needle: { damage: 11, rate: 0.2, speed: 26, range: 14, pierce: 1, aimRange: 13, moveWhileFiring: 0.9 },
-    dashCd: 2.6, dashCharges: 1, stepRange: 7, stepDist: 5, stepDmg: 22, stepGuard: 0.3,
+    needle: { damage: 9, rate: 0.2, speed: 26, range: 14, pierce: 0, bounce: 2, bounceFall: 0.8, aimRange: 13, moveWhileFiring: 0.9 },
+    finisherEvery: 4, markTime: 4, markBonus: 0.8, markRefund: 0.5, markRefundCd: 1.2,
+    dashCd: 2.6, dashCharges: 1, stepRange: 11.2, stepDist: 5, stepDmg: 22, stepGuard: 0.3,
     ultCd: 13, cloneTime: 5, clonePct: 0.45, // v1.15: 5s clone that copies every upgrade at 45% damage
   },
 };

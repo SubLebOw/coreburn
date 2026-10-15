@@ -1,6 +1,6 @@
 {
-  "version": "1.14.0",
-  "url": "https://sublebow.github.io/coreburn/updates/coreburn-1.14.0.zip",
-  "checksum": "b64c38d3505cd2b7fcae1b6275c838692d954fad1b7bf664eab49dacba6ca844",
+  "version": "1.14.1",
+  "url": "https://sublebow.github.io/coreburn/updates/coreburn-1.14.1.zip",
+  "checksum": "6724632a87ced3542d6aff609485cd17796e3f59d6035e1f13ebf2f524bc23aa",
   "minNativeBuild": 1
 }

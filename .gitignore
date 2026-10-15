@@ -1,4 +1,4 @@
-node_modules/
+node_modules
 dist/
 # Android build output and local files
 android/app/build/

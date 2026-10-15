@@ -107,6 +107,8 @@ export class WaveManager {
       this.stats.speedMult *= mut.speed || 1;
       this.stats.eliteChance = Math.min(0.85, this.stats.eliteChance + (mut.elite || 0));
     }
+    // CoreBurnZ RISK SHRINE curse (host): tougher + more enemies for 3 waves
+    this.curseCount = RULES.z && this.world.shrine && !this.world.netClient ? this.world.shrine.applyCurse(this.stats, n) : 1;
     this.queue = [];
     this.waveActive = true;
     this.spawnTimer = 0.8;
@@ -125,7 +127,7 @@ export class WaveManager {
       return;
     }
 
-    const total = Math.round((4 + 2 * n) * (this.world.coopCount || 1) * (mut?.count || 1)); // co-op / SWARM: more enemies
+    const total = Math.round((4 + 2 * n) * (this.world.coopCount || 1) * (mut?.count || 1) * (this.curseCount || 1)); // co-op / SWARM: more enemies
     const pool = (RULES.z ? UNLOCKS.concat(Z_UNLOCKS) : UNLOCKS).filter((u) => n >= u.wave);
     const totalWeight = pool.reduce((s, u) => s + u.weight, 0);
     const rng = this.world.waveRng?.(n) || Math.random; // daily challenge: the same mix + elites for everyone

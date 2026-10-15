@@ -438,7 +438,7 @@ body.touch .ucard .key { display: none; }
 @keyframes cursepulse { 50% { box-shadow: 0 0 28px var(--c); transform: scale(1.06); } }
 body.closecall #slowmo-tint { opacity: 1; background: radial-gradient(ellipse at center, transparent 45%, #d8f0ff55 100%); }
 body.closecall #game canvas { filter: saturate(.55) contrast(1.15); }
-#mutator-tag { margin-right: 48px; }
+#mutator-tag, #shrine-tag { margin-right: 48px; }
 #closecall { position: absolute; top: 62%; left: 0; right: 0; text-align: center; opacity: 0; pointer-events: none; }
 #closecall b { display: block; font-size: clamp(26px, 6vw, 44px); font-weight: 900; font-style: italic; letter-spacing: 4px; color: #fff; text-shadow: 0 3px 0 #000, 0 0 18px #7ad8ff, 0 0 40px #3ff6e0; }
 #closecall span { font-size: 14px; font-weight: 800; color: #bff; text-shadow: 0 2px 0 #000; }
@@ -719,3 +719,9 @@ body.zmode #title-panel .m-brand h1 { font-size: clamp(30px, 8.6vw, 52px); }
 .ucard.evolved .uname { color: #ffe39a; }
 .ucard.evolved .lvl b { color: #ffc23a; }
 @keyframes evoGlow { 50% { box-shadow: 0 0 34px #ffc23aaa, inset 0 0 24px #ffc23a33; } }
+
+/* v1.21: CoreBurnZ risk shrine curse */
+#shrine-tag { margin-top: 6px; display: inline-block; font-size: 11px; font-weight: 900; letter-spacing: 2px; padding: 2px 8px; border-radius: 4px; color: #fff; background: #c01a2a; box-shadow: 0 0 14px #ff2a3a; animation: shrinePulse 1.4s ease-in-out infinite; }
+#shrine-tag.hidden { display: none; }
+body.shrine-curse #hud::after { content: ''; position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 80px 4px #ff1a2a3a; }
+@keyframes shrinePulse { 50% { box-shadow: 0 0 24px #ff2a3a; } }

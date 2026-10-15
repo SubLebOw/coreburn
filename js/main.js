@@ -41,6 +41,7 @@ import { rotation } from './bosses.js';
 import { progress, xpForRun, ARENA_SKINS, skinFor, variantById } from './progress.js';
 import { Wardrobe } from './cosmetics.js';
 import { CosmeticsUI } from './cosmetics-ui.js';
+import { Shrine } from './shrine.js';
 
 const IS_TOUCH = isTouchDevice();
 if (IS_TOUCH) document.body.classList.add('touch'); // shows the touch controls (see style.css)
@@ -161,6 +162,9 @@ const world = {
   },
   onWaveStart(n) {
     const mut = enemies.mutator;
+    if (RULES.z && mode === 'endless' && shrine.onWaveStart(n, !mut && !isBossWave(n))) { // CoreBurnZ: a RISK SHRINE rises
+      setTimeout(() => { if (shrine.visible) { hud.showToast('RISK SHRINE', 'Stand on the red altar: curse 3 waves, win a boss relic', '#ff3a4a'); if (coop.mode === 'host') coop.net.broadcast({ t: 'toast', text: 'RISK SHRINE', sub: 'Stand on the red altar: curse 3 waves, win a boss relic', color: '#ff3a4a' }); } }, 1800);
+    }
     if (mut) { // MUTATOR wave: its own banner (and a tag under the score while it lasts)
       hud.showBanner(`MUTATOR: ${mut.name}`, `Wave ${n} · ${mut.desc}`, mut.color);
       hud.setMutator(mut);
@@ -225,6 +229,11 @@ const world = {
       world.player.heal(25);
       hud.showBanner(`WAVE ${n} CLEARED`, `+${bonus} pts · +25 health`);
     }
+    if (RULES.z && shrine.onWaveCleared(n)) { // CoreBurnZ: survived the shrine's 3 cursed waves
+      bossPicks++; upgradeTimer = Math.max(upgradeTimer, 1.3);
+      hud.showBanner('CURSE SURVIVED', 'The shrine pays out: a guaranteed boss relic', '#ffc23a');
+      sound.play('bossDefeated');
+    }
   },
   mutatorFor(n) {
     if (!isMutatorWave(n)) return null;
@@ -280,6 +289,8 @@ const enemies = new WaveManager(scene, world);
 const powerups = new PowerUps(scene, world);
 world.player = player;
 world.enemies = enemies;
+const shrine = new Shrine(scene, world); // CoreBurnZ risk shrines
+world.shrine = shrine;
 world.powerups = powerups;
 const allies = new Allies(scene, world); // ISKRA's needles + decoys, ORIN's drones + vortex
 world.allies = allies;
@@ -292,6 +303,15 @@ function setSlowmo(on) {
   document.body.classList.toggle('slowmo', on);
   sound.setSlowmo(on);
   if (state === 'playing') sound.play(on ? 'slowmoIn' : 'slowmoOut');
+}
+
+// CoreBurnZ RISK SHRINE activated: the next 3 waves are cursed
+function shrineActivated() {
+  const p = shrine.group.position;
+  effects.spawnRing(p, 0xff2a3a, 4, 0.7); effects.spawnSparks(p.clone().setY(2.3), 0xff2a3a, 20, 8);
+  world.shake(0.5); sound.play('bossWarning');
+  hud.showBanner('SHRINE ACTIVATED', 'The next 3 waves are cursed · survive them for a boss relic', '#ff3a4a');
+  if (coop.mode === 'host') coop.net.broadcast({ t: 'toast', text: 'SHRINE ACTIVATED', sub: 'The next 3 waves are cursed · survive them for a boss relic', color: '#ff3a4a' });
 }
 
 // Upgrade picker: pause, show 3 cards, apply the pick (weapon tier +1 and the card's perk)
@@ -399,6 +419,7 @@ function startGame(id = heroId) {
   projectiles.reset();
   allies.reset();
   enemies.reset();
+  shrine.reset();
   player.reset();
   powerups.reset();
   hud.hidePicker();
@@ -429,6 +450,7 @@ function resetWorld() {
   projectiles.reset();
   allies.reset();
   enemies.reset();
+  shrine.reset();
   powerups.reset();
   hud.hidePicker();
   upgradeTimer = 0;
@@ -957,6 +979,7 @@ function frame() {
     } else {
       player.update(dt, input);
       enemies.update(worldDt);
+      if (RULES.z && shrine.update(worldDt, world.heroes || [player])) shrineActivated();
       allies.update(worldDt);
       projectiles.update(worldDt, world.heroes || player, arena, effects);
       arena.update(worldDt, player, world, true);

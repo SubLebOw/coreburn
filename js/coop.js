@@ -472,6 +472,7 @@ export class Coop {
       ar: [arena.current.index, arena.current.loop],
       h: this.heroes.map((h) => [h.slot, r2(h.position.x), r2(h.position.z), r2(h.facing), h.state, h.comboStep, Math.ceil(h.hp), h.maxHp, h.dead ? 1 : 0, r2(h.reviveProgress || 0), h.loadout.tier,
         powerups.listFor(h).map((p) => [p.type, r2(p.left), p.seconds, p.hits]), (h.shieldHp > 0 ? 1 : 0) | (h.tauntTimer > 0 ? 2 : 0)]),
+      sh: this.ctx.world.shrine?.snapshot(), // CoreBurnZ risk shrine
       a: this.ctx.allies.serialize(), // needles, decoys, drones, vortexes
       e: enemies.list.filter((e) => e.nid).map((e) => e.isBoss
         ? [e.nid, 'B', r2(e.position.x), r2(e.position.z), r2(e.facing), e.state, (e.flashTimer > 0 ? 2 : 0) | (e.dead ? 4 : 0) | (e.golden ? 8 : 0), e.bossNumber, e.part, r2(e.stateTime), e.attack || '', e.hidden ? 1 : 0, r2(e.telegraphTime || 1), r2(e.rootY || 0)]
@@ -818,6 +819,7 @@ export class Coop {
       p.life = 1;
     });
     this.ctx.allies.applySnapshot(m.a);
+    this.ctx.world.shrine?.applySnapshot(m.sh);
     // pickups + heal orbs
     const pseen = new Set();
     for (const [id, type, x, z] of m.pu) {
@@ -945,6 +947,7 @@ export class Coop {
     // bolts glide between snapshots
     for (const p of this.ctx.projectiles.list) if (p.mesh.visible && p.target) p.mesh.position.lerp(p.target, k);
     powerups.update(dt, true);
+    this.ctx.world.shrine?.animate(dt);
     this.ctx.allies.update(dt); // friends: just glide what the host sent
     arena.update(dt, player, world, false);
   }

@@ -85,6 +85,17 @@
     <div id="closecall"><b>CLOSE CALL</b><span></span></div>
   </div>
 
+  <!-- PAUSE (in a run; Esc / P on keyboard) -->
+  <button id="pause-btn" class="hidden" aria-label="Pause" title="Pause (Esc / P)"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg></button>
+  <div id="pause-overlay" class="hidden">
+    <div class="pause-panel">
+      <h2>PAUSED</h2>
+      <div id="pause-sub" class="pause-sub"></div>
+      <button id="pause-resume" class="big-btn">&#9654; RESUME</button>
+      <button id="pause-restart" class="big-btn">&#8635; RESTART <small>change hero</small></button>
+      <button id="pause-menu" class="big-btn">&#9776; MENU</button>
+    </div>
+  </div>
   <!-- Sound on/off (remembered between visits). Keyboard shortcut: M -->
   <button id="mute-btn" aria-label="Toggle sound" title="Sound on/off (M)">
     <svg class="icon-on" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>

@@ -28,7 +28,7 @@ export const HERO_STATS = {
   zaleks: {
     id: 'zaleks', name: 'ZALEKS', title: 'Plated bruiser', tag: 'TANK', color: 0xffa030, blade: 0xffc060,
     blurb: 'Soaks the hits: blocks from the front while swinging, stuns with charges and pulls aggro.',
-    hp: 190, speed: 5.9, dmg: 1.18, atkSpeed: 1, armor: 0, // (armor = flat % damage reduction; his toughness comes from block + shield instead)
+    hp: 219, speed: 6.2, dmg: 1.18, // v1.15: +15% hp, +5% speed (both modes) atkSpeed: 1, armor: 0, // (armor = flat % damage reduction; his toughness comes from block + shield instead)
     abilities: {
       attack: { name: 'Shield Bash', short: 'BASH', icon: '⛊', desc: 'Bash + hammer-fist, huge knockback, blocks 40% from the front' },
       mobility: { name: 'Shoulder Charge', short: 'CHARGE', icon: '⇛', desc: 'Charge that stuns what it hits (stops at walls)' },
@@ -82,11 +82,11 @@ export const HERO_STATS = {
     abilities: {
       attack: { name: 'Shurikens', short: 'STAR', icon: '✴', desc: 'Spinning stars that seek the enemy you move towards and pierce 1' },
       mobility: { name: 'Shadow Step', short: 'SHADOW<br>STEP', icon: '◐', desc: 'Teleport behind the nearest enemy ahead, cutting through everything on the way' },
-      ultimate: { name: 'Shadow Clone', short: 'SHADOW<br>CLONE', icon: '♊', desc: 'A shadow clone fights beside you, copying your throws and steps' },
+      ultimate: { name: 'Shadow Clone', short: 'SHADOW<br>CLONE', icon: '♊', desc: 'A 5s shadow clone copies all your moves and upgrades at 45% damage' },
     },
     needle: { damage: 11, rate: 0.2, speed: 26, range: 14, pierce: 1, aimRange: 13, moveWhileFiring: 0.9 },
     dashCd: 2.6, dashCharges: 1, stepRange: 7, stepDist: 5, stepDmg: 22, stepGuard: 0.3,
-    ultCd: 13, cloneTime: 8, clonePct: 0.5,
+    ultCd: 13, cloneTime: 5, clonePct: 0.45, // v1.15: 5s clone that copies every upgrade at 45% damage
   },
 };
 export const CHARACTER_ORDER = ['sarrow', 'zaleks', 'iskra', 'orin'];

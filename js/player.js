@@ -742,6 +742,7 @@ export class Player {
   }
   // damage everything along a step (used by Kagero and his clone)
   stepCut(from, seg, len, dmg) {
+    const hits = [];
     for (const e of this.world.enemies.list) {
       if (!e.canBeHit) continue;
       const dx = e.position.x - from.x, dz = e.position.z - from.z;
@@ -750,7 +751,11 @@ export class Player {
       if (Math.abs(dx * seg.z - dz * seg.x) > 1.1 + e.radius) continue;
       this.strike(e, dmg, seg.x * 6, seg.z * 6, true, 'dash');
       this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0xc8c0ff, 4);
+      hits.push(e);
     }
+    // RETURNING EDGE: stars stay in what you cut, then fly back to you
+    if (this.stats.ret && hits.length) this.world.allies?.embedStars(this, hits, dmg * 0.5 * (1 + 0.15 * this.stats.retMore), 1 + this.stats.retMore);
+    return hits;
   }
 
   stormVolley() {
@@ -901,7 +906,7 @@ export class Player {
       this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0x9ab8ff, 4);
     }
     // healing (capped per second so it can't make you unkillable)
-    if (attack && s.leech > 0) this.leechHeal(s.leech, 6);
+    if (attack && s.leech > 0 && !this.cloneHit) this.leechHeal(s.leech, 6); // the clone's hits don't heal you
     if (kind === 'spin' && s.spinLeech > 0) this.leechHeal(s.spinLeech, 10);
     if (attack) {
       this.world.onTalonHit?.(e, dmg, this); // ARC TALONS power-up

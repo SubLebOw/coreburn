@@ -307,7 +307,13 @@ function openUpgradePicker() {
   hostPicking = true;
   const cardRng = mode === 'daily' ? rngFor(`daily:${seed()}:${boss ? 'boss' : 'cards'}:${loadout.tier}:${bossPicks}`) : Math.random;
   const hand = boss ? loadout.rollBoss(3, cardRng) : loadout.maybeCurse(loadout.roll(3, cardRng), enemies.wave, cardRng);
-  const picker = hud.showPicker(hand, loadout, (id) => {
+  hud.rerollHook = (b, handle) => { // CoreBurnZ reroll (yours only; friends reroll their own)
+    loadout.rerolls--;
+    const h2 = b ? loadout.rollBoss(3) : loadout.maybeCurse(loadout.roll(3), enemies.wave);
+    hud.showPicker(h2, loadout, onPickCard, b, handle);
+    sound.play('powerup');
+  };
+  const onPickCard = (id) => {
     twitch.endVote();
     hostPicking = false;
     loadout.apply(id);
@@ -323,7 +329,8 @@ function openUpgradePicker() {
     milestones();
     if (coop.mode === 'host' && coop.picksPending) { state = 'upgrade'; coop.checkPicksDone(); }
     if (bossPicks > 0 || normalPick) upgradeTimer = 0.45; // the next pick (boss relic, then the normal one)
-  }, boss);
+  };
+  const picker = hud.showPicker(hand, loadout, onPickCard, boss);
   twitch.startVote(hand.length, (i) => picker.pickIndex(i)); // Streamer Mode: chat votes !1 !2 !3
 }
 
@@ -803,6 +810,30 @@ document.getElementById('go-menu-btn').addEventListener('click', (e) => {
   if (state !== 'gameover' || restarting) return;
   if (coop.mode) coop.leave(); else showTitle();
 });
+const $p = (id) => document.getElementById(id);
+// ---------- PAUSE (both modes). Solo: everything freezes, timer too. Co-op: a menu just for you,
+// the shared game keeps going (nobody else gets frozen). ----------
+const pauseBtn = $p('pause-btn'), pauseOv = $p('pause-overlay');
+let coopMenu = false;
+function openPause() {
+  if (state !== 'playing' || world.runOver) return;
+  if (coop.mode) { coopMenu = true; $p('pause-sub').textContent = 'Co-op keeps running while this menu is open'; $p('pause-restart').classList.add('hidden'); $p('pause-menu').innerHTML = '&#10006; LEAVE GAME'; }
+  else { state = 'paused'; $p('pause-sub').textContent = 'Wave ' + Math.max(1, enemies.wave) + ' · ' + document.getElementById('run-timer').textContent; $p('pause-restart').classList.remove('hidden'); $p('pause-menu').innerHTML = '&#9776; MENU'; sound.setSlowmo?.(false); }
+  pauseOv.classList.remove('hidden');
+}
+function closePause() { pauseOv.classList.add('hidden'); coopMenu = false; if (state === 'paused') state = 'playing'; }
+world.isPaused = () => state === 'paused';
+for (const el of [pauseBtn, pauseOv]) el.addEventListener('pointerdown', (e) => e.stopPropagation());
+pauseBtn.addEventListener('click', (e) => { e.stopPropagation(); pauseBtn.blur(); openPause(); });
+$p('pause-resume').addEventListener('click', (e) => { e.stopPropagation(); closePause(); });
+$p('pause-restart').addEventListener('click', (e) => { e.stopPropagation(); closePause(); world.runOver = true; showCharacterSelect(); });
+$p('pause-menu').addEventListener('click', (e) => { e.stopPropagation(); closePause(); world.runOver = true; if (coop.mode) coop.leave(); else { resetWorld(); showTitle(); } });
+window.addEventListener('keydown', (e) => {
+  if (e.code !== 'Escape' && e.code !== 'KeyP') return;
+  if (state === 'paused' || coopMenu) { e.preventDefault(); closePause(); }
+  else if (state === 'playing') { e.preventDefault(); openPause(); }
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'playing' && !coop.mode) openPause(); }); // phone: switching apps pauses
 document.getElementById('start-btn').addEventListener('click', showCharacterSelect);
 document.getElementById('restart-btn').addEventListener('click', tryRestart);
 setRules(localStorage.getItem('coreburn-rules') === 'z');
@@ -944,10 +975,11 @@ function frame() {
     arena.update(dt, player, world, false);
   }
 
+  pauseBtn.classList.toggle('hidden', !(state === 'playing' || state === 'paused') || world.runOver);
   if (state === 'playing' && !world.runOver && !(player.dead && !coop.mode)) runClock += dt; // RUN TIMER
   hud.setTimer(runClock);
   if (coop.mode === 'host') coop.hostNet(dt, state); // snapshots to friends
-  if (state !== 'upgrade') effects.update(worldDt);
+  if (state !== 'upgrade' && state !== 'paused') effects.update(worldDt);
   updateCamera(dt);
   if (coop.mode === 'client' && coop.view) {
     const v = coop.view;
@@ -969,6 +1001,6 @@ frame();
 const LOCAL_DEV = !IS_NATIVE && ['localhost', '127.0.0.1'].includes(location.hostname);
 if (LOCAL_DEV) {
   import('./dev.local.js')
-    .then((m) => m.install({ player, enemies, world, progress, allies, arena, powerups, projectiles, effects, hud, sound, ads, startGame, snapCamera: () => updateCamera(0, true), getScore: () => score, combo, meta, twitch, input, getState: () => state, getLastRun: () => lastRun, getMode: () => mode, bursts }))
+    .then((m) => m.install({ player, enemies, world, progress, allies, arena, powerups, projectiles, effects, hud, sound, ads, startGame, snapCamera: () => updateCamera(0, true), getScore: () => score, combo, meta, twitch, input, getState: () => state, getLastRun: () => lastRun, getMode: () => mode, bursts, openPicker: () => { normalPick = true; openUpgradePicker(); } }))
     .catch(() => {}); // no dev file = no helpers, that's fine
 }

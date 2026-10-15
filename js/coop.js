@@ -269,6 +269,15 @@ export class Coop {
         if (msg.ep === this.epoch && Number.isFinite(msg.x) && Number.isFinite(msg.z)) { h.reported.set(msg.x, 0, msg.z); h.reportedFacing = msg.f; h.hasReport = true; }
         break;
       }
+      case 'reroll': { // CoreBurnZ: a friend rerolls their own cards (2 per run, counted here too)
+        const h = this.heroBySlot(conn.slot);
+        if (!RULES.z || !h || !h.pendingPick || !(h.loadout.rerolls > 0)) break;
+        h.loadout.rerolls--;
+        const boss = h.loadout.def(h.pendingPick[0])?.group === 'boss';
+        h.pendingPick = boss ? h.loadout.rollBoss(3) : h.loadout.roll(3);
+        this.net.send(conn, { t: 'pick', cards: h.pendingPick, boss });
+        break;
+      }
       case 'pick': {
         const h = this.heroBySlot(conn.slot);
         if (h && h.pendingPick && h.pendingPick.includes(msg.id)) this.applyRemotePick(h, msg.id);
@@ -679,6 +688,7 @@ export class Coop {
   clientPick(cards, boss = false) {
     this.ctx.setState('upgrade');
     const loadout = this.ctx.player.loadout;
+    this.ctx.hud.rerollHook = () => { loadout.rerolls--; this.net.send({ t: 'reroll' }); }; // the host sends 3 new cards
     this.ctx.hud.showPicker(cards, loadout, (id) => {
       this.net.send({ t: 'pick', id });
       this.clientApplyPick(id);

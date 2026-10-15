@@ -91,7 +91,7 @@ export class Hud {
   }
 
   // The upgrade picker. cards = ids from Loadout.roll(); onPick(id) is called once.
-  showPicker(cards, loadout, onPick, boss = false) {
+  showPicker(cards, loadout, onPick, boss = false, handle = {}) {
     const hex = (c) => '#' + c.toString(16).padStart(6, '0');
     const tc = hex(tierColor(loadout.tier + 1));
     $('upgrade-title').textContent = boss ? 'BOSS RELIC' : 'CHOOSE AN UPGRADE';
@@ -118,12 +118,24 @@ export class Hud {
       b.addEventListener('click', (e) => { e.stopPropagation(); pick(id); });
       box.appendChild(b);
     });
+    // COREBURNZ REROLL: swap all 3 cards (2 per run, each player their own)
+    const rr = this.rerollHook;
+    document.querySelectorAll('.reroll-btn').forEach((x) => x.remove());
+    if (RULES.z && rr && loadout.rerolls > 0) {
+      const b = document.createElement('button');
+      b.className = 'big-btn reroll-btn';
+      b.innerHTML = `⟳ REROLL <small>${loadout.rerolls} left</small>`;
+      b.addEventListener('pointerdown', (e) => e.stopPropagation());
+      b.addEventListener('click', (e) => { e.stopPropagation(); if (done) return; done = true; window.removeEventListener('keydown', onKey, true); rr(boss, handle); });
+      box.after(b);
+    }
     let done = false;
     const pick = (id) => {
       if (done) return;
       done = true;
       window.removeEventListener('keydown', onKey, true);
       this.upgradeOverlay.classList.add('hidden');
+      document.querySelectorAll('.reroll-btn').forEach((x) => x.remove());
       onPick(id);
     };
     const onKey = (e) => {
@@ -135,7 +147,9 @@ export class Hud {
     box.style.pointerEvents = 'none';
     setTimeout(() => { box.style.pointerEvents = ''; }, 350);
     this.upgradeOverlay.classList.remove('hidden');
-    return { pickIndex: (i) => cards[i] && pick(cards[i]) }; // Streamer Mode: chat's winning card
+    handle.pickIndex = (i) => cards[i] && pick(cards[i]); // Streamer Mode: chat's winning card
+    handle.cards = cards;
+    return handle;
   }
 
   // Character select (before every run). Same overlay + card style as the upgrade picker.

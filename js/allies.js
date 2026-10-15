@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { CHARACTERS } from './characters.js';
 
-const NEEDLES = 80, STARS = 60, DECOYS = 6, DRONES = 12, VORTEXES = 3, CLONES = 4;
+const NEEDLES = 80, STARS = 100, DECOYS = 6, DRONES = 12, VORTEXES = 3, CLONES = 4;
 
 export class Allies {
   constructor(scene, world) {
@@ -110,11 +110,11 @@ export class Allies {
   get host() { return !this.world.netClient; }
 
   // ---------- spawning (solo / host only) ----------
-  fireNeedle(owner, from, dir, dmg, { pierce = 0, speed = 30, range = 15, color = 0xe8a0ff, kind = 'needle', star = false } = {}) {
+  fireNeedle(owner, from, dir, dmg, { pierce = 0, speed = 30, range = 15, color = 0xe8a0ff, kind = 'needle', star = false, clone = false } = {}) {
     if (!this.host) return;
     const n = (star ? this.stars : this.needles).find((x) => x.life <= 0);
     if (!n) return;
-    n.owner = owner; n.dmg = dmg; n.pierce = pierce; n.kind = kind; n.hitSet.clear();
+    n.owner = owner; n.dmg = dmg; n.pierce = pierce; n.kind = kind; n.hitSet.clear(); n.ret = null; n.clone = clone;
     n.vel.set(dir.x, 0, dir.z).normalize().multiplyScalar(speed);
     n.life = range / speed;
     n.color = color;
@@ -151,14 +151,30 @@ export class Allies {
     const aim = target ? new THREE.Vector3(target.position.x - c.position.x, 0, target.position.z - c.position.z) : new THREE.Vector3(Math.sin(o.facing), 0, Math.cos(o.facing));
     if (aim.lengthSq() < 1e-4) return;
     aim.normalize(); c.facing = Math.atan2(aim.x, aim.z); c.flick = 0.15;
-    this.fireNeedle(o, c.position, aim, nd.damage * c.pct, { pierce: nd.pierce + (o.stats.starPierce || 0), speed: nd.speed, range: nd.range, color: 0xa898ff, star: true });
+    const opts = { pierce: nd.pierce + (o.stats.starPierce || 0), speed: nd.speed, range: nd.range, color: 0xa898ff, star: true, clone: true };
+    this.fireNeedle(o, c.position, aim, nd.damage * c.pct, opts);
+    for (let i = 1; i <= (o.stats.starFan || 0); i++) for (const sgn of [-1, 1]) { // Star Fan, copied
+      const a2 = c.facing + sgn * 0.22 * i;
+      this.fireNeedle(o, c.position, new THREE.Vector3(Math.sin(a2), 0, Math.cos(a2)), nd.damage * 0.3 * c.pct, opts);
+    }
+  }
+  // RETURNING EDGE: `per` stars stick in each enemy cut, then fly back to the owner
+  embedStars(owner, hits, dmg, per) {
+    if (!this.host) return;
+    for (const e of hits) for (let i = 0; i < per; i++) {
+      const n = this.stars.find((x) => x.life <= 0); if (!n) return;
+      const a = Math.random() * Math.PI * 2, r = (e.radius || 0.5) * 0.7;
+      this.fireNeedle(owner, e.position, new THREE.Vector3(1, 0, 0), dmg, { star: true, color: 0x9a7aff, kind: 'needle', clone: !!owner.cloneHit });
+      n.ret = { enemy: e, t: 0, phase: 'embed', ox: Math.sin(a) * r, oz: Math.cos(a) * r, dmg };
+      n.vel.set(0, 0, 0);
+    }
   }
   // copies a Shadow Step from where it stands
   cloneStep(owner, dir) {
     const c = this.cloneOf(owner); if (!c) return;
     const from = c.position.clone(), to = this.cloneSpot(owner);
     const seg = to.clone().sub(from), len = seg.length();
-    if (len > 0.5) owner.stepCut(from, seg.divideScalar(len), len, owner.char.stepDmg * owner.stats.stepDmg * c.pct);
+    if (len > 0.5) { owner.cloneHit = true; owner.stepCut(from, seg.divideScalar(len), len, owner.char.stepDmg * owner.stats.stepDmg * c.pct); owner.cloneHit = false; }
     c.position.copy(to);
     this.world.effects.spawnRing(to, 0x8a7aff, 1.4, 0.25);
   }
@@ -226,23 +242,37 @@ export class Allies {
       if (n.life <= 0) continue;
       n.life -= dt;
       if (n.star) n.mesh.rotation.y += dt * 22;
+      if (n.ret && n.ret.phase === 'embed') { // stuck in an enemy, waiting to fly home
+        n.life = 9; n.ret.t += dt;
+        const e = n.ret.enemy;
+        if (e && !e.dead) n.mesh.position.set(e.position.x + n.ret.ox, 1.2, e.position.z + n.ret.oz);
+        if (n.ret.t >= 1.5 || !e || e.dead || !n.owner || n.owner.dead) {
+          n.ret.phase = 'back'; n.hitSet.clear(); n.pierce = 99;
+          n.dmg = n.ret.dmg * (1 + 0.6 * Math.min(1, n.ret.t / 1.5)); // longer stuck = harder return
+        }
+        continue;
+      }
+      if (n.ret && n.ret.phase === 'back') {
+        const o = n.owner, d = new THREE.Vector3(o.position.x - n.mesh.position.x, 0, o.position.z - n.mesh.position.z);
+        if (d.length() < 0.8 || o.dead) { n.life = 0.0001; } else n.vel.copy(d.normalize().multiplyScalar(26));
+      }
       const pos = n.mesh.position;
       pos.addScaledVector(n.vel, dt);
       let done = n.life <= 0 || Math.abs(pos.x) > 19 || Math.abs(pos.z) > 19;
-      for (const o of arena.obstacles) if (Math.hypot(pos.x - o.x, pos.z - o.z) < o.r) { done = true; break; }
+      if (!n.ret) for (const o of arena.obstacles) if (Math.hypot(pos.x - o.x, pos.z - o.z) < o.r) { done = true; break; }
       if (!done) {
         for (const e of enemies) {
           if (!e.canBeHit || n.hitSet.has(e)) continue;
           if (Math.hypot(pos.x - e.position.x, pos.z - e.position.z) < e.radius + 0.35) {
             n.hitSet.add(e);
             const k = n.vel.clone().normalize().multiplyScalar(2);
-            n.owner?.strike(e, n.dmg, k.x, k.z, false, n.kind);
+            if (n.owner) { n.owner.cloneHit = !!n.clone; n.owner.strike(e, n.dmg, k.x, k.z, false, n.kind); n.owner.cloneHit = false; if (n.ret && n.owner.stats.retCd) n.owner.dashCooldown = Math.max(0.01, n.owner.dashCooldown - n.owner.stats.retCd); }
             this.world.effects.spawnSparks(pos.clone(), n.color, 3, 4);
             if (n.pierce-- <= 0) { done = true; break; }
           }
         }
       }
-      if (done) { n.life = 0; n.mesh.visible = false; }
+      if (done) { n.life = 0; n.mesh.visible = false; n.ret = null; n.clone = false; }
     }
     for (const c of this.clones) {
       if (c.life <= 0) continue;

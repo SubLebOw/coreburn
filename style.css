@@ -635,3 +635,16 @@ body.zmode #title-panel h1::after { content: 'Z'; color: #ffc23a; text-shadow: 0
 .cos-chip.on { border-color: #ffc23a; color: #ffc23a; background: #ffc23a1a; }
 .cos-chip.locked { opacity: .45; cursor: default; }
 .cos-chip i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+
+/* ---------- v1.15: pause, reroll ---------- */
+#pause-btn { position: fixed; z-index: 30; top: calc(110px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right));
+  width: 38px; height: 38px; border-radius: 50%; padding: 8px; background: rgba(20,25,29,.7); color: #3ff6e0; border: 2px solid #3ff6e0; cursor: pointer; touch-action: manipulation; }
+#pause-btn svg { width: 100%; height: 100%; display: block; }
+#pause-btn.hidden, #pause-overlay.hidden { display: none; }
+#pause-overlay { position: fixed; inset: 0; z-index: 60; background: rgba(8,10,12,.72); display: flex; align-items: center; justify-content: center; }
+.pause-panel { display: flex; flex-direction: column; gap: 10px; min-width: 240px; padding: 22px; border: 2px solid #3ff6e0; border-radius: 12px; background: #14191dee; text-align: center; }
+.pause-panel h2 { margin: 0 0 4px; color: #3ff6e0; letter-spacing: 4px; }
+.pause-sub { font-size: 12px; opacity: .75; }
+.reroll-btn { grid-column: 1 / -1; justify-self: center; margin-top: 6px; padding: 8px 18px; font-size: 15px; border-color: #ffc23a; color: #ffc23a; }
+.reroll-btn small { opacity: .8; margin-left: 6px; }
+.reroll-btn { display: block; margin: 10px auto 0; width: auto; min-width: 0; background: #14191dee !important; border: 2px solid #ffc23a !important; color: #ffc23a !important; box-shadow: none !important; }

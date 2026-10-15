@@ -93,7 +93,10 @@ export const UPGRADES = {
   nEdge:    { name: 'Shadow Edge', heroes: N, group: 'mobility', icon: '◐', color: 0x8a7aff, max: 5, desc: () => '+25% Shadow Step damage, +8% step reach' },
   nTwin:    { name: 'Twin Shadows', heroes: N, group: 'mobility', icon: '⇉', color: 0x9a8aff, max: 1, desc: () => 'Shadow Step +1 charge' },
   nShade:   { name: 'Lingering Shade', heroes: N, group: 'ultimate', icon: '♊', color: 0x6a5aff, max: 4, desc: () => 'Shadow Clone lasts +1s' },
-  nMirror:  { name: 'Perfect Mirror', heroes: N, group: 'ultimate', icon: '⧉', color: 0xb0a0ff, max: 4, desc: () => 'Clone copies with +10% of your damage' },
+  nReturn:  { name: 'Returning Edge', heroes: N, group: 'mobility', icon: '↺', color: 0x7a6aff, max: 1, desc: () => 'After Shadow Step, stars stay in the enemies you cut, then fly back to you after 1.5s, hitting everything on the way (+damage the longer they stayed in)' },
+  nReturnMore:{ name: 'Edge Storm', heroes: N, needs: 'nReturn', group: 'mobility', icon: '⟲', color: 0x6a5aee, max: 2, desc: () => '+1 extra returning star per enemy cut, +15% return damage' },
+  nReturnCd:{ name: 'Homecoming', heroes: N, needs: 'nReturn', group: 'mobility', icon: '↻', color: 0x8a7aee, max: 3, desc: () => 'Each return hit takes 0.15s off Shadow Step cooldown' },
+  nMirror:  { name: 'Perfect Mirror', heroes: N, group: 'ultimate', icon: '⧉', color: 0xb0a0ff, max: 4, desc: () => 'Clone hits +5% harder (of your damage)' },
   oVortex:  { name: 'Deep Vortex', heroes: O, group: 'ultimate', icon: '◉', color: 0xff5070, max: 5, desc: () => '+10% vortex radius and pull' },
 };
 // COREBURNZ BOSS CARDS: one gold pick after every boss kill (never in the normal pool). Rarer and
@@ -138,6 +141,7 @@ export class Loadout {
   reset() {
     this.tier = 0;
     this.levels = {};
+    this.rerolls = RULES.z ? 2 : 0; // CoreBurnZ: 2 rerolls per run on the pick screen
     this.patches = 0;
     this.version = 0; // bumps on every change (the HUD redraws when it changes)
     this.recompute();
@@ -149,7 +153,7 @@ export class Loadout {
 
   // 3 different random cards that aren't maxed yet (Reactor Patch fills any gaps)
   roll(count = 3, rng = Math.random) {
-    const open = Object.keys(UPGRADES).filter((id) => cardForHero(id, this.hero) && this.level(id) < UPGRADES[id].max);
+    const open = Object.keys(UPGRADES).filter((id) => cardForHero(id, this.hero) && this.level(id) < UPGRADES[id].max && (!UPGRADES[id].needs || this.level(UPGRADES[id].needs) > 0));
     const hand = [];
     // CoreBurnZ: cards you already own are a bit more likely (weighted draw); classic = plain random
     const w = (id) => (RULES.z && this.level(id) > 0 ? Z_TUNING.ownedWeight : 1);
@@ -230,7 +234,7 @@ export class Loadout {
       droneDmg: 1 + 0.1 * L('oDroneDmg'), droneTime: 1 * L('oDroneTime'), vortex: 1 + 0.1 * L('oVortex'), shell: 0.06 * L('oShell'),
       // Kagero
       starPierce: L('nPierce'), starFan: L('nFan'), stepDmg: 1 + 0.25 * L('nEdge'), stepRange: 1 + 0.08 * L('nEdge'),
-      cloneTime: L('nShade'), cloneDmg: 0.1 * L('nMirror'),
+      cloneTime: L('nShade'), ret: L('nReturn'), retMore: L('nReturnMore'), retCd: 0.15 * L('nReturnCd'), cloneDmg: 0.05 * L('nMirror'),
       hurtMult: (L('greed') ? 1.15 : 1) * (L('glass') ? 1.2 : 1),
     };
     // cursed cards

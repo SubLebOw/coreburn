@@ -218,43 +218,45 @@
   <!-- Title screen + game over screen -->
   <div id="overlay">
     <div class="panel" id="title-panel">
-      <h1>COREBURN</h1>
-      <h2>Endless Arena Brawler</h2>
-      <div id="rules-row" class="rules-row"><button data-z="0">CLASSIC<small>the original game</small></button><button data-z="1">COREBURNZ<small>remix: 12 bosses, relics</small></button></div>
-      <div id="rules-desc" class="small"></div>
-      <p class="logline">The Grindchoir melts down anything with a pulse to feed its machine hymn. Sarrow, a scavenger
-        with a stolen reactor core burning in his chest, has decided the song ends here.</p>
-      <ul class="kb-only">
-        <li><b>WASD / Arrows</b> - move</li>
-        <li><b>J / Left-click</b> - attack (hold to keep going)</li>
-        <li><b>K / Space</b> - mobility (blink, charge, phase hop or grapple)</li>
-        <li><b>L</b> - ultimate (on a cooldown)</li>
-        <li>4 heroes, 4 different kits: duelist, tank, kiter, controller</li>
-      </ul>
-      <ul class="touch-only">
-        <li><b>Left thumb</b> - drag to move</li>
-        <li><b>Big button</b> - attack (hold to keep going)</li>
-        <li><b>Low button</b> - mobility (each hero's is different)</li>
-        <li><b>High button</b> - ultimate (on a cooldown)</li>
-      </ul>
-      <p class="small">Endless waves · 7 bosses · power-ups · a new arena every 10 waves · how far can you go?</p>
-      <button id="start-btn" class="big-btn">START</button>
-      <button id="coop-btn" class="big-btn coop">CO-OP <small>online, 2-4 players</small></button>
-      <div class="mode-row">
+      <div class="m-brand">
+        <h1>COREBURN</h1>
+        <h2>Endless Arena Brawler</h2>
+      </div>
+      <div id="rules-row" class="rules-row m-modes" role="radiogroup" aria-label="Game mode">
+        <button data-z="0"><b>CLASSIC</b><small>The original endless run</small></button>
+        <button data-z="1"><b>COREBURN<em>Z</em></b><small>Remix: relics, 12 bosses, Kagero</small></button>
+      </div>
+      <div id="rules-desc" class="hidden"></div>
+      <button id="start-btn" class="big-btn m-play">&#9654;&nbsp; PLAY</button>
+      <div class="mode-row m-sub">
+        <button id="coop-btn" class="mode-btn coop">CO-OP<small>2-4 online</small></button>
         <button id="daily-btn" class="mode-btn">DAILY<small>challenge</small></button>
         <button id="rush-btn" class="mode-btn">BOSS RUSH<small>weekly</small></button>
-        <button id="ranks-btn" class="mode-btn">RANKS<small>leaderboards</small></button>
       </div>
-      <button id="shop-btn" class="big-btn shop">SHOP <small id="shop-scrap">0 scrap</small></button>
-      <button id="cos-btn" class="big-btn cos">COSMETICS <small id="cos-sub">level 1</small></button>
       <div id="lvl-bar"><span id="lvl-text">LEVEL 1</span><span id="lvl-title"></span><i><b id="lvl-fill"></b></i></div>
       <div class="best" id="best-text"></div>
-      <div class="footer-links">
-        <a href="https://sublebow.github.io/coreburn/privacy.html" target="_blank" rel="noopener">Privacy policy</a>
-        <button id="tw-btn" class="link-btn">Streamer mode</button>
-        <button id="privacy-options-btn" class="link-btn hidden">Ad privacy choices</button>
-        <span id="version-text"></span>
+      <div class="m-icons">
+        <button id="shop-btn" class="m-icon shop" title="Shop"><span>&#9670;</span>SHOP<small id="shop-scrap">0 scrap</small></button>
+        <button id="cos-btn" class="m-icon cos" title="Cosmetics"><span>&#10022;</span>LOOKS<small id="cos-sub">level 1</small></button>
+        <button id="ranks-btn" class="m-icon" title="Leaderboards"><span>&#9819;</span>RANKS<small>boards</small></button>
+        <button id="tw-btn" class="m-icon" title="Streamer mode"><span>&#9673;</span>STREAM<small>Twitch</small></button>
+        <button id="menu-more-btn" class="m-icon" title="Settings &amp; help" aria-expanded="false"><span>&#8801;</span>MORE<small>help</small></button>
       </div>
+      <div id="menu-more" class="m-more hidden">
+        <div class="m-more-h">HOW TO PLAY</div>
+        <ul class="kb-only">
+          <li><b>WASD</b> move · <b>J / click</b> attack · <b>K / Space</b> mobility · <b>L</b> ultimate · <b>Esc</b> pause</li>
+        </ul>
+        <ul class="touch-only">
+          <li>Left thumb moves · big button attacks · small buttons are mobility and ultimate</li>
+        </ul>
+        <p class="m-lore">The Grindchoir melts down anything with a pulse to feed its machine hymn. The song ends here.</p>
+        <div class="m-more-links">
+          <a href="https://sublebow.github.io/coreburn/privacy.html" target="_blank" rel="noopener">Privacy policy</a>
+          <button id="privacy-options-btn" class="link-btn hidden">Ad privacy choices</button>
+        </div>
+      </div>
+      <span id="version-text" class="m-version"></span>
     </div>
 
     <div class="panel hidden" id="gameover-panel">

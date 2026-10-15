@@ -835,6 +835,9 @@ window.addEventListener('keydown', (e) => {
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'playing' && !coop.mode) openPause(); }); // phone: switching apps pauses
 document.getElementById('start-btn').addEventListener('click', showCharacterSelect);
+{ const mb = document.getElementById('menu-more-btn'), mm = document.getElementById('menu-more'); // MORE: help + links, collapsed by default
+  mb.addEventListener('pointerdown', (e) => e.stopPropagation()); mm.addEventListener('pointerdown', (e) => e.stopPropagation());
+  mb.addEventListener('click', (e) => { e.stopPropagation(); const open = mm.classList.toggle('hidden') === false; mb.setAttribute('aria-expanded', String(open)); mb.classList.toggle('on', open); }); }
 document.getElementById('restart-btn').addEventListener('click', tryRestart);
 setRules(localStorage.getItem('coreburn-rules') === 'z');
 onRulesChanged();

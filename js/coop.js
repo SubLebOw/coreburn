@@ -12,6 +12,7 @@
 // Rules: enemies get more numerous and tougher per player, bosses switch targets every few seconds,
 // a downed hero is revived by a teammate standing next to them for 3 seconds, and the run ends when
 // everyone is down. Score and combo are shared; upgrade picks and power-ups are per player.
+import { applyAffixVisuals } from './affixes.js';
 import * as THREE from 'three';
 import { NetHost, NetClient, normalizeCode, MAX_PLAYERS } from './net.js';
 import { Player } from './player.js';
@@ -474,7 +475,7 @@ export class Coop {
       a: this.ctx.allies.serialize(), // needles, decoys, drones, vortexes
       e: enemies.list.filter((e) => e.nid).map((e) => e.isBoss
         ? [e.nid, 'B', r2(e.position.x), r2(e.position.z), r2(e.facing), e.state, (e.flashTimer > 0 ? 2 : 0) | (e.dead ? 4 : 0) | (e.golden ? 8 : 0), e.bossNumber, e.part, r2(e.stateTime), e.attack || '', e.hidden ? 1 : 0, r2(e.telegraphTime || 1), r2(e.rootY || 0)]
-        : [e.nid, e.typeName, r2(e.position.x), r2(e.position.z), r2(e.facing), e.state, (e.elite ? 1 : 0) | (e.flashTimer > 0 ? 2 : 0) | (e.dead ? 4 : 0) | (e.stun > 0 ? 8 : 0), r2(e.stateTime)]),
+        : [e.nid, e.typeName, r2(e.position.x), r2(e.position.z), r2(e.facing), e.state, (e.elite ? 1 : 0) | (e.flashTimer > 0 ? 2 : 0) | (e.dead ? 4 : 0) | (e.stun > 0 ? 8 : 0), r2(e.stateTime), e.affixMask || 0]),
       p: projectiles.list.filter((p) => p.life > 0).map((p) => [r2(p.mesh.position.x), r2(p.mesh.position.z), p.mesh.material.color.getHex(), p.size]),
       pu: powerups.pickups.map((p) => [p.id, p.type, r2(p.obj.position.x), r2(p.obj.position.z)]),
       o: powerups.orbs.map((o) => [r2(o.obj.position.x), r2(o.obj.position.z)]),
@@ -859,6 +860,7 @@ export class Coop {
       return this.registerPuppet(es[0], part, pos);
     }
     const e = new Enemy(scene, es[1], pos, { hpMult: 1, dmgMult: 1, speedMult: 1, elite: !!(es[6] & 1) }, world);
+    if (es[8]) applyAffixVisuals(e, es[8]); // CoreBurnZ affixes: aura + name tag
     return this.registerPuppet(es[0], e, pos);
   }
 

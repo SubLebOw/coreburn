@@ -1068,6 +1068,7 @@ export class Player {
       if (amount <= 0) { this.world.sfx('shieldBlock'); return true; }
     }
     this.hp -= amount;
+    source?.onHurtHero?.(amount);                       // CoreBurnZ: Vampiric affix heals off you
     this.hurtTimer = 0.15;
     this.timeSinceHit = 0;
     if (source) this.lastHitBy = source;

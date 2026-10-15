@@ -3,6 +3,7 @@
 // acid-green visors. This file defines every regular enemy type, how they look,
 // and how they behave. (Bosses live in boss.js, waves in waves.js.)
 import * as THREE from 'three';
+import { affixDamage } from './affixes.js';
 
 const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1); // shared by every enemy body part
 const VISOR_MAT = new THREE.MeshBasicMaterial({ color: 0xc8ff3a });  // acid-green glow
@@ -206,6 +207,8 @@ export class Enemy {
   // Called by the player's attacks
   hit(damage, knockX, knockZ, heavy) {
     if (!this.canBeHit) return;
+    if (this.affixMask) damage = affixDamage(this, damage); // CoreBurnZ: shield bubble / ward aura
+    else if (this.wardMult) damage *= this.wardMult;
     this.hp -= damage;
     this.flashTimer = 0.1;
     const resist = this.type.armored ? 0.4 : (this.elite ? 0.7 : 1);

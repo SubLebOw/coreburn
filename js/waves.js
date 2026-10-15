@@ -17,6 +17,7 @@ import { Enemy } from './enemy.js';
 import { bossForNumber } from './bosses.js';
 import { RULES, Z_TUNING } from './rules.js';
 import { tickBossPhase } from './boss-phases.js';
+import { rollAffixes, applyAffixStats, tickAffixes, tickAffixVisuals, affixDeath, tickAffixJobs } from './affixes.js';
 import { makeGolden } from './golden.js';
 
 const SCREEN_CAP = 14;        // regular enemies alive at once (not counting mites/summons)
@@ -64,6 +65,7 @@ export class WaveManager {
     this.wave = 0;
     this.queue = [];
     this.eliteQueue = [];
+    this.affixJobs = [];
     this.waveActive = false;
     this.breakTimer = 0;
     this.bosses = [];   // usually one boss, two for the Forge Twins
@@ -171,6 +173,15 @@ export class WaveManager {
       if (e.isBoss && RULES.z && !this.world.netClient) tickBossPhase(e, dt); // CoreBurnZ: phase 2 + enrage
     }
 
+    // CoreBurnZ elite affixes (wave 50+)
+    if (RULES.z) {
+      if (this.world.netClient) tickAffixVisuals(this.list, dt);
+      else {
+        tickAffixes(this.list, dt, this.world); tickAffixVisuals(this.list, dt); tickAffixJobs(this, dt);
+        for (const e of this.list) if (e.dead && e.affixMask && !e.affixDone) { e.affixDone = true; if (!e.crumble) affixDeath(e, this); }
+      }
+    }
+
     // remove anything whose death animation has finished
     for (let i = this.list.length - 1; i >= 0; i--) {
       if (this.list[i].remove) {
@@ -188,6 +199,7 @@ export class WaveManager {
     const elite = typeName !== 'mite' && (eliteRoll ?? Math.random() < this.stats.eliteChance);
     const e = new Enemy(this.scene, typeName, p, { ...this.stats, elite }, this.world);
     e.summoned = summoned;
+    if (RULES.z && typeName !== 'mite' && !this.world.netClient) applyAffixStats(e, this.forceAffix ?? rollAffixes(this.wave)); // wave 50+
     e.nid = ++this.nextNid; // network id (co-op)
     this.list.push(e);
     this.world.effects.spawnRing(p, elite ? 0xffb020 : 0xc8ff3a, 2.2, 0.7);

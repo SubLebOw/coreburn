@@ -34,7 +34,7 @@ export const MASTERIES = {
   orin: [
     { id: 'oLong', row: 0, name: 'Long Tether', desc: 'Arc Tether reaches 15% further' },
     { id: 'oOver', row: 0, name: 'Overcharge', desc: '+6% damage' },
-    { id: 'oChainG', row: 1, name: 'Chain Grapple', desc: 'Grappled enemies arc lightning to 2 more foes' },
+    { id: 'oChainG', row: 1, name: 'Collapse', desc: 'Your Gravity Well detonates when it ends, stunning what it held' },
     { id: 'oBloom', row: 1, name: 'Vortex Bloom', desc: 'Hymn vortex 25% bigger' },
     { id: 'oChoir', row: 2, name: 'Drone Choir', desc: '+1 drone' },
     { id: 'oShell', row: 2, name: 'Magnet Shell', desc: 'Take 10% less damage while drones fly' },

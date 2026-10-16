@@ -239,6 +239,9 @@ export class Enemy {
   }
 
   update(dt, player, others) {
+    // CoreBurnZ slows (Iskra's Tar Mines, Orin's Gravity Well on bosses)
+    if (this.slowT > 0) { this.slowT -= dt; if (!this.slowBase) { this.slowBase = this.speed; this.speed *= this.slowMul || 0.6; } }
+    else if (this.slowBase) { this.speed = this.slowBase; this.slowBase = 0; }
     this.stateTime += dt;
     this.flashTimer -= dt;
     this.stun -= dt;

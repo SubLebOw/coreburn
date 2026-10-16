@@ -11,8 +11,8 @@ export const HERO_STATS = {
     blurb: 'Gets in close, chains a 3-hit talon combo and blinks out of trouble.',
     hp: 180, speed: 7, dmg: 0.8, atkSpeed: 1, armor: 0,
     abilities: {
-      attack: { name: 'Talon Combo', short: 'SLASH', icon: '✦', desc: '3-hit combo, the 3rd hit is a heavy finisher', zdesc: '3-hit combo, the 3rd hit is a heavy finisher that throws a piercing BLADE WAVE' },
-      mobility: { name: 'Blink', short: 'BLINK', icon: '➹', desc: 'Untouchable dash that cuts through enemies' },
+      attack: { name: 'Talon Combo', short: 'SLASH', icon: '✦', desc: '3-hit combo, the 3rd hit is a heavy finisher', zdesc: '3-hit combo that stacks BLEED; landed swings build FLOW (faster attacks + moves, lost when hit). The 3rd hit throws a piercing BLADE WAVE' },
+      mobility: { name: 'Blink', short: 'BLINK', icon: '➹', desc: 'Untouchable dash that cuts through enemies', zdesc: 'Untouchable dash: cutting through a bleeding enemy BURSTS its bleed' },
       ultimate: { name: 'Overdrive', short: 'OVER<br>DRIVE', icon: '⟲', desc: 'Whirlwind spin, half damage taken', zdesc: 'Whirlwind spin, half damage taken. Kills during it give you a Blink back' },
     },
     combo: [
@@ -50,7 +50,7 @@ export const HERO_STATS = {
     hp: 70, speed: 7.9, dmg: 0.88, atkSpeed: 1, armor: 0,
     abilities: {
       attack: { name: 'Needles', short: 'NEEDLE', icon: '➶', desc: 'Rapid needles that aim at the nearest enemy you move towards' },
-      mobility: { name: 'Phase Hop', short: 'PHASE<br>HOP', icon: '⇉', desc: 'Short teleport, 2 charges, leaves a decoy that enemies chase' },
+      mobility: { name: 'Phase Hop', short: 'PHASE<br>HOP', icon: '⇉', desc: 'Short teleport, 2 charges, leaves a decoy that enemies chase', zdesc: 'Short teleport, 2 charges, leaves a decoy and 2 NEEDLE MINES (Needle Storm detonates them all)' },
       ultimate: { name: 'Needle Storm', short: 'NEEDLE<br>STORM', icon: '⁂', desc: 'Fan barrage of needles for a few seconds' },
     },
     needle: { damage: 7.5, rate: 0.14, speed: 30, range: 15, pierce: 1, aimRange: 13, moveWhileFiring: 0.85 },
@@ -66,7 +66,7 @@ export const HERO_STATS = {
     hp: 165, speed: 6.6, dmg: 1.08, atkSpeed: 1, armor: 0,
     abilities: {
       attack: { name: 'Arc Tether', short: 'TETHER', icon: 'ϟ', desc: 'Short beam that pins an enemy in place and chains to 2 more' },
-      mobility: { name: 'Magnet Grapple', short: 'GRAPPLE', icon: '⊸', desc: 'Yank an enemy in (stunned), or pull yourself to a pillar or boss' },
+      mobility: { name: 'Magnet Grapple', short: 'GRAPPLE', icon: '⊸', desc: 'Yank an enemy in (stunned), or pull yourself to a pillar or boss', z: { name: 'Gravity Well', short: 'GRAVITY<br>WELL', icon: '◎', desc: 'Throw a well at the biggest crowd: pulls enemies in for 2s (bosses slowed). Tether +30% to enemies inside' } },
       ultimate: { name: 'Hymn Engine', short: 'HYMN<br>ENGINE', icon: '❂', desc: 'Vortex that drags enemies in + 2 scrap drones for 10s' },
     },
     beam: { damage: 8, tick: 0.2, lock: 0.5, range: 5.5, chains: 2, chainRange: 4, chainPct: 0.8, moveWhileFiring: 0.7 },

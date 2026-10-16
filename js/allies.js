@@ -11,7 +11,13 @@ import { CHARACTERS } from './characters.js';
 
 // Returning Edge: stuck 2s, fly home, orbit 2s (hit each enemy at most every 0.45s for 30% of the return hit)
 const RET_TIME = 2.0, ORBIT_TIME = 2.0, ORBIT_R = 1.7, ORBIT_HIT_CD = 0.45, ORBIT_DMG = 0.3, REFUND_CAP = 0.5;
-const WAVES = 8;
+const WAVES = 8, MINES = 16, WELLS = 3;
+// CoreBurnZ v1.26 kit numbers
+export const KIT = {
+  bleedMax: 5, bleedTime: 4, bleedDps: 0.16, burstPer: 0.9,          // SARROW bleed: per stack, x Talon hit 1 damage (12)
+  mineCap: 8, mineLife: 12, mineArm: 0.35, mineR: 2.4, mineDmg: 2.6, mineStorm: 1.6, // ISKRA mines (x needle damage 7.5)
+  wellTime: 2, wellR: 4.5, wellPull: 7, wellAmp: 0.3, wellBoom: 2.2,  // ORIN well (boom x tether damage 8)
+};
 const NEEDLES = 80, STARS = 100, DECOYS = 6, DRONES = 12, VORTEXES = 3, CLONES = 4;
 
 export class Allies {
@@ -37,6 +43,24 @@ export class Allies {
       const mesh = new THREE.Mesh(wg, new THREE.MeshBasicMaterial({ color: 0x9ffff5, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }));
       mesh.visible = false; scene.add(mesh);
       this.waves.push({ mesh, vel: new THREE.Vector3(), life: 0, max: 1, owner: null, dmg: 0, hitSet: new Set(), color: 0x9ffff5, target: new THREE.Vector3() });
+    }
+    // ISKRA's needle mines: a small spiky crystal on the floor
+    const mg = new THREE.OctahedronGeometry(0.32, 0);
+    this.mines = [];
+    for (let i = 0; i < MINES; i++) {
+      const mesh = new THREE.Mesh(mg, this.mat(0xff70ff)); mesh.visible = false; scene.add(mesh);
+      this.mines.push({ mesh, life: 0, owner: null, arm: 0, target: new THREE.Vector3() });
+    }
+    // ORIN's Gravity Well: a dark blue core + a ring on the floor
+    this.wells = [];
+    for (let i = 0; i < WELLS; i++) {
+      const g = new THREE.Group();
+      const core = new THREE.Mesh(new THREE.SphereGeometry(0.45, 12, 8), this.mat(0x2a3aff));
+      core.position.y = 0.6;
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 40), new THREE.MeshBasicMaterial({ color: 0x5a8aff, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
+      ring.rotation.x = -Math.PI / 2; ring.position.y = 0.06;
+      g.add(core, ring); g.visible = false; scene.add(g);
+      this.wells.push({ obj: g, ring, life: 0, max: 1, owner: null, radius: 1, pos: new THREE.Vector3(), target: new THREE.Vector3() });
     }
     // KAGERO's shurikens: flat 4-point stars that spin (same flight code as needles)
     const sg = new THREE.BoxGeometry(0.42, 0.05, 0.12), sg2 = new THREE.BoxGeometry(0.12, 0.05, 0.42);
@@ -166,8 +190,119 @@ export class Allies {
           w.hitSet.add(e);
           const v = w.vel.clone().normalize();
           w.owner.strike(e, w.dmg, v.x * 5, v.z * 5, false, 'wave');
+          if (w.owner.stats.crimson) { if ((w.owner.flow || 0) >= 5) this.burstBleed(w.owner, e); this.addBleed(w.owner, e, 2); } // CRIMSON TIDE
           this.world.effects.spawnSparks(e.position.clone().setY(1.1), w.color, 5);
         }
+      }
+    }
+  }
+
+  // ---------- SARROW: Bleed (host) ----------
+  addBleed(owner, e, n = 1) {
+    if (!this.host || !e.canBeHit) return;
+    const cap = KIT.bleedMax + (owner.stats.bleedCap || 0);
+    if (!e.bleed || e.bleed.owner !== owner) e.bleed = { owner, stacks: 0, t: 0, tick: 0.5 };
+    e.bleed.stacks = Math.min(cap, e.bleed.stacks + n); e.bleed.t = KIT.bleedTime;
+  }
+  burstBleed(owner, e) { // instant damage scaling with stacks, clears the bleed
+    const b = e.bleed; if (!b || !b.stacks || !e.canBeHit) return false;
+    const dmg = owner.combo[0].damage * KIT.burstPer * b.stacks * (owner.stats.burstDmg || 1);
+    e.bleed = null;
+    owner.strike(e, dmg, 0, 0, true, 'trail');
+    this.world.effects.spawnSparks(e.position.clone().setY(1.2), 0xff2030, 10 + b.stacks * 2, 7);
+    this.world.effects.spawnRing(e.position, 0xff2030, 1.2, 0.25);
+    return true;
+  }
+  updateBleed(dt) {
+    for (const e of this.world.enemies.list) {
+      const b = e.bleed; if (!b) continue;
+      if (e.dead) { // HEMORRHAGE: spread to nearby enemies on death
+        const L = b.owner.stats.hemo || 0;
+        if (L) { let n = 0; for (const o of this.world.enemies.list) if (o !== e && o.canBeHit && n < 2 && o.position.distanceTo(e.position) < 3.5) { this.addBleed(b.owner, o, Math.min(b.stacks, L + 1)); n++; } }
+        e.bleed = null; continue;
+      }
+      b.t -= dt; b.tick -= dt;
+      if (b.tick <= 0) {
+        b.tick = 0.5;
+        b.owner.strike(e, b.owner.combo[0].damage * KIT.bleedDps * 0.5 * b.stacks * (b.owner.stats.bleedDmg || 1), 0, 0, false, 'trail');
+        this.world.effects.spawnSparks(e.position.clone().setY(1.0), 0xc8102a, 2 + b.stacks, 1.5); // red drips
+      }
+      if (b.t <= 0) e.bleed = null;
+    }
+  }
+
+  // ---------- ISKRA: Needle mines ----------
+  addMine(owner, pos) {
+    if (!this.host) return;
+    const own = this.mines.filter((m) => m.life > 0 && m.owner === owner);
+    const cap = KIT.mineCap + (owner.stats.mineCap || 0);
+    if (own.length >= cap) { own.sort((a, b) => a.life - b.life)[0].life = 0; }
+    const m = this.mines.find((x) => x.life <= 0); if (!m) return;
+    m.owner = owner; m.life = KIT.mineLife + (owner.stats.mineLife || 0); m.arm = KIT.mineArm;
+    m.mesh.position.set(pos.x, 0.35, pos.z); this.world.arena.resolve(m.mesh.position, 0.3); m.mesh.position.y = 0.35; m.mesh.visible = true;
+  }
+  boomMine(m, mult = 1) {
+    if (m.life <= 0) return;
+    m.life = 0; m.mesh.visible = false;
+    const o = m.owner, s = o.stats, p = m.mesh.position.clone(), R = KIT.mineR * (s.mineR || 1);
+    const dmg = o.char.needle.damage * KIT.mineDmg * (s.mineDmg || 1) * mult;
+    this.world.effects.spawnRing(p, 0xff70ff, R, 0.35);
+    this.world.effects.spawnSparks(p.clone().setY(0.8), 0xffb0ff, 14, 7);
+    for (const e of this.world.enemies.list) {
+      if (!e.canBeHit || e.position.distanceTo(p) > R + e.radius) continue;
+      const dx = e.position.x - p.x, dz = e.position.z - p.z, d = Math.hypot(dx, dz) || 1;
+      o.strike(e, dmg, dx / d * 6, dz / d * 6, true, 'mine');
+      if (s.mineSlow) { e.slowT = 1.5 * s.mineSlow; e.slowMul = 0.6; }
+    }
+    for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; this.fireNeedle(o, p, new THREE.Vector3(Math.sin(a), 0, Math.cos(a)), dmg * 0.25, { pierce: 1, range: 5, speed: 26, color: 0xffb0ff, kind: 'mine' }); }
+    this.world.sfx('hit'); this.world.shake(0.15);
+    if (s.mineChain) for (const n of this.mines) if (n.life > 0 && n.owner === o && n.mesh.position.distanceTo(p) < 4) { n.life = Math.min(n.life, 0.12); n.chain = mult; } // SYMPATHETIC CHARGE
+  }
+  detonateMines(owner, mult) { for (const m of this.mines) if (m.life > 0 && m.owner === owner) this.boomMine(m, mult); }
+  updateMines(dt) {
+    for (const m of this.mines) {
+      if (m.life <= 0) continue;
+      m.life -= dt; m.arm -= dt; m.mesh.rotation.y += dt * 3;
+      if (m.chain) { if (m.life <= 0.0001 || m.life < 0.02) { m.life = 0.001; const c = m.chain; m.chain = 0; this.boomMine(m, c); } continue; }
+      if (m.life <= 0 || !m.owner || m.owner.dead) { m.life = 0; m.mesh.visible = false; continue; }
+      if (m.arm > 0) continue;
+      for (const e of this.world.enemies.list) if (e.canBeHit && Math.hypot(e.position.x - m.mesh.position.x, e.position.z - m.mesh.position.z) < 0.7 + e.radius) { this.boomMine(m); break; }
+    }
+  }
+
+  // ---------- ORIN: Gravity Well ----------
+  addWell(owner, pos) {
+    if (!this.host) return;
+    for (const w of this.wells) if (w.owner === owner && w.life > 0) this.endWell(w); // one at a time
+    const w = this.wells.find((x) => x.life <= 0); if (!w) return;
+    const s = owner.stats;
+    w.owner = owner; w.life = w.max = KIT.wellTime + (s.wellTime || 0); w.radius = KIT.wellR * (s.wellR || 1);
+    w.pos.set(pos.x, 0, pos.z); w.obj.position.copy(w.pos); w.ring.scale.setScalar(w.radius); w.obj.visible = true;
+    this.world.effects.spawnRing(w.pos, 0x5a8aff, w.radius, 0.35);
+  }
+  endWell(w) {
+    const o = w.owner, s = o.stats;
+    w.life = 0; w.obj.visible = false;
+    const boom = (s.wellBoom || 0) + (s.m?.oChainG ? 0.7 : 0); // Singularity evolution / Collapse mastery
+    if (!boom) return;
+    const dmg = o.char.beam.damage * KIT.wellBoom * boom;
+    this.world.effects.spawnRing(w.pos, 0x8ab0ff, w.radius, 0.45); this.world.shake(0.3); this.world.sfx('hit');
+    for (const e of this.world.enemies.list) if (e.canBeHit && e.position.distanceTo(w.pos) < w.radius + e.radius) { o.strike(e, dmg, 0, 0, true, 'spin'); o.stun(e, 0.5); }
+  }
+  updateWells(dt) {
+    const now = this.now;
+    for (const w of this.wells) {
+      if (w.life <= 0) continue;
+      w.life -= dt;
+      if (w.life <= 0 || !w.owner || w.owner.dead) { this.endWell(w); continue; }
+      w.ring.rotation.z += dt * 4; w.obj.children[0].rotation.y += dt * 6;
+      for (const e of this.world.enemies.list) {
+        if (!e.canBeHit) continue;
+        const dx = w.pos.x - e.position.x, dz = w.pos.z - e.position.z, d = Math.hypot(dx, dz);
+        if (d > w.radius + e.radius) continue;
+        e.wellUntil = now + 0.2;
+        if (e.isBoss) { e.slowT = 0.25; e.slowMul = 0.6; continue; } // bosses: slowed, never pulled
+        if (d > 0.6) { const k = Math.min(d - 0.5, KIT.wellPull * dt * (0.6 + 0.4 * d / w.radius)); e.position.x += dx / d * k; e.position.z += dz / d * k; }
       }
     }
   }
@@ -318,7 +453,7 @@ export class Allies {
   }
   update(dt) {
     if (!this.host) return this.clientUpdate(dt);
-    this.updateWaves(dt);
+    this.updateWaves(dt); this.updateBleed(dt); this.updateMines(dt); this.updateWells(dt);
     this.drawMarks(this.markList());
     const enemies = this.world.enemies.list, arena = this.world.arena;
     // STAR HALO evolution: keep a permanent ring of shurikens round each owner who has it
@@ -496,6 +631,8 @@ export class Allies {
   serialize() {
     const r2 = this.r2, out = [];
     for (const n of this.needles) if (n.life > 0) out.push(['n', r2(n.mesh.position.x), r2(n.mesh.position.z), r2(n.mesh.rotation.y), n.color]);
+    for (const m of this.mines) if (m.life > 0) out.push(['i', r2(m.mesh.position.x), r2(m.mesh.position.z)]);
+    for (const w of this.wells) if (w.life > 0) out.push(['g', r2(w.pos.x), r2(w.pos.z), r2(w.radius)]);
     for (const w of this.waves) if (w.life > 0) out.push(['w', r2(w.mesh.position.x), r2(w.mesh.position.z), r2(Math.atan2(w.vel.x, w.vel.z)), w.color, r2(w.life / w.max)]);
     for (const n of this.stars) if (n.life > 0) out.push(['s', r2(n.mesh.position.x), r2(n.mesh.position.z), 0, n.color]);
     for (const c of this.clones) if (c.life > 0) out.push(['c', r2(c.position.x), r2(c.position.z), r2(c.facing), r2(c.life), c.flick > 0 ? 1 : 0]);
@@ -507,11 +644,13 @@ export class Allies {
   }
 
   applySnapshot(list) {
-    const used = { w: 0, n: 0, s: 0, c: 0, d: 0, r: 0, v: 0 };
+    const used = { i: 0, g: 0, w: 0, n: 0, s: 0, c: 0, d: 0, r: 0, v: 0 };
     const marks = [];
     for (const s of list || []) {
       const [k, x, z, a, b] = s;
       if (k === 'm') { marks.push([x, z, a]); continue; }
+      if (k === 'i') { const m = this.mines[used.i++]; if (m) { m.mesh.position.set(x, 0.35, z); m.mesh.visible = true; m.life = 1; } continue; }
+      if (k === 'g') { const w = this.wells[used.g++]; if (w) { w.obj.position.set(x, 0, z); w.ring.scale.setScalar(a); w.obj.visible = true; w.life = 1; } continue; }
       if (k === 'w') {
         const w = this.waves[used.w++]; if (!w) continue;
         if (!w.mesh.visible) w.mesh.position.set(x, 1, z);
@@ -547,6 +686,8 @@ export class Allies {
       }
     }
     this.drawMarks(marks);
+    this.mines.slice(used.i).forEach((m) => { m.life = 0; m.mesh.visible = false; });
+    this.wells.slice(used.g).forEach((w) => { w.life = 0; w.obj.visible = false; });
     this.waves.slice(used.w).forEach((w) => { w.life = 0; w.mesh.visible = false; });
     this.needles.slice(used.n).forEach((n) => { n.life = 0; n.mesh.visible = false; });
     this.stars.slice(used.s).forEach((n) => { n.life = 0; n.mesh.visible = false; });
@@ -565,11 +706,15 @@ export class Allies {
     for (const d of this.drones) if (d.obj.visible) d.obj.position.lerp(d.target, k);
     for (const d of this.decoys) if (d.obj.visible) { d.obj.rotation.y += dt * 3; d.mat.opacity = 0.3 + 0.15 * Math.sin(performance.now() / 90); }
     for (const v of this.vortexes) if (v.obj.visible) { v.a.rotation.z -= dt * 6; v.b.rotation.z += dt * 9; }
+    for (const m of this.mines) if (m.mesh.visible) m.mesh.rotation.y += dt * 3;
+    for (const w of this.wells) if (w.obj.visible) { w.ring.rotation.z += dt * 4; }
   }
 
   reset() {
     for (const n of this.needles) { n.life = 0; n.mesh.visible = false; }
     for (const w of this.waves) { w.life = 0; w.mesh.visible = false; w.owner = null; }
+    for (const m of this.mines) { m.life = 0; m.mesh.visible = false; m.owner = null; m.chain = 0; }
+    for (const w of this.wells) { w.life = 0; w.obj.visible = false; w.owner = null; }
     for (const n of this.stars) { n.life = 0; n.mesh.visible = false; }
     for (const c of this.clones) { c.life = 0; c.m.root.visible = false; c.owner = null; }
     for (const m of this.marks) m.visible = false;

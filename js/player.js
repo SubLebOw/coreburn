@@ -11,6 +11,7 @@ import { decorateSkin } from './cosmetics.js';
 import { RULES, zHero } from './rules.js';
 import { Loadout, tierColor } from './upgrades.js';
 import { CHARACTERS } from './characters.js';
+import { KIT } from './allies.js';
 
 // The camera looks at the arena from the +X/+Z corner. These are the floor directions
 // that match "up the screen" and "right on the screen", so W always moves up the screen.
@@ -196,7 +197,7 @@ export class Player {
     this.tauntTimer = 0;       // ZALEKS: enemies come for him
     this.tauntRadius = 0;
     this.shieldHp = 0;         // ZALEKS: slam shield
-    this.rage = 0; this.dragged = null; // CoreBurnZ: Zaleks' Rage + carried enemies
+    this.rage = 0; this.dragged = null; this.flow = 0; // CoreBurnZ: Zaleks' Rage + carried enemies
     this.shieldTimer = 0;
     this.tether = null;        // ORIN: who the beam is locked on
     this.guard.visible = false;
@@ -277,7 +278,7 @@ export class Player {
 
     this.stateTime += dt;
     this.velocity.set(0, 0, 0);
-    const walk = this.char.speed * (zHero(this.char.id).speed || 1) * this.stats.speed;
+    const walk = this.char.speed * (zHero(this.char.id).speed || 1) * this.stats.speed * (1 + 0.03 * (this.flow || 0)); // CoreBurnZ Flow
 
     switch (this.state) {
       case 'normal':
@@ -354,7 +355,7 @@ export class Player {
     // melee combos (SARROW 3 hits, ZALEKS 2 heavy hits)
     const combo = this.combo, n = combo.length;
     const hit = combo[this.comboStep - 1];
-    const t = this.stateTime / (hit.duration / this.char.atkSpeed);
+    const t = this.stateTime / (hit.duration / (this.char.atkSpeed * (1 + 0.05 * (this.flow || 0)))); // CoreBurnZ Flow
     const fin = this.comboStep === n;
     if (t < 0.4) this.velocity.copy(this.facingDir).multiplyScalar(k === 'zaleks' ? (fin ? 3 : 4.5) : (fin ? 6 : 4));
     if (moving) this.velocity.addScaledVector(dir, this.char.speed * 0.25);
@@ -373,7 +374,7 @@ export class Player {
       case 'zaleks': return this.startCharge(aim);
       case 'iskra': return this.phaseHop(aim);
       case 'ninja': return this.shadowStep(aim);
-      case 'orin': return this.grapple(aim);
+      case 'orin': return RULES.z ? this.gravityWell(aim) : this.grapple(aim); // CoreBurnZ: Gravity Well replaces the grapple
       default: return this.startDash(aim);
     }
   }
@@ -432,6 +433,7 @@ export class Player {
         this.spinRing.visible = true;
         this.world.effects.spawnRing(this.position, 0xe060ff, 3, 0.4);
         this.world.sfx('overdrive');
+        if (RULES.z) this.world.allies?.detonateMines(this, KIT.mineStorm * (this.stats.lattice ? 2 : 1)); // CoreBurnZ: Storm sets off every mine
         break;
       case 'orin': this.hymnEngine(); break;
       case 'ninja': // SHADOW CLONE
@@ -523,6 +525,7 @@ export class Player {
       this.world.effects.spawnSparks(e.position.clone().setY(1.1), fin ? 0xffa040 : (zal ? 0xffd090 : 0x9ffff5), fin ? 12 : 6);
       struck.add(e);
       hitSomething = true;
+      if (RULES.z && !zal && this.kit === 'sarrow') this.world.allies?.addBleed(this, e, fin ? 2 : 1); // CoreBurnZ BLEED
     }
     if (zal && fin) this.world.effects.spawnRing(this.position.clone().addScaledVector(forward, 1.8), 0xffa030, 1.6, 0.3);
     // Shockwave Finisher (Sarrow): the 3rd hit sends out a ring that hits everything around you
@@ -538,6 +541,10 @@ export class Player {
         this.strike(e, hit.damage * pct, to.x * 8, to.z * 8, false, 'shock');
         hitSomething = true;
       }
+    }
+    if (RULES.z && hitSomething && !zal && this.kit === 'sarrow') { // CoreBurnZ FLOW: +1 per swing that lands
+      const was = this.flow || 0; this.flow = Math.min(5, was + 1);
+      if (was < 5 && this.flow === 5) { this.world.effects.spawnRing(this.position, 0x3ff6e0, 2, 0.3); this.flowFull = true; }
     }
     if (RULES.z && fin && !zal && this.kit === 'sarrow') { // CoreBurnZ: BLADE WAVE
       this.world.allies?.fireWave(this, this.position, forward, hit.damage * s.arcDmg * ZK.waveDmg, { speed: ZK.waveSpeed, range: ZK.waveRange * s.range, color: this.damageMult > 1 ? 0xff3a2a : 0x9ffff5 });
@@ -587,6 +594,7 @@ export class Player {
           kx = side.x * k; kz = side.z * k;
         }
         this.strike(e, this.char.dashDmg * (zal ? this.stats.chargeDmg : this.stats.dashDmg), kx, kz, zal, 'dash');
+        if (!zal && RULES.z && this.kit === 'sarrow') this.world.allies?.burstBleed(this, e); // CoreBurnZ: Blink bursts BLEED
         if (zal) this.stun(e, this.char.chargeStun + this.stats.chargeStun); // after the hit (a hit resets the flinch timer)
         if (zal && RULES.z && !e.isBoss && !e.dead && (this.dragged ||= []).length < ZK.dragMax) this.dragged.push(e); // CoreBurnZ: carried along
         this.world.effects.spawnSparks(e.position.clone().setY(1.1), zal ? 0xffd090 : 0x9ffff5, zal ? 10 : 6);
@@ -767,6 +775,7 @@ export class Player {
     this.state = 'dash';
     this.stateTime = 0;
     this.world.allies?.addDecoy(this, from, c.decoyTime + s.decoy, c.decoyHits + 2 * s.decoy);
+    if (RULES.z) { const n = 2 + (s.mines || 0); for (let i = 0; i < n; i++) { const a = i * Math.PI * 2 / n + this.facing; this.world.allies?.addMine(this, from.clone().add(new THREE.Vector3(Math.sin(a) * 1.1, 0, Math.cos(a) * 1.1))); } } // CoreBurnZ NEEDLE MINES
     if (s.m?.iTwin) this.world.allies?.addDecoy(this, from.clone().add(new THREE.Vector3(-direction.z * 1.6, 0, direction.x * 1.6)), c.decoyTime + s.decoy, c.decoyHits + 2 * s.decoy); // MASTERY Twin Decoy
     this.world.effects.spawnRing(from, 0xc070ff, 1.4, 0.3);
     this.world.effects.spawnRing(this.position, 0xe8a0ff, 1.8, 0.3);
@@ -946,6 +955,26 @@ export class Player {
     this.world.sfx('blink');
   }
 
+  // CoreBurnZ ORIN: throw a Gravity Well at the biggest cluster ahead (or the nearest enemy, or 7 m ahead)
+  gravityWell(direction) {
+    this.spendCharge();
+    let best = null, bn = 0;
+    for (const e of this.world.enemies.list) {
+      if (!e.canBeHit) continue;
+      const dx = e.position.x - this.position.x, dz = e.position.z - this.position.z, d = Math.hypot(dx, dz);
+      if (d > 12 || (d > 2 && (dx * direction.x + dz * direction.z) / d < 0.3)) continue;
+      let n = 0; for (const o of this.world.enemies.list) if (o.canBeHit && o.position.distanceTo(e.position) < 4) n++;
+      if (n > bn) { bn = n; best = e; }
+    }
+    const at = best ? best.position.clone() : this.position.clone().addScaledVector(direction, 7);
+    this.world.arena.resolve(at, 0.5);
+    this.facing = Math.atan2(at.x - this.position.x, at.z - this.position.z);
+    this.world.effects.spawnZap(this.position.clone().setY(1.1), at.clone().setY(1), 0x5a8aff);
+    this.world.allies?.addWell(this, at);
+    this.state = 'dash'; this.stateTime = 0; this.dashDir = new THREE.Vector3(); this.dashLen = 0.15;
+    this.world.sfx('zap');
+  }
+
   pullTo(point, stopAt) {
     const to = new THREE.Vector3(point.x - this.position.x, 0, point.z - this.position.z);
     const d = Math.max(0, to.length() - stopAt);
@@ -976,6 +1005,7 @@ export class Player {
     const s = this.stats;
     let dmg = base * s.dmg * this.char.dmg * zHero(this.char.id).dmg * this.damageMult;
     if (e.isBoss && s.bossDmg > 1) dmg *= s.bossDmg; // CoreBurnZ: Bossfang relic
+    if (kind === 'beam' && RULES.z && e.wellUntil > performance.now() / 1000) dmg *= 1 + 0.3 + (s.wellAmp || 0); // CoreBurnZ: tether +30% inside a Gravity Well
     const crit = kind !== 'trail' && Math.random() < s.crit;
     if (crit) {
       dmg *= s.critMult || 1.8;
@@ -1155,6 +1185,7 @@ export class Player {
       if (this.shieldHp <= 0) { this.shieldTimer = 0; this.world.effects.spawnRing(this.position, 0xffa030, 1.8, 0.3); }
       if (amount <= 0) { this.world.sfx('shieldBlock'); return true; }
     }
+    if (this.kit === 'sarrow' && RULES.z && amount > 0 && this.flow) this.flow = this.stats.unbroken ? Math.floor(this.flow / 2) : 0; // FLOW drops
     if (this.kit === 'zaleks' && RULES.z && amount > 0) {
       this.addRage(amount * ZK.rageHurt);
     }

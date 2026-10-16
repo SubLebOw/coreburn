@@ -7,6 +7,7 @@ import { MASTERIES, masteryPoints, spentOn, getMastery, openMasteryPanel } from 
 import { UPGRADES, FALLBACK, GROUP_LABELS, groupLabel, weaponMult, tierColor } from './upgrades.js';
 import { HERO_STATS } from './hero-stats.js';
 import { RULES, Z_TUNING } from './rules.js';
+const zab = (x) => (RULES.z && x.z ? { ...x, ...x.z } : x); // CoreBurnZ ability overrides (Orin's Gravity Well)
 import { xpNeeded, heroReward } from './progress.js';
 
 const $ = (id) => document.getElementById(id);
@@ -63,16 +64,19 @@ export class Hud {
     this.setCooldown('dash', this.dashEls, player.dashCooldownShown, player.dashCooldownMax);
     this.setCooldown('spin', this.spinEls, player.spinCooldown, player.spinCooldownMax);
     // CoreBurnZ: Zaleks' RAGE bar on the Seismic Slam button
-    const rage = RULES.z && player.kit === 'zaleks' ? Math.round(player.rageFrac * 50) : -1;
+    const flow = RULES.z && player.kit === 'sarrow';
+    const rage = RULES.z && player.kit === 'zaleks' ? Math.round(player.rageFrac * 50) : flow ? (player.flow || 0) * 10 : -1; // Zaleks RAGE / Sarrow FLOW
     if (this.last.rage !== rage) {
       this.last.rage = rage;
       for (const el of this.spinEls) {
         let bar = el.querySelector('.rage');
         if (!bar) { bar = document.createElement('span'); bar.className = 'rage'; bar.innerHTML = '<i></i><b>RAGE</b>'; el.appendChild(bar); }
+        bar.querySelector('b').textContent = flow ? 'FLOW ' + '●'.repeat(player.flow || 0) + '○'.repeat(5 - (player.flow || 0)) : 'RAGE';
+        bar.classList.toggle('flow', flow);
         bar.style.display = rage < 0 ? 'none' : '';
         bar.querySelector('i').style.width = `${Math.max(0, rage) * 2}%`;
         bar.classList.toggle('full', rage >= 50);
-        el.classList.toggle('quake', rage >= 50);
+        el.classList.toggle('quake', rage >= 50 && !flow);
       }
     }
 
@@ -191,7 +195,7 @@ export class Hud {
       b.style.setProperty('--c', hex(c.color));
       const range = { sarrow: 0.3, zaleks: 0.25, iskra: 1, orin: 0.6, ninja: 0.85 }[c.id] ?? 0.5;
       const kit = c.abilities ? ['attack', 'mobility', 'ultimate'].map((k, j) =>
-        `<div class="kslot"><b>${c.abilities[k].icon} ${c.abilities[k].name}</b> <span>${['J', 'K', 'L'][j]}</span><i>${(RULES.z && c.abilities[k].zdesc) || c.abilities[k].desc}</i></div>`).join('') : '';
+        `<div class="kslot"><b>${zab(c.abilities[k]).icon} ${zab(c.abilities[k]).name}</b> <span>${['J', 'K', 'L'][j]}</span><i>${(RULES.z && c.abilities[k].zdesc) || zab(c.abilities[k]).desc}</i></div>`).join('') : '';
       b.innerHTML = `<span class="key">${i + 1}</span><div class="icon">⬢</div><div class="ubody"><div class="group"></div><div class="uname"></div><div class="effect"></div>` +
         `<div class="kit">${kit}</div><div class="stats">${bar('HEALTH', c.hp / 200)}${bar('SPEED', c.speed / 8.3)}${bar('RANGE', range)}</div></div>`;
       b.querySelector('.group').innerHTML = `<span class="ptag">${c.tag}</span> ${c.title.toUpperCase()}`;
@@ -304,9 +308,11 @@ export class Hud {
 
   // Each hero names (and draws) the 3 ability slots differently
   setKit(c) {
-    const a = c.abilities;
+    let a = c.abilities;
     if (!a) return;
     const flat = (t) => t.replace(/<br>/g, ' ');
+    const Z = (x) => (RULES.z && x.z ? { ...x, ...x.z } : x);
+    a = { attack: Z(a.attack), mobility: Z(a.mobility), ultimate: Z(a.ultimate) };
     for (const [id, slot] of [['ab-dash', a.mobility], ['ab-spin', a.ultimate]]) {
       const el = $(id);
       el.querySelector('.label').textContent = flat(slot.short);

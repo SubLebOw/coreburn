@@ -761,3 +761,6 @@ body.shrine-curse #hud::after { content: ''; position: fixed; inset: 0; pointer-
 .rage.full i { background: #ff2a1a; box-shadow: 0 0 8px #ff2a1a; animation: ragePulse .5s infinite alternate; }
 .ability.quake, #btn-spin.quake { border-color: #ff3a1a !important; box-shadow: 0 0 14px #ff3a1acc !important; }
 @keyframes ragePulse { from { opacity: .7; } to { opacity: 1; } }
+.rage.flow i { background: linear-gradient(90deg, #3ff6e0, #9ffff5); }
+.rage.flow.full i { background: #9ffff5; box-shadow: 0 0 8px #3ff6e0; }
+.rage.flow b { font-size: 6px; letter-spacing: 0; }

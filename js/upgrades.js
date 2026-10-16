@@ -83,7 +83,7 @@ export const UPGRADES = {
   // ---- ORIN ----
   oChain:   { name: 'Choir Chain', heroes: O, group: 'attack', icon: 'ϟ', color: 0xff9a8a, max: 3, desc: () => 'Tether chains to +1 enemy' },
   oReach:   { name: 'Long Tether', heroes: O, group: 'attack', icon: '⟿', color: 0xff8070, max: 4, desc: () => '+10% tether range' },
-  oGrapple: { name: 'Magnet Shock', heroes: O, group: 'mobility', icon: '⊸', color: 0xff6a5a, max: 4, desc: () => 'Grapple stun +0.3s, +25% grapple damage' },
+  oGrapple: { name: 'Magnet Shock', heroes: O, group: 'mobility', icon: '⊸', color: 0xff6a5a, max: 4, desc: () => RULES.z ? 'Gravity Well +12% bigger and lasts +0.3s' : 'Grapple stun +0.3s, +25% grapple damage' },
   oDrone:   { name: 'Extra Drone', heroes: O, group: 'ultimate', icon: '❂', color: 0xff4a5a, max: 1, desc: () => 'Drone count +1' },
   oDroneDmg:{ name: 'Drone Armament', heroes: O, group: 'ultimate', icon: '✜', color: 0xff7a6a, max: 5, desc: () => '+10% drone damage' },
   oDroneTime:{ name: 'Drone Lifespan', heroes: O, group: 'ultimate', icon: '⧗', color: 0xffaa9a, max: 3, desc: () => 'Drones last +1s' },
@@ -99,6 +99,17 @@ export const UPGRADES = {
   nReturnCd:{ name: 'Homecoming', heroes: N, needs: 'nReturn', group: 'mobility', icon: '↻', color: 0x8a7aee, max: 3, desc: () => 'Return and orbit hits take 0.15s off Shadow Step cooldown (max 0.5s per second)' },
   nMirror:  { name: 'Perfect Mirror', heroes: N, group: 'ultimate', icon: '⧉', color: 0xb0a0ff, max: 4, desc: () => 'Clone hits +5% harder (of your damage)' },
   oVortex:  { name: 'Deep Vortex', heroes: O, group: 'ultimate', icon: '◉', color: 0xff5070, max: 5, desc: () => '+10% vortex radius and pull' },
+  // CoreBurnZ v1.26 kit cards (never offered in classic)
+  sDeep:    { zonly: true, name: 'Deep Cuts', heroes: S, group: 'attack', icon: '🩸', color: 0xd0203a, max: 4, desc: () => '+25% bleed damage, +1 max bleed stack' },
+  sHemo:    { zonly: true, name: 'Hemorrhage', heroes: S, group: 'attack', icon: '⁘', color: 0xb01030, max: 3, desc: () => 'Bleeding enemies spread their bleed to 2 nearby on death (+1 stack per level)' },
+  sRip:     { zonly: true, name: 'Riptide', heroes: S, group: 'mobility', icon: '≈', color: 0xff3a4a, max: 4, desc: () => '+30% bleed burst damage from Blink' },
+  sUnbroken:{ zonly: true, name: 'Unbroken', heroes: S, group: 'core', icon: '◉', color: 0x3ff6e0, max: 1, desc: () => 'Getting hit only drops half your Flow' },
+  iMineN:   { zonly: true, name: 'Minefield', heroes: I, group: 'mobility', icon: '✣', color: 0xff70ff, max: 2, desc: () => 'Phase Hop drops +1 needle mine' },
+  iBlast:   { zonly: true, name: 'Shrapnel', heroes: I, group: 'mobility', icon: '✺', color: 0xff90e0, max: 4, desc: () => 'Mines +20% damage and +10% blast size' },
+  iTar:     { zonly: true, name: 'Tar Mines', heroes: I, group: 'mobility', icon: '◍', color: 0xa060c0, max: 2, desc: () => 'Mine blasts slow enemies by 40% (+1.5s)' },
+  iChain:   { zonly: true, name: 'Sympathetic Charge', heroes: I, group: 'mobility', icon: '⁂', color: 0xe070ff, max: 1, desc: () => 'A mine blast sets off your other mines nearby' },
+  oWellAmp: { zonly: true, name: 'Event Horizon', heroes: O, group: 'attack', icon: '◎', color: 0x5a8aff, max: 3, desc: () => 'Tether +10% more damage to enemies inside your Gravity Well' },
+
 };
 // COREBURNZ BOSS CARDS: one gold pick after every boss kill (never in the normal pool). Rarer and
 // stronger; they don't raise the weapon tier (the normal picks keep the even scaling).
@@ -129,13 +140,16 @@ export const EVOLUTIONS = {
   eTempest:EV({ name: 'Endless Tempest', icon: '⁂', heroes: I, needs: ['iStorm', 'iVolley'], text: 'Needle storm +3 needles per volley and lasts 2s longer' }),
   eHive:   EV({ name: 'Hive Choir', icon: '❂', heroes: O, needs: ['oDroneDmg', 'oDroneTime'], text: '+1 drone and drones deal +40% damage' }),
   eHalo:   EV({ name: 'Star Halo', icon: '✴', heroes: N, needs: ['nReturn', 'nFan'], text: 'A permanent ring of 3 shurikens orbits you, cutting anything close' }),
+  eCrimson:EV({ name: 'Crimson Tide', icon: '🩸', heroes: S, needs: ['sDeep', 'sRip'], text: 'Blade waves apply 2 bleed, and at full Flow they burst bleed too' }),
+  eLattice:EV({ name: 'Lattice Array', icon: '✣', heroes: I, needs: ['iMineN', 'iBlast'], text: '+4 mine cap, mines last 6s longer, Needle Storm detonations hit twice as hard' }),
+  eSingular:EV({ name: 'Singularity', icon: '◎', heroes: O, needs: ['oGrapple', 'oVortex'], text: 'Gravity Well +40% bigger, +1.5s, and detonates when it ends' }),
   eLegion: EV({ name: 'Shadow Legion', icon: '⧉', heroes: N, needs: ['nShade', 'nMirror'], text: 'Shadow Clone +15% of your damage and lasts 2s longer' }),
 };
 export const GROUP_LABELS = { evolved: 'EVOLVED', attack: 'ATTACK', mobility: 'MOBILITY', ultimate: 'ULTIMATE', core: 'CORE', cursed: 'CURSED', boss: 'BOSS RELIC' };
 export const cardForHero = (id, hero) => { const u = UPGRADES[id]; return !!u && (!u.heroes || !hero || u.heroes.includes(hero)); };
 // The card's group label, using the hero's own ability names (e.g. "PHASE HOP" for Iskra)
 export function groupLabel(group, kit) {
-  const a = kit && kit[group];
+  let a = kit && kit[group]; if (a && RULES.z && a.z) a = a.z;
   return a ? a.name.toUpperCase() : GROUP_LABELS[group];
 }
 
@@ -170,7 +184,7 @@ export class Loadout {
 
   // 3 different random cards that aren't maxed yet (Reactor Patch fills any gaps)
   roll(count = 3, rng = Math.random) {
-    const open = Object.keys(UPGRADES).filter((id) => cardForHero(id, this.hero) && this.level(id) < UPGRADES[id].max && (!UPGRADES[id].needs || this.level(UPGRADES[id].needs) > 0));
+    const open = Object.keys(UPGRADES).filter((id) => cardForHero(id, this.hero) && (!UPGRADES[id].zonly || RULES.z) && this.level(id) < UPGRADES[id].max && (!UPGRADES[id].needs || this.level(UPGRADES[id].needs) > 0));
     const hand = [];
     // CoreBurnZ: cards you already own are a bit more likely (weighted draw); classic = plain random
     const w = (id) => (RULES.z && this.level(id) > 0 ? Z_TUNING.ownedWeight : 1);
@@ -292,6 +306,12 @@ export class Loadout {
     if (L('eTempest')) { s.stormCount += 3; s.stormTime += 2; }
     if (L('eHive')) { s.drones += 1; s.droneDmg *= 1.4; }
     s.halo = L('eHalo') ? 3 : 0;
+    // CoreBurnZ v1.26 kits
+    s.bleedDmg = 1 + 0.25 * L('sDeep'); s.bleedCap = L('sDeep'); s.hemo = L('sHemo'); s.burstDmg = 1 + 0.3 * L('sRip'); s.unbroken = L('sUnbroken'); s.crimson = L('eCrimson');
+    s.mines = L('iMineN'); s.mineDmg = 1 + 0.2 * L('iBlast'); s.mineR = 1 + 0.1 * L('iBlast'); s.mineSlow = L('iTar'); s.mineChain = L('iChain');
+    s.lattice = L('eLattice'); s.mineCap = 4 * L('eLattice'); s.mineLife = 6 * L('eLattice');
+    s.wellR = (1 + 0.12 * L('oGrapple')) * (L('eSingular') ? 1.4 : 1); s.wellTime = 0.3 * L('oGrapple') + 1.5 * L('eSingular'); s.wellAmp = 0.1 * L('oWellAmp');
+    s.wellBoom = (L('eSingular') ? 1 : 0);
     if (L('eLegion')) { s.cloneDmg += 0.15; s.cloneTime += 2; }
     // CoreBurnZ hero masteries (mastery.js; ability changes read the flags in s.m)
     const ms = RULES.z ? (this.mastery || []) : [], M = (id) => ms.includes(id);

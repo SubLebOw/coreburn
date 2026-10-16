@@ -14,7 +14,7 @@ import * as THREE from 'three';
 
 import { HERO_STATS, CHARACTER_ORDER, ALL_HEROES, heroOrder, characterBudget } from './hero-stats.js';
 export { CHARACTER_ORDER, ALL_HEROES, heroOrder, characterBudget };
-const BUILDERS = { sarrow: (t) => buildSarrow(t), zaleks: (t) => buildZaleks(t), iskra: (t) => buildIskra(t), orin: (t) => buildOrin(t), ninja: (t) => buildNinja(t) };
+const BUILDERS = { sarrow: (t) => buildSarrow(t), zaleks: (t) => buildZaleks(t), iskra: (t) => buildIskra(t), orin: (t) => buildOrin(t), ninja: (t) => buildNinja(t), axiom: (t) => buildAxiom(t) };
 export const CHARACTERS = Object.fromEntries(Object.entries(HERO_STATS).map(([id, c]) => [id, { ...c, build: BUILDERS[id] }]));
 
 // Co-op duplicates get a colour tint so you can tell them apart
@@ -385,4 +385,55 @@ function buildNinja(tint) {
   const armL = arm(0.34), armR = arm(-0.34);
   const flashMats = [mats.cloth, mats.clothDark, mats.accent, mats.metal, mats.mask];
   return { root, body, head, core, legL, legR, armL, armR, flashMats, blade: mats.blade, blades, halos, bladeBase: -0.84, bladeLen: 0.2 };
+}
+
+// ---------- AXIOM (CoreBurnZ): the machine mind ----------
+// An angular faceless war-frame: gunmetal plates, a wedge helmet with a single red visor line,
+// a split chest reactor that opens during Ascension, and blade-fin shoulders. Original design.
+function buildAxiom(tint) {
+  const mats = tintMats(tint, {
+    plate: new THREE.MeshLambertMaterial({ color: 0x2a2c34 }),
+    dark: new THREE.MeshLambertMaterial({ color: 0x15161b }),
+    metal: new THREE.MeshLambertMaterial({ color: 0x5a5e6a }),
+    accent: new THREE.MeshLambertMaterial({ color: 0x8a1a22 }),
+    glow: new THREE.MeshBasicMaterial({ color: 0xff2a3a }),
+    blade: new THREE.MeshBasicMaterial({ color: 0xff5a5a, transparent: true, opacity: 0.9 }),
+  });
+  const box = boxMaker(new THREE.BoxGeometry(1, 1, 1));
+  const root = new THREE.Group(), body = new THREE.Group();
+  root.add(body);
+  function leg(x) {
+    const g = new THREE.Group(); g.position.set(x, 0.92, 0); body.add(g);
+    box(g, mats.plate, 0.22, 0.6, 0.24, 0, -0.3, 0);
+    box(g, mats.dark, 0.26, 0.32, 0.34, 0, -0.76, 0.04);
+    box(g, mats.glow, 0.04, 0.2, 0.02, 0, -0.32, 0.13, false);      // shin light
+    return g;
+  }
+  const legL = leg(0.15), legR = leg(-0.15);
+  box(body, mats.dark, 0.44, 0.3, 0.28, 0, 1.0, 0);
+  box(body, mats.plate, 0.62, 0.66, 0.34, 0, 1.38, 0);              // torso
+  box(body, mats.metal, 0.5, 0.08, 0.36, 0, 1.08, 0, false);
+  const plateL = box(body, mats.metal, 0.16, 0.34, 0.06, 0.1, 1.42, 0.19, false); // reactor doors
+  const plateR = box(body, mats.metal, 0.16, 0.34, 0.06, -0.1, 1.42, 0.19, false);
+  const core = box(body, mats.glow, 0.16, 0.2, 0.06, 0, 1.42, 0.16, false);       // chest reactor
+  for (const sx of [-1, 1]) { const fin = box(body, mats.accent, 0.08, 0.5, 0.3, sx * 0.42, 1.86, -0.05); fin.rotation.z = sx * -0.5; } // blade-fin shoulders
+  const head = new THREE.Group(); head.position.set(0, 2.02, 0); body.add(head);
+  const helm = box(head, mats.plate, 0.36, 0.36, 0.4, 0, 0, 0); helm.rotation.y = Math.PI / 4; helm.scale.set(0.34, 0.36, 0.34);
+  box(head, mats.dark, 0.3, 0.3, 0.36, 0, 0.02, 0.02);
+  const crest = box(head, mats.accent, 0.06, 0.12, 0.44, 0, 0.2, -0.02); crest.rotation.x = -0.15; // wedge crest
+  box(head, mats.glow, 0.26, 0.035, 0.02, 0, 0.03, 0.21, false);    // single red visor line, no face
+  const blades = [], halos = [];
+  function arm(x) {
+    const g = new THREE.Group(); g.position.set(x, 1.66, 0); body.add(g);
+    box(g, mats.metal, 0.22, 0.2, 0.24, 0, 0, 0);
+    box(g, mats.plate, 0.16, 0.5, 0.18, 0, -0.32, 0);
+    box(g, mats.dark, 0.2, 0.24, 0.22, 0, -0.66, 0);
+    const b = box(g, mats.blade, 0.08, 0.16, 0.08, 0, -0.84, 0.04, false); blades.push(b); // emitter
+    const halo = box(g, new THREE.MeshBasicMaterial({ color: 0xff5a5a, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }), 0.14, 0.2, 0.14, 0, -0.84, 0.04, false);
+    halo.visible = false; halos.push(halo);
+    return g;
+  }
+  const armL = arm(0.4), armR = arm(-0.4);
+  const flashMats = [mats.plate, mats.dark, mats.metal, mats.accent];
+  return { root, body, head, core, legL, legR, armL, armR, flashMats, blade: mats.blade, blades, halos, bladeBase: -0.84, bladeLen: 0.16, plateL, plateR };
 }

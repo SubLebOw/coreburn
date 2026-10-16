@@ -89,10 +89,25 @@ export const HERO_STATS = {
     dashCd: 2.6, dashCharges: 1, stepRange: 11.2, stepDist: 5, stepDmg: 22, stepGuard: 0.3,
     ultCd: 13, cloneTime: 5, clonePct: 0.45, // v1.15: 5s clone that copies every upgrade at 45% damage
   },
+  // AXIOM (CoreBurnZ only, v1.28): swarm commander. Red pulse bolts + a growing army of drones that fire with him.
+  axiom: {
+    id: 'axiom', name: 'AXIOM', title: 'The Machine Mind', tag: 'SWARM', color: 0xff2a3a, blade: 0xff5a5a, zOnly: true,
+    blurb: 'A machine overlord: every bolt he fires, his growing drone army fires too.',
+    hp: 140, speed: 6.9, dmg: 1, atkSpeed: 1, armor: 0,
+    abilities: {
+      attack: { name: 'Pulse Command', short: 'PULSE', icon: '◉', desc: 'A red bolt every 0.55s, and every drone fires a 25% bolt with it' },
+      mobility: { name: 'Reforge', short: 'REFORGE', icon: '⚙', desc: 'Drones shield you for 0.75s while you build a drone (or overclock them +35% for 5s at max). Kills cut the cooldown' },
+      ultimate: { name: 'Ascension Protocol', short: 'ASCEND', icon: '⟁', desc: '10s: levitate, drones spread into wings, +75% drone fire rate, +1 pierce, up to 2 extra drones that explode at the end' },
+    },
+    needle: { damage: 16, rate: 0.55, speed: 30, range: 14, pierce: 0, aimRange: 13, moveWhileFiring: 0.85 },
+    droneDmg: 0.25, droneRate: 0.55, droneRange: 11, startDrones: 2, droneCap: 6,
+    dashCd: 12, dashCharges: 1, barrier: 0.75, overclock: 5, overclockRate: 0.35, killRefund: 0.3, refundCap: 3,
+    ultCd: 22, ascendTime: 10, ascendRate: 0.75, ascendTemp: 2,
+  },
 };
 export const CHARACTER_ORDER = ['sarrow', 'zaleks', 'iskra', 'orin'];
 // CoreBurnZ adds the ninja; classic keeps the original 4
-export const Z_HEROES = ['ninja'];
+export const Z_HEROES = ['ninja', 'axiom'];
 export const ALL_HEROES = [...CHARACTER_ORDER, ...Z_HEROES];
 export const heroOrder = (z) => (z ? ALL_HEROES : CHARACTER_ORDER);
 

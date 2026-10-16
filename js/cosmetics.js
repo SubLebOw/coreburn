@@ -138,7 +138,7 @@ export function previewColor(item) { return '#' + item.color.toString(16).padSta
 
 // ---------- ARENA SKINS: body colours + materials + small themed attachments ----------
 // A handful of extra boxes and material tweaks per skin (no lights, no textures) so it stays cheap on phones.
-const SIZE = { sarrow: 1, zaleks: 1.3, iskra: 0.88, orin: 1.1, ninja: 0.92 };
+const SIZE = { sarrow: 1, zaleks: 1.3, iskra: 0.88, orin: 1.1, ninja: 0.92, axiom: 1.05 };
 const THEME = {
   slag:      { emissive: 0x000000, ei: 0,    rough: true },
   foundry:   { emissive: 0xff4a10, ei: 0.22 },

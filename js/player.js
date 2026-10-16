@@ -197,7 +197,8 @@ export class Player {
     this.tauntTimer = 0;       // ZALEKS: enemies come for him
     this.tauntRadius = 0;
     this.shieldHp = 0;         // ZALEKS: slam shield
-    this.rage = 0; this.dragged = null; this.flow = 0; // CoreBurnZ: Zaleks' Rage + carried enemies
+    this.rage = 0; this.dragged = null; this.flow = 0;
+    this.axNeedStart = this.char.id === 'axiom'; this.ascendT = 0; this.axClockT = 0; this.axRefund = 0; this.uploadUsed = false; this.axKills = 0; this.axEliteT = 0; this.uploading = 0; // CoreBurnZ: Zaleks' Rage + carried enemies
     this.shieldTimer = 0;
     this.tether = null;        // ORIN: who the beam is locked on
     this.guard.visible = false;
@@ -274,6 +275,7 @@ export class Player {
     if (input.wasPressed('spin') && !this.ultCancelled) this.ultBuffer = 0.35;
     this.ultCancelled = false;
     this.mobBuffer -= dt; this.ultBuffer -= dt;
+    if (this.kit === 'axiom') this.axiomTick(dt, input);
     if (this.mobBuffer > 0 && this.dashCharges > 0 && (this.state === 'normal' || this.state === 'attack')) {
       this.mobBuffer = 0;
       this.useMobility(aim);
@@ -320,6 +322,7 @@ export class Player {
     if (this.dragged && this.state !== 'dash') this.dragSlam(); // CoreBurnZ: charge over, slam the carried enemies
 
     this.animate(dt);
+    if (this.kit === 'axiom') this.axiomPose();
     this.syncModel();
   }
 
@@ -338,7 +341,7 @@ export class Player {
 
   attackStart(moveDir) {
     switch (this.kit) {
-      case 'iskra': case 'ninja': this.state = 'attack'; this.stateTime = 0; break;
+      case 'iskra': case 'ninja': case 'axiom': this.state = 'attack'; this.stateTime = 0; break;
       case 'orin': this.state = 'attack'; this.stateTime = 0; this.tether = null; break;
       default: {
         const n = this.combo.length;
@@ -349,7 +352,7 @@ export class Player {
 
   attackUpdate(dt, dir, moving, walk) {
     const k = this.kit;
-    if (k === 'iskra' || k === 'orin' || k === 'ninja') {
+    if (k === 'iskra' || k === 'orin' || k === 'ninja' || k === 'axiom') {
       // ranged / channelled: keep moving (a bit slower) while the button is held
       const slow = k !== 'orin' ? this.char.needle.moveWhileFiring : this.char.beam.moveWhileFiring;
       if (moving) this.velocity.copy(dir).multiplyScalar(walk * slow);
@@ -381,6 +384,7 @@ export class Player {
       case 'zaleks': return this.startCharge(aim);
       case 'iskra': return this.phaseHop(aim);
       case 'ninja': return this.shadowStep(aim);
+      case 'axiom': return this.reforge();
       case 'orin': return RULES.z ? this.gravityWell(aim) : this.grapple(aim); // CoreBurnZ: Gravity Well replaces the grapple
       default: return this.startDash(aim);
     }
@@ -393,7 +397,7 @@ export class Player {
 
   dashUpdate() {
     switch (this.kit) {
-      case 'iskra': case 'ninja': // the hop / step already happened; this is just the short blink-in pose
+      case 'iskra': case 'ninja': case 'axiom': // the hop / step already happened; this is just the short blink-in pose
         if (this.stateTime >= 0.14) this.state = 'normal';
         return;
       case 'orin':
@@ -445,6 +449,7 @@ export class Player {
         if (RULES.z) this.world.allies?.detonateMines(this, KIT.mineStorm * (this.stats.lattice ? 2 : 1)); // CoreBurnZ: Storm sets off every mine
         break;
       case 'orin': this.hymnEngine(); break;
+      case 'axiom': this.ascend(echo); break;
       case 'ninja': // SHADOW CLONE
         this.world.allies?.addClone(this, this.char.cloneTime + this.stats.cloneTime);
         this.world.effects.spawnRing(this.position, 0x8a7aff, 3, 0.45);
@@ -479,6 +484,10 @@ export class Player {
       case 'orin':
         if (moving) this.velocity.copy(dir).multiplyScalar(walk * 0.5);
         if (this.stateTime >= 0.6) end();
+        return;
+      case 'axiom':
+        if (moving) this.velocity.copy(dir).multiplyScalar(walk * 0.6);
+        if (this.stateTime >= 0.4) end();
         return;
       case 'ninja': // a quick hand-sign, then back to work while the clone fights
         if (moving) this.velocity.copy(dir).multiplyScalar(walk * 0.7);
@@ -1032,6 +1041,7 @@ export class Player {
     const wasDead = e.dead;
     e.hit(dmg, kx, kz, heavy);
     if (RULES.z) this.zOnStrike(e, kind, !wasDead && e.dead);
+    if (kind === 'adroneH') { this.world.effects.spawnRing(e.position, 0xffa02a, 1.8, 0.2); for (const o of this.world.enemies.list) if (o !== e && o.canBeHit && o.position.distanceTo(e.position) < 1.8 + o.radius) this.strike(o, base * 0.6, 0, 0, false, 'splash'); }
     this.world.onComboHit?.(); // COMBO +1 per hit
     const attack = ATTACK_KINDS.has(kind);
     if (attack && kind !== 'dash' && Math.random() < s.twin) {
@@ -1049,6 +1059,7 @@ export class Player {
 
   // CoreBurnZ: Sarrow's Overdrive kills refund Blink; Zaleks' hits build a little Rage
   zOnStrike(e, kind, killed) {
+    if (this.kit === 'axiom') return this.axiomOnStrike(e, kind, killed);
     if (this.kit === 'sarrow' && killed && this.state === 'spin' && this.dashCharges < this.maxCharges) {
       const now = performance.now() / 1000;
       if (now - (this.blinkResetAt ?? -9) >= ZK.blinkResetCd) {
@@ -1058,6 +1069,74 @@ export class Player {
         this.world.effects.spawnRing(this.position, 0x3ff6e0, 1.4, 0.25);
       }
     } else if (this.kit === 'zaleks' && kind !== 'spin') this.addRage(ZK.rageHit);
+  }
+  // ======================= AXIOM (CoreBurnZ v1.28) =======================
+  get swarm() { return this.world.allies?.axiom; }
+  axCap() { return this.char.droneCap + (this.stats.axCap || 0); }
+  axiomTick(dt, input) {
+    const ax = this.swarm; if (!ax || this.world.netClient) return;
+    if (this.axNeedStart) { this.axNeedStart = false; ax.clearOwner(this); for (let i = 0; i < this.char.startDrones + (this.stats.m?.aNet ? 1 : 0); i++) ax.add(this); }
+    if (this.axClockT > 0) this.axClockT -= dt;
+    if (this.ascendT > 0) {
+      this.ascendT -= dt;
+      // ultimate cancel: press the ultimate again to end Ascension early (extras still explode)
+      if (RULES.z && input.wasPressed('spin') && this.ascendT < this.ascendMax - 0.4) { this.ultCancelled = true; this.ultBuffer = 0; this.ascendT = 0; }
+      if (this.ascendT <= 0) this.endAscend();
+    }
+  }
+  reforge() {
+    const c = this.char, s = this.stats, ax = this.swarm; if (!ax) return;
+    this.spendCharge(); this.axRefund = 0;
+    this.state = 'dash'; this.stateTime = 0;
+    ax.shield(this, c.barrier);
+    const over = this.ascendT > 0 ? c.ascendTemp + (s.myAxSing ? 0 : 0) : 0;
+    let n = (s.axFactory ? 2 : 1) + (s.m?.aRep && Math.random() < 0.2 ? 1 : 0), made = 0;
+    for (; n > 0; n--) {
+      if (ax.perm(this) < this.axCap()) { ax.add(this); made++; }
+      else if (over && ax.mine(this, 'asc').length < over) { ax.add(this, 'asc'); made++; }
+    }
+    if (!made) { this.axClockT = c.overclock; this.world.effects.spawnRing(this.position, 0xff8a3a, 2.4, 0.35); } // at capacity: OVERCLOCK
+    this.world.effects.spawnRing(this.position, 0xff3a3a, 1.8, 0.3);
+    this.world.sfx('powerup');
+  }
+  ascend(echo) {
+    const c = this.char, ax = this.swarm;
+    this.ascendMax = (echo ? c.ascendTime / 2 : c.ascendTime) + (this.stats.m?.aAscend ? 2 : 0);
+    this.ascendT = this.ascendMax;
+    this.dashCharges = this.maxCharges; this.dashCooldown = 0; // Reforge refreshes
+    this.world.effects.spawnRing(this.position, 0xff2a3a, 4, 0.5);
+    this.world.effects.spawnSparks(this.position.clone().setY(1.5), 0xff3a3a, 24, 9);
+    this.world.shake?.(0.25);
+    this.world.sfx('overdrive');
+  }
+  endAscend() {
+    this.ascendT = 0; this.swarm?.explodeAsc(this);
+    this.world.effects.spawnRing(this.position, 0xff5a3a, 2.4, 0.3);
+  }
+  axiomPose() {
+    const m = this.model, asc = this.ascendT > 0, t = performance.now() / 1000;
+    if (asc) m.body.position.y += 0.45 + 0.08 * Math.sin(t * 3); // levitate
+    const open = asc ? 0.16 : 0;
+    if (m.plateL) { m.plateL.position.x += (0.1 + open - m.plateL.position.x) * 0.2; m.plateR.position.x += (-0.1 - open - m.plateR.position.x) * 0.2; }
+    if (m.core) m.core.scale.set(asc ? 0.3 : 0.16, asc ? 0.3 : 0.2, 0.06);
+    if (this.uploading > 0) { this.uploading -= 1 / 60; m.root.scale.setScalar(Math.min(1, 1 - this.uploading * 0.5)); } else m.root.scale.setScalar(1);
+  }
+  axiomOnStrike(e, kind, killed) {
+    if (!killed) return;
+    const c = this.char, s = this.stats, ax = this.swarm;
+    if (this.dashCharges < this.maxCharges && this.axRefund < c.refundCap) { const r = Math.min(c.killRefund, c.refundCap - this.axRefund); this.axRefund += r; this.dashCooldown = Math.max(0, this.dashCooldown - r); }
+    if (kind !== 'adrone' && kind !== 'adroneH') return;
+    if (s.axFeedback && Math.random() < 0.1 * s.axFeedback) { const t = ax?.nearest(e.position, 8); if (t) this.world.allies.fireNeedle(this, e.position, new THREE.Vector3(t.position.x - e.position.x, 0, t.position.z - e.position.z), c.needle.damage * c.droneDmg, { color: 0xff3a4a, kind: 'adrone' }); }
+    if (s.axEvo && ax && ++this.axKills % 5 === 0 && ax.mine(this, 'evo').length < 4) { const d = ax.add(this, 'evo', 12); }
+  }
+  emergencyUpload() {
+    const ax = this.swarm, fx = this.world.effects, p = this.position.clone();
+    this.uploadUsed = true; ax.lose(this, 3);
+    fx.spawnRing(p, 0xff2a3a, 3.4, 0.5); fx.spawnSparks(p.clone().setY(1.2), 0xff5a3a, 30, 10); fx.spawnSparks(p.clone().setY(1.2), 0x2a2c34, 16, 7);
+    for (const e of this.world.enemies.list) if (e.canBeHit && e.position.distanceTo(p) < 3.4 + e.radius) this.strike(e, this.char.needle.damage * 4, 0, 0, true, 'spin');
+    this.hp = this.maxHp * 0.2; this.invulnTimer = 2; this.uploading = 1;
+    this.world.shake?.(0.4); this.world.sfx('revive');
+    this.mJobs.push({ t: 0.5, run: () => fx.spawnRing(this.position, 0xff8a8a, 1.6, 0.4) });
   }
   addRage(n) {
     if (!RULES.z || this.kit !== 'zaleks' || this.dead) return;
@@ -1179,6 +1258,7 @@ export class Player {
     if (this.state === 'dash' && (this.kit === 'sarrow' || this.kit === 'orin')) return false; // blinking / grappling = untouchable
     if (this.phaseTimer > 0) return false;               // ISKRA: just phased
     if (this.invulnTimer > 0) return false;              // just revived
+    if (this.kit === 'axiom' && this.world.allies?.axiom.shielded(this)) { this.world.effects.spawnSparks(this.position.clone().setY(1.2), 0xff5a5a, 4); return false; } // REFORGE barrier
     if (this.world.powerups && this.world.powerups.absorb(opts, this)) return false; // SHIELD
     const c = this.char;
     if (this.state === 'spin' && c.spinGuard) amount *= 1 - c.spinGuard; // overdrive = tougher
@@ -1195,6 +1275,7 @@ export class Player {
       }
     }
     if (this.stats.shell && this.world.allies?.drones.some((d) => d.owner === this && d.life > 0)) amount *= 1 - this.stats.shell; // ORIN: Hymn Shell
+    if (this.kit === 'axiom') { const ax = this.world.allies?.axiom; if (ax) { if (this.stats.axPlating) amount *= 1 - Math.min(0.2, 0.02 * ax.mine(this).length); if (source && (source.elite || source.isBoss) && Math.random() < 0.35) ax.lose(this, 1); } } // Reactive Plating / elites + bosses smash a drone
     amount *= this.stats.hurtMult || 1;                   // cursed cards (Greed Engine, Glass Heart)
     if (this.shieldHp > 0) {                              // ZALEKS' slam shield soaks it first
       const soak = Math.min(this.shieldHp, amount);
@@ -1222,6 +1303,7 @@ export class Player {
         this.world.sfx('revive');
       }
     }
+    if (this.hp <= 0 && this.kit === 'axiom' && RULES.z && this.stats.m?.aUpload && !this.uploadUsed && source?.def?.id !== 'klaxon' && (this.world.allies?.axiom.weight(this) || 0) >= 3) this.emergencyUpload();
     if (this.hp <= 0) {
       this.killedBy = source || this.lastHitBy || null;
       this.goDown();
@@ -1316,9 +1398,9 @@ export class Player {
     this.slashArc.material.opacity = Math.max(0, this.slashArc.material.opacity - dt * 6);
 
     const kit = this.kit;
-    if (this.state === 'attack' && (kit === 'iskra' || kit === 'orin' || kit === 'ninja')) {
+    if (this.state === 'attack' && (kit === 'iskra' || kit === 'orin' || kit === 'ninja' || kit === 'axiom')) {
       // ranged: aim the arm at the target, the other arm flicks (needles) or stays raised (tether)
-      const flick = kit !== 'orin' ? Math.max(0, this.fireCd) / (kit === 'ninja' ? 0.2 : 0.14) : 0.3 + 0.1 * Math.sin(performance.now() / 40);
+      const flick = kit !== 'orin' ? Math.max(0, this.fireCd) / (kit === 'ninja' ? 0.2 : kit === 'axiom' ? 0.55 : 0.14) : 0.3 + 0.1 * Math.sin(performance.now() / 40);
       if (kit !== 'orin' && this.armFlip) { m.armL.rotation.set(-1.5 + flick * 0.4, 0, 0.1); m.armR.rotation.set(-0.9, 0, -0.2); }
       else { m.armR.rotation.set(-1.5 + flick * 0.4, 0, -0.1); m.armL.rotation.set(kit === 'orin' ? -1.3 : -0.9, 0, 0.2); }
     } else if (this.state === 'attack') {
@@ -1353,7 +1435,7 @@ export class Player {
       if (kit === 'zaleks') { // shoulder first
         m.body.rotation.x = 0.35; m.body.rotation.y = 0.5;
         m.armL.rotation.set(-0.3, 0, 0.6); m.armR.rotation.set(0.6, 0, -0.2);
-      } else if (kit === 'iskra' || kit === 'ninja') { // blink-in: crouched, arms spread
+      } else if (kit === 'iskra' || kit === 'ninja' || kit === 'axiom') { // blink-in: crouched, arms spread
         m.body.rotation.x = 0.3;
         m.armL.rotation.set(0.4, 0, 1.2); m.armR.rotation.set(0.4, 0, -1.2);
       } else if (kit === 'orin') { // reeling in on the magnet line
@@ -1377,6 +1459,8 @@ export class Player {
         this.spinRing.rotation.z -= dt * 10;
       } else if (kit === 'ninja') { // hand-sign: both hands together in front of the mask
         m.armL.rotation.set(-1.9, 0, -0.5); m.armR.rotation.set(-1.9, 0, 0.5);
+      } else if (kit === 'axiom') { // arms flung wide as the reactor opens
+        m.armL.rotation.set(-0.4, 0, 1.4); m.armR.rotation.set(-0.4, 0, -1.4); m.body.rotation.x = -0.2;
       } else if (kit === 'orin') { // conducting the hymn: arms raised
         m.armL.rotation.set(-2.7, 0, 0.5); m.armR.rotation.set(-2.7, 0, -0.5);
         m.body.rotation.x = -0.15;

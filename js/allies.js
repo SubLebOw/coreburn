@@ -8,6 +8,7 @@
 // Co-op friends: never simulate; they draw what the host's snapshot says (serialize / applySnapshot).
 import * as THREE from 'three';
 import { CHARACTERS } from './characters.js';
+import { AxiomSwarm } from './axiom.js';
 
 // Returning Edge: stuck 2s, fly home, orbit 2s (hit each enemy at most every 0.45s for 30% of the return hit)
 const RET_TIME = 2.0, ORBIT_TIME = 2.0, ORBIT_R = 1.7, ORBIT_HIT_CD = 0.45, ORBIT_DMG = 0.3, REFUND_CAP = 0.5;
@@ -18,7 +19,7 @@ export const KIT = {
   mineCap: 8, mineLife: 12, mineArm: 0.35, mineR: 2.4, mineDmg: 2.6, mineStorm: 1.6, // ISKRA mines (x needle damage 7.5)
   wellTime: 2, wellR: 4.5, wellPull: 7, wellAmp: 0.3, wellBoom: 2.2,  // ORIN well (boom x tether damage 8)
 };
-const NEEDLES = 80, STARS = 100, DECOYS = 6, DRONES = 12, VORTEXES = 3, CLONES = 4;
+const NEEDLES = 160, STARS = 100, DECOYS = 6, DRONES = 12, VORTEXES = 3, CLONES = 4;
 
 export class Allies {
   constructor(scene, world) {
@@ -145,6 +146,7 @@ export class Allies {
   }
 
   get host() { return !this.world.netClient; }
+  get axiom() { return this._ax || (this._ax = new AxiomSwarm(this.scene, this.world, this)); } // AXIOM's drones
 
   // ---------- spawning (solo / host only) ----------
   fireNeedle(owner, from, dir, dmg, { pierce = 0, speed = 30, range = 15, color = 0xe8a0ff, kind = 'needle', star = false, clone = false, bounce = 0 } = {}) {
@@ -464,6 +466,7 @@ export class Allies {
     for (let i = 1; i <= fan; i++) for (const sgn of [-1, 1]) this.fireNeedle(owner, from, dir(facing + sgn * 0.22 * i), dmg * 0.3, opts);
   }
   update(dt) {
+    this.axiom.update(dt);
     if (!this.host) return this.clientUpdate(dt);
     this.updateWaves(dt); this.updateBleed(dt); this.updateMines(dt); this.updateWells(dt);
     this.drawMarks(this.markList());
@@ -652,12 +655,14 @@ export class Allies {
     for (const d of this.decoys) if (d.life > 0) out.push(['d', r2(d.position.x), r2(d.position.z), d.mat.color.getHex()]);
     for (const d of this.drones) if (d.life > 0) out.push(['r', r2(d.obj.position.x), r2(d.obj.position.z), r2(d.obj.rotation.y)]);
     for (const v of this.vortexes) if (v.life > 0) out.push(['v', r2(v.obj.position.x), r2(v.obj.position.z), r2(v.radius)]);
+    this.axiom.serialize(out);
     return out;
   }
 
   applySnapshot(list) {
     const used = { i: 0, g: 0, w: 0, n: 0, s: 0, c: 0, d: 0, r: 0, v: 0 };
     const marks = [];
+    this.axiom.applySnapshot((list || []).filter((e) => e[0] === 'x' || e[0] === 'X'));
     for (const s of list || []) {
       const [k, x, z, a, b] = s;
       if (k === 'm') { marks.push([x, z, a]); continue; }
@@ -733,5 +738,6 @@ export class Allies {
     for (const d of this.decoys) { d.life = 0; d.obj.visible = false; }
     for (const d of this.drones) { d.life = 0; d.obj.visible = false; d.owner = null; }
     for (const v of this.vortexes) { v.life = 0; v.obj.visible = false; v.owner = null; }
+    this.axiom.reset();
   }
 }

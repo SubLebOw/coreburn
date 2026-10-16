@@ -39,6 +39,14 @@ export const MASTERIES = {
     { id: 'oChoir', row: 2, name: 'Drone Choir', desc: '+1 drone' },
     { id: 'oShell', row: 2, name: 'Magnet Shell', desc: 'Take 10% less damage while drones fly' },
   ],
+  axiom: [
+    { id: 'aNet', row: 0, name: 'Network Efficiency', desc: 'Start each run with 3 drones instead of 2' },
+    { id: 'aBolt', row: 0, name: 'Focused Pulse', desc: '+6% damage' },
+    { id: 'aRep', row: 1, name: 'Perfect Replication', desc: 'Reforge has a 20% chance to build an extra drone' },
+    { id: 'aRange', row: 1, name: 'Long Optics', desc: 'Drones reach 20% further' },
+    { id: 'aUpload', row: 2, name: 'Emergency Upload', desc: 'Once per run: lethal damage with 3+ drones blows up your body and rebuilds you from 3 drones at 20% health (not vs Sister Klaxon)' },
+    { id: 'aAscend', row: 2, name: 'Prolonged Ascension', desc: 'Ascension Protocol lasts 2s longer' },
+  ],
   ninja: [
     { id: 'nSharp', row: 0, name: 'Sharp Stars', desc: '+6% damage' },
     { id: 'nLong', row: 0, name: 'Long Shadow', desc: 'Shadow Step reaches 15% further' },

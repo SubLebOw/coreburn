@@ -18,6 +18,7 @@ export const Z_HERO = {
   iskra: { hp: 1.2, dmg: 1.1 }, // v1.25: +~10% hp/dmg
   orin: { hp: 1.1, dmg: 0.97 }, // v1.25: +10% hp/dmg
   ninja: { hp: 1, dmg: 1 },
+  axiom: { hp: 1, dmg: 1 },
 };
 // Classic per-hero tuning (v1.14 bot pass): weak heroes buffed up towards ORIN, nobody nerfed.
 export const C_HERO = {}; // classic stays exactly as v1.13 (balance pass comes later)

@@ -40,7 +40,7 @@ export function tierColor(tier, base = TIER_COLOURS[0]) {
 
 // group: attack / mobility / ultimate / core. desc(level) = what the NEXT level gives.
 // heroes: only offered to those heroes (no `heroes` = a universal card every hero can roll).
-const S = ['sarrow'], Z = ['zaleks'], I = ['iskra'], O = ['orin'], N = ['ninja'];
+const S = ['sarrow'], Z = ['zaleks'], I = ['iskra'], O = ['orin'], N = ['ninja'], A = ['axiom'];
 export const UPGRADES = {
   // ---- universal (every hero) ----
   edge:     { name: 'Core Edge', group: 'attack', icon: '✦', color: 0xff8a3a, max: 10, desc: () => '+3.5% damage (everything)' },
@@ -88,6 +88,13 @@ export const UPGRADES = {
   oDroneDmg:{ name: 'Drone Armament', heroes: O, group: 'ultimate', icon: '✜', color: 0xff7a6a, max: 5, desc: () => '+10% drone damage' },
   oDroneTime:{ name: 'Drone Lifespan', heroes: O, group: 'ultimate', icon: '⧗', color: 0xffaa9a, max: 3, desc: () => 'Drones last +1s' },
   oShell:   { name: 'Hymn Shell', heroes: O, group: 'ultimate', icon: '⬣', color: 0xff8a9a, max: 4, desc: () => 'Take -6% damage while your drones fly' },
+  // ---- AXIOM (CoreBurnZ v1.28) ----
+  axCap:    { name: 'Expanded Network', heroes: A, group: 'core', icon: '⬡', color: 0xff3a4a, max: 3, desc: () => '+1 drone capacity' },
+  axFactory:{ name: 'War Factory', heroes: A, group: 'mobility', icon: '⚙', color: 0xff5a3a, max: 1, desc: () => 'Reforge builds 2 drones instead of 1' },
+  axServo:  { name: 'Overclocked Servos', heroes: A, group: 'attack', icon: '⟳', color: 0xff6a6a, max: 5, desc: () => '+15% drone attack speed' },
+  axPayload:{ name: 'Heavy Payload', heroes: A, group: 'attack', icon: '✺', color: 0xffa02a, max: 1, desc: () => 'Every 4th drone shot is a missile that splashes (drones grow missile pods)' },
+  axFeedback:{ name: 'Feedback Loop', heroes: A, group: 'attack', icon: '↯', color: 0xff4a6a, max: 2, desc: () => 'Drone kills: +10% chance to fire an extra bolt at the next enemy' },
+  axPlating:{ name: 'Reactive Plating', heroes: A, group: 'core', icon: '⛨', color: 0xc84a4a, max: 1, desc: () => 'Take 2% less damage per drone (max 20%)' },
   // ---- KAGERO (CoreBurnZ) ----
   nPierce:  { name: 'Razor Stars', heroes: N, group: 'attack', icon: '✴', color: 0xc8c0ff, max: 2, desc: () => 'Shurikens ricochet +1 more time' },
   nFan:     { name: 'Star Fan', heroes: N, group: 'attack', icon: '⋔', color: 0xa898ff, max: 2, desc: () => '+1 side shuriken each side per throw (30% damage)' },
@@ -143,6 +150,7 @@ export const EVOLUTIONS = {
   eCrimson:EV({ name: 'Crimson Tide', icon: '🩸', heroes: S, needs: ['sDeep', 'sRip'], text: 'Blade waves apply 2 bleed, and at full Flow they burst bleed too' }),
   eLattice:EV({ name: 'Lattice Array', icon: '✣', heroes: I, needs: ['iMineN', 'iBlast'], text: '+4 mine cap, mines last 6s longer, Needle Storm detonations hit twice as hard' }),
   eSingular:EV({ name: 'Singularity', icon: '◎', heroes: O, needs: ['oGrapple', 'oVortex'], text: 'Gravity Well +40% bigger, +1.5s, and detonates when it ends' }),
+  eExtinct:EV({ name: 'Extinction Protocol', icon: '☢', heroes: A, needs: ['axFactory', 'axFeedback'], text: 'Every 5 drone kills builds a temporary drone (max 4, 12s, not counted against capacity)' }),
   eLegion: EV({ name: 'Shadow Legion', icon: '⧉', heroes: N, needs: ['nShade', 'nMirror'], text: 'Shadow Clone +15% of your damage and lasts 2s longer' }),
 };
 // COREBURNZ MYTHIC CARDS (v1.27): from wave 75, about one offer per 5 waves takes a slot in a normal pick.
@@ -154,6 +162,7 @@ export const MYTHICS = {
   myWrath:   MY({ name: "Titan's Wrath", icon: '◉', heroes: Z, text: 'A full-Rage slam leaves a shockwave ring that keeps expanding for 3s' }),
   myField:   MY({ name: 'Living Minefield', icon: '❈', heroes: I, text: 'Armed mines drift toward the nearest enemy before detonating' }),
   myCollapse:MY({ name: 'Event Collapse', icon: '●', heroes: O, text: 'Gravity Well becomes a mini black hole that fires chain lightning while it lasts' }),
+  myAxSing:  MY({ name: 'Singularity Intelligence', icon: '⟁', heroes: A, text: 'Every 20s a drone becomes an Elite Drone (max 3): bigger, fires 2 bolts, counts as 2 for Emergency Upload, stronger in Ascension' }),
   myEcho:    MY({ name: 'Echo Core', icon: '⟲', text: 'Your ultimate recasts itself 2s later at 50% power' }),
   myGlass:   MY({ name: 'Glass Cannon', icon: '◈', text: 'x2 damage, but health orbs no longer heal you' }),
   myClock:   MY({ name: 'Overclock', icon: '⧗', text: 'Every 30s: 5s with no Blink or ultimate cooldowns' }),
@@ -337,6 +346,7 @@ export class Loadout {
     s.halo = L('eHalo') ? 3 : 0;
     // CoreBurnZ MYTHICS
     s.myCuts = L('myCuts'); s.myTempest = L('myTempest'); s.myWrath = L('myWrath'); s.myField = L('myField'); s.myCollapse = L('myCollapse');
+    s.axCap = L('axCap'); s.axFactory = L('axFactory'); s.axServo = 0.15 * L('axServo'); s.axPayload = L('axPayload'); s.axFeedback = L('axFeedback'); s.axPlating = L('axPlating'); s.axEvo = L('eExtinct'); s.myAxSing = L('myAxSing');
     s.myEcho = L('myEcho'); s.myClock = L('myClock'); s.myStand = L('myStand'); s.noOrbHeal = L('myGlass');
     if (L('myGlass')) s.dmg *= 2;
     // CoreBurnZ v1.26 kits
@@ -350,7 +360,7 @@ export class Loadout {
     const ms = RULES.z ? (this.mastery || []) : [], M = (id) => ms.includes(id);
     s.m = {}; for (const id of ms) s.m[id] = 1;
     if (M('sLong')) s.dashTime *= 1.2;
-    if (M('sKeen') || M('iSharp') || M('oOver') || M('nSharp')) s.dmg *= 1.06;
+    if (M('sKeen') || M('iSharp') || M('oOver') || M('nSharp') || M('aBolt')) s.dmg *= 1.06;
     if (M('sDouble') || M('zDouble') || M('iExtra') || M('nDouble')) s.dashCharges += 1;
     if (M('zPlate')) s.hurtMult *= 0.94;
     if (M('zHeavy')) s.bashDmg *= 1.1;

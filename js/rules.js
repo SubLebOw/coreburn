@@ -13,10 +13,10 @@ export const Z_TUNING = {
 };
 // CoreBurnZ per-hero tuning (v1.14, from the bot autoplayer + kit sim). Classic is untouched.
 export const Z_HERO = {
-  sarrow: { hp: 1.15, dmg: 1.15 },
+  sarrow: { hp: 1.25, dmg: 1.25 }, // v1.25: +~9% hp/dmg
   zaleks: { hp: 1.4, dmg: 1.6, speed: 1.15 },
-  iskra: { hp: 1.1, dmg: 1 },
-  orin: { hp: 1, dmg: 0.88 },
+  iskra: { hp: 1.2, dmg: 1.1 }, // v1.25: +~10% hp/dmg
+  orin: { hp: 1.1, dmg: 0.97 }, // v1.25: +10% hp/dmg
   ninja: { hp: 1, dmg: 1 },
 };
 // Classic per-hero tuning (v1.14 bot pass): weak heroes buffed up towards ORIN, nobody nerfed.

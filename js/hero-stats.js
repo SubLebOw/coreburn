@@ -28,7 +28,7 @@ export const HERO_STATS = {
   zaleks: {
     id: 'zaleks', name: 'ZALEKS', title: 'Plated bruiser', tag: 'TANK', color: 0xffa030, blade: 0xffc060,
     blurb: 'Soaks the hits: blocks from the front while swinging, stuns with charges and pulls aggro.',
-    hp: 219, speed: 6.2, dmg: 1.18, // v1.15: +15% hp, +5% speed (both modes) atkSpeed: 1, armor: 0, // (armor = flat % damage reduction; his toughness comes from block + shield instead)
+    hp: 219, speed: 6.2, dmg: 1.18, atkSpeed: 1, armor: 0, // v1.15: +15% hp, +5% speed (both modes). (armor = flat % damage reduction; his toughness comes from block + shield instead)
     abilities: {
       attack: { name: 'Shield Bash', short: 'BASH', icon: '⛊', desc: 'Bash + hammer-fist, huge knockback, blocks 40% from the front' },
       mobility: { name: 'Shoulder Charge', short: 'CHARGE', icon: '⇛', desc: 'Charge that stuns what it hits (stops at walls)', zdesc: 'Charge that CARRIES enemies with you, then slams them down stunned' },

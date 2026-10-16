@@ -479,7 +479,7 @@ export class Coop {
       bb: bb ? [bb.name, Math.round(bb.hp), Math.round(bb.maxHp)] : 0,
       ar: [arena.current.index, arena.current.loop],
       h: this.heroes.map((h) => [h.slot, r2(h.position.x), r2(h.position.z), r2(h.facing), h.state, h.comboStep, Math.ceil(h.hp), h.maxHp, h.dead ? 1 : 0, r2(h.reviveProgress || 0), h.loadout.tier,
-        powerups.listFor(h).map((p) => [p.type, r2(p.left), p.seconds, p.hits]), (h.shieldHp > 0 ? 1 : 0) | (h.tauntTimer > 0 ? 2 : 0)]),
+        powerups.listFor(h).map((p) => [p.type, r2(p.left), p.seconds, p.hits]), (h.shieldHp > 0 ? 1 : 0) | (h.tauntTimer > 0 ? 2 : 0), Math.round(h.rage || 0)]),
       sh: this.ctx.world.shrine?.snapshot(), // CoreBurnZ risk shrine
       a: this.ctx.allies.serialize(), // needles, decoys, drones, vortexes
       e: enemies.list.filter((e) => e.nid).map((e) => e.isBoss
@@ -748,10 +748,11 @@ export class Coop {
     }
     // heroes
     for (const hs of m.h) {
-      const [slot, x, z, f, st, cs, hp, mhp, dead, rv, tier, pw, kf = 0] = hs;
+      const [slot, x, z, f, st, cs, hp, mhp, dead, rv, tier, pw, kf = 0, rage = 0] = hs;
       const h = slot === this.mySlot ? player : this.puppets.get(slot);
       if (!h) continue;
       h.reviveProgress = rv;
+      h.rage = rage; // CoreBurnZ: Zaleks' Rage (host-authoritative)
       h.netShield = !!(kf & 1);
       h.guard.visible = h.netShield && !dead;
       h.tauntTimer = kf & 2 ? 0.2 : 0;

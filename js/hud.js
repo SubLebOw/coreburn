@@ -62,6 +62,19 @@ export class Hud {
     }
     this.setCooldown('dash', this.dashEls, player.dashCooldownShown, player.dashCooldownMax);
     this.setCooldown('spin', this.spinEls, player.spinCooldown, player.spinCooldownMax);
+    // CoreBurnZ: Zaleks' RAGE bar on the Seismic Slam button
+    const rage = RULES.z && player.kit === 'zaleks' ? Math.round(player.rageFrac * 50) : -1;
+    if (this.last.rage !== rage) {
+      this.last.rage = rage;
+      for (const el of this.spinEls) {
+        let bar = el.querySelector('.rage');
+        if (!bar) { bar = document.createElement('span'); bar.className = 'rage'; bar.innerHTML = '<i></i><b>RAGE</b>'; el.appendChild(bar); }
+        bar.style.display = rage < 0 ? 'none' : '';
+        bar.querySelector('i').style.width = `${Math.max(0, rage) * 2}%`;
+        bar.classList.toggle('full', rage >= 50);
+        el.classList.toggle('quake', rage >= 50);
+      }
+    }
 
     // boss health bar (twin bosses share one)
     const showBoss = !!bossBar;
@@ -178,7 +191,7 @@ export class Hud {
       b.style.setProperty('--c', hex(c.color));
       const range = { sarrow: 0.3, zaleks: 0.25, iskra: 1, orin: 0.6, ninja: 0.85 }[c.id] ?? 0.5;
       const kit = c.abilities ? ['attack', 'mobility', 'ultimate'].map((k, j) =>
-        `<div class="kslot"><b>${c.abilities[k].icon} ${c.abilities[k].name}</b> <span>${['J', 'K', 'L'][j]}</span><i>${c.abilities[k].desc}</i></div>`).join('') : '';
+        `<div class="kslot"><b>${c.abilities[k].icon} ${c.abilities[k].name}</b> <span>${['J', 'K', 'L'][j]}</span><i>${(RULES.z && c.abilities[k].zdesc) || c.abilities[k].desc}</i></div>`).join('') : '';
       b.innerHTML = `<span class="key">${i + 1}</span><div class="icon">⬢</div><div class="ubody"><div class="group"></div><div class="uname"></div><div class="effect"></div>` +
         `<div class="kit">${kit}</div><div class="stats">${bar('HEALTH', c.hp / 200)}${bar('SPEED', c.speed / 8.3)}${bar('RANGE', range)}</div></div>`;
       b.querySelector('.group').innerHTML = `<span class="ptag">${c.tag}</span> ${c.title.toUpperCase()}`;
@@ -298,7 +311,7 @@ export class Hud {
       const el = $(id);
       el.querySelector('.label').textContent = flat(slot.short);
       el.querySelector('.aicon').textContent = slot.icon;
-      el.title = `${slot.name}: ${slot.desc}`;
+      el.title = `${slot.name}: ${(RULES.z && slot.zdesc) || slot.desc}`;
     }
     const icon = (t) => `<span class="ticon">${t}</span>`;
     $('btn-slash').innerHTML = icon(a.attack.icon) + flat(a.attack.short);

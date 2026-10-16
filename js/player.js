@@ -20,6 +20,14 @@ const SCREEN_RIGHT = new THREE.Vector3(1, 0, -1).normalize();
 // attack kinds that count as "attacks" for leech, twin strike, storm and ARC TALONS
 const ATTACK_KINDS = new Set(['slash', 'dash', 'needle', 'beam']);
 const COMBO_OF = (c) => c.combo || [];
+// CoreBurnZ v1.24 kit spice (classic untouched)
+const ZK = {
+  waveDmg: 0.7, waveSpeed: 20, waveRange: 11,     // SARROW: 3rd talon hit throws a piercing blade wave (x finisher damage)
+  blinkResetCd: 0.5,                              // SARROW: Overdrive kills give a Blink back, at most once per 0.5s
+  rageMax: 100, rageHurt: 1.6, rageHit: 0.7,      // ZALEKS: Rage per 1 damage taken / per hit landed
+  quakeRadius: 1.6, quakeDmg: 1.6, quakeStun: 1.2, // ZALEKS: full-Rage Seismic Slam
+  dragMax: 6, dragSlam: 0.8, dragStun: 0.9,       // ZALEKS: charge carries up to 6 enemies, slams them at the end
+};
 
 export class Player {
   constructor(scene, world, charId = 'sarrow', tint = null) {
@@ -188,6 +196,7 @@ export class Player {
     this.tauntTimer = 0;       // ZALEKS: enemies come for him
     this.tauntRadius = 0;
     this.shieldHp = 0;         // ZALEKS: slam shield
+    this.rage = 0; this.dragged = null; // CoreBurnZ: Zaleks' Rage + carried enemies
     this.shieldTimer = 0;
     this.tether = null;        // ORIN: who the beam is locked on
     this.guard.visible = false;
@@ -300,6 +309,7 @@ export class Player {
     // ZALEKS' charge (and ORIN's reel) stop dead at walls and pillars
     if (this.state === 'dash' && this.stateTime > 0.06 && this.velocity.lengthSq() > 1 &&
         this.position.distanceTo(before) < this.velocity.length() * dt * 0.35) this.hitWall();
+    if (this.dragged && this.state !== 'dash') this.dragSlam(); // CoreBurnZ: charge over, slam the carried enemies
 
     this.animate(dt);
     this.syncModel();
@@ -385,6 +395,7 @@ export class Player {
       case 'zaleks':
         this.velocity.copy(this.dashDir).multiplyScalar(this.char.dashSpeed);
         this.dashHits();
+        this.dragUpdate();
         if (this.stateTime >= this.char.dashTime * this.stats.chargeDist) this.state = 'normal';
         return;
       default:
@@ -528,6 +539,9 @@ export class Player {
         hitSomething = true;
       }
     }
+    if (RULES.z && fin && !zal && this.kit === 'sarrow') { // CoreBurnZ: BLADE WAVE
+      this.world.allies?.fireWave(this, this.position, forward, hit.damage * s.arcDmg * ZK.waveDmg, { speed: ZK.waveSpeed, range: ZK.waveRange * s.range, color: this.damageMult > 1 ? 0xff3a2a : 0x9ffff5 });
+    }
     if (hitSomething) {
       this.world.sfx('hit');
       this.world.shake(fin ? (zal ? 0.45 : 0.35) : 0.15);
@@ -574,6 +588,7 @@ export class Player {
         }
         this.strike(e, this.char.dashDmg * (zal ? this.stats.chargeDmg : this.stats.dashDmg), kx, kz, zal, 'dash');
         if (zal) this.stun(e, this.char.chargeStun + this.stats.chargeStun); // after the hit (a hit resets the flinch timer)
+        if (zal && RULES.z && !e.isBoss && !e.dead && (this.dragged ||= []).length < ZK.dragMax) this.dragged.push(e); // CoreBurnZ: carried along
         this.world.effects.spawnSparks(e.position.clone().setY(1.1), zal ? 0xffd090 : 0x9ffff5, zal ? 10 : 6);
         this.world.shake(zal ? 0.2 : 0.12);
         this.world.sfx('hit');
@@ -613,6 +628,33 @@ export class Player {
 
   // ---------- ZALEKS: Shoulder Charge + Seismic Slam ----------
 
+  // CoreBurnZ: enemies the charge hits are pinned in front of Zaleks, then slammed when it ends
+  dragUpdate() {
+    if (!this.dragged?.length) return;
+    const d = this.dashDir, side = new THREE.Vector3(-d.z, 0, d.x);
+    this.dragged = this.dragged.filter((e) => !e.dead);
+    this.dragged.forEach((e, i) => {
+      const off = (i - (this.dragged.length - 1) / 2) * 0.9;
+      e.position.set(this.position.x + d.x * (1.3 + e.radius) + side.x * off, e.position.y, this.position.z + d.z * (1.3 + e.radius) + side.z * off);
+      e.knockback?.set?.(0, 0, 0);
+      e.stun = Math.max(e.stun || 0, 0.25);
+    });
+  }
+  dragSlam() {
+    const list = (this.dragged || []).filter((e) => !e.dead);
+    this.dragged = null;
+    if (!list.length) return;
+    const fx = this.world.effects, k = this.char.dashKnock * 0.6;
+    fx.spawnRing(this.position.clone().addScaledVector(this.dashDir, 1.6), 0xffa030, 2.4, 0.35);
+    for (const e of list) {
+      this.world.arena.resolve(e.position, e.radius);
+      this.strike(e, this.char.dashDmg * this.stats.chargeDmg * ZK.dragSlam, this.dashDir.x * k, this.dashDir.z * k, true, 'dash');
+      this.stun(e, ZK.dragStun);
+      fx.spawnSparks(e.position.clone().setY(1), 0xffd090, 8);
+    }
+    this.world.shake(0.4); this.world.hitstop(0.05); this.world.sfx('hit');
+  }
+
   startCharge(direction) {
     this.state = 'dash';
     this.stateTime = 0;
@@ -627,7 +669,14 @@ export class Player {
 
   seismicSlam(echo = 0) {
     const c = this.char, s = this.stats;
-    const radius = c.slamRadius * s.slamRadius;
+    const quake = !echo && RULES.z && (this.rage || 0) >= ZK.rageMax; // CoreBurnZ: full Rage = QUAKE
+    if (quake) {
+      this.rage = 0;
+      this.world.effects.spawnRing(this.position, 0xff3a1a, c.slamRadius * s.slamRadius * ZK.quakeRadius * 1.1, 0.8);
+      this.world.effects.spawnSparks(this.position.clone().setY(0.6), 0xff5a20, 24, 9);
+      this.world.shake(1);
+    }
+    const radius = c.slamRadius * s.slamRadius * (quake ? ZK.quakeRadius : 1);
     if (!echo && s.m?.zAfter) this.mJobs.push({ t: 0.7, run: () => { if (!this.dead) this.seismicSlam(0.6); } }); // MASTERY Aftershock
     this.world.effects.spawnRing(this.position, 0xffa030, radius, 0.6);
     this.world.effects.spawnRing(this.position, 0xff5a20, radius * 0.6, 0.45);
@@ -640,8 +689,8 @@ export class Player {
       const d = to.length();
       if (d > radius + e.radius) continue;
       to.normalize();
-      this.strike(e, c.slamDmg * s.spinDmg * s.slamDmg * (echo || 1), to.x * c.slamKnock, to.z * c.slamKnock, true, 'spin');
-      this.stun(e, c.slamStun);
+      this.strike(e, c.slamDmg * s.spinDmg * s.slamDmg * (echo || 1) * (quake ? ZK.quakeDmg : 1), to.x * c.slamKnock, to.z * c.slamKnock, true, 'spin');
+      this.stun(e, quake ? Math.max(c.slamStun, ZK.quakeStun) : c.slamStun);
       this.world.effects.spawnSparks(e.position.clone().setY(1.1), 0xffa030, 6);
     }
     if (echo) return; // the aftershock is just damage
@@ -932,7 +981,9 @@ export class Player {
       dmg *= s.critMult || 1.8;
       this.world.effects.spawnSparks(e.position.clone().setY(1.4), 0xfff27a, 5, 8);
     }
+    const wasDead = e.dead;
     e.hit(dmg, kx, kz, heavy);
+    if (RULES.z) this.zOnStrike(e, kind, !wasDead && e.dead);
     this.world.onComboHit?.(); // COMBO +1 per hit
     const attack = ATTACK_KINDS.has(kind);
     if (attack && kind !== 'dash' && Math.random() < s.twin) {
@@ -947,6 +998,26 @@ export class Player {
       if (Math.random() < s.storm) this.stormChain(e, dmg * 0.35);
     }
   }
+
+  // CoreBurnZ: Sarrow's Overdrive kills refund Blink; Zaleks' hits build a little Rage
+  zOnStrike(e, kind, killed) {
+    if (this.kit === 'sarrow' && killed && this.state === 'spin' && this.dashCharges < this.maxCharges) {
+      const now = performance.now() / 1000;
+      if (now - (this.blinkResetAt ?? -9) >= ZK.blinkResetCd) {
+        this.blinkResetAt = now;
+        this.dashCharges++;
+        this.dashCooldown = this.dashCharges < this.maxCharges ? this.dashCooldownMax : 0;
+        this.world.effects.spawnRing(this.position, 0x3ff6e0, 1.4, 0.25);
+      }
+    } else if (this.kit === 'zaleks' && kind !== 'spin') this.addRage(ZK.rageHit);
+  }
+  addRage(n) {
+    if (!RULES.z || this.kit !== 'zaleks' || this.dead) return;
+    const was = this.rage || 0;
+    this.rage = Math.min(ZK.rageMax, was + n);
+    if (was < ZK.rageMax && this.rage >= ZK.rageMax) { this.world.effects.spawnRing(this.position, 0xff3a1a, 2.2, 0.4); this.world.sfx('powerup'); }
+  }
+  get rageFrac() { return (this.rage || 0) / ZK.rageMax; }
 
   leechHeal(amount, perSecond) {
     const room = perSecond - this.leechBudget;
@@ -1083,6 +1154,9 @@ export class Player {
       amount -= soak;
       if (this.shieldHp <= 0) { this.shieldTimer = 0; this.world.effects.spawnRing(this.position, 0xffa030, 1.8, 0.3); }
       if (amount <= 0) { this.world.sfx('shieldBlock'); return true; }
+    }
+    if (this.kit === 'zaleks' && RULES.z && amount > 0) {
+      this.addRage(amount * ZK.rageHurt);
     }
     this.hp -= amount;
     source?.onHurtHero?.(amount);                       // CoreBurnZ: Vampiric affix heals off you

@@ -11,6 +11,7 @@ import { CHARACTERS } from './characters.js';
 
 // Returning Edge: stuck 2s, fly home, orbit 2s (hit each enemy at most every 0.45s for 30% of the return hit)
 const RET_TIME = 2.0, ORBIT_TIME = 2.0, ORBIT_R = 1.7, ORBIT_HIT_CD = 0.45, ORBIT_DMG = 0.3, REFUND_CAP = 0.5;
+const WAVES = 8;
 const NEEDLES = 80, STARS = 100, DECOYS = 6, DRONES = 12, VORTEXES = 3, CLONES = 4;
 
 export class Allies {
@@ -28,6 +29,14 @@ export class Allies {
       mesh.visible = false;
       scene.add(mesh);
       this.needles.push({ mesh, vel: new THREE.Vector3(), life: 0, owner: null, dmg: 0, pierce: 0, hitSet: new Set(), color: 0xe8a0ff, target: new THREE.Vector3() });
+    }
+    // SARROW's blade waves (CoreBurnZ): a flat glowing crescent that pierces everything
+    const wg = new THREE.RingGeometry(1.0, 1.55, 20, 1, Math.PI * 0.15, Math.PI * 0.7);
+    this.waves = [];
+    for (let i = 0; i < WAVES; i++) {
+      const mesh = new THREE.Mesh(wg, new THREE.MeshBasicMaterial({ color: 0x9ffff5, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }));
+      mesh.visible = false; scene.add(mesh);
+      this.waves.push({ mesh, vel: new THREE.Vector3(), life: 0, max: 1, owner: null, dmg: 0, hitSet: new Set(), color: 0x9ffff5, target: new THREE.Vector3() });
     }
     // KAGERO's shurikens: flat 4-point stars that spin (same flight code as needles)
     const sg = new THREE.BoxGeometry(0.42, 0.05, 0.12), sg2 = new THREE.BoxGeometry(0.12, 0.05, 0.42);
@@ -126,6 +135,41 @@ export class Allies {
     n.mesh.position.set(from.x, 1.1, from.z).addScaledVector(n.vel, 0.02);
     n.mesh.rotation.set(0, Math.atan2(dir.x, dir.z), 0);
     n.mesh.visible = true;
+  }
+
+  fireWave(owner, from, dir, dmg, { speed = 20, range = 11, color = 0x9ffff5 } = {}) {
+    if (!this.host) return;
+    const w = this.waves.find((x) => x.life <= 0); if (!w) return;
+    w.owner = owner; w.dmg = dmg; w.hitSet.clear(); w.color = color;
+    w.vel.set(dir.x, 0, dir.z).normalize().multiplyScalar(speed);
+    w.life = w.max = range / speed;
+    this.poseWave(w, from.x + dir.x * 0.8, from.z + dir.z * 0.8, Math.atan2(dir.x, dir.z), color, 1);
+    w.mesh.visible = true;
+  }
+  poseWave(w, x, z, ang, color, fade) {
+    w.mesh.position.set(x, 1.0, z);
+    w.mesh.rotation.set(-Math.PI / 2, 0, 0); w.mesh.rotateZ(ang - Math.PI / 2 + Math.PI);
+    w.mesh.material.color.setHex(color); w.mesh.material.opacity = 0.35 + 0.55 * fade;
+    w.mesh.scale.setScalar(1 + 0.5 * (1 - fade));
+  }
+  updateWaves(dt) {
+    for (const w of this.waves) {
+      if (w.life <= 0) continue;
+      w.life -= dt;
+      if (w.life <= 0 || !w.owner) { w.life = 0; w.mesh.visible = false; continue; }
+      const p = w.mesh.position.addScaledVector(w.vel, dt);
+      this.poseWave(w, p.x, p.z, Math.atan2(w.vel.x, w.vel.z), w.color, w.life / w.max);
+      const r = 1.5 * w.mesh.scale.x;
+      for (const e of this.world.enemies.list) {
+        if (!e.canBeHit || w.hitSet.has(e)) continue;
+        if (Math.hypot(p.x - e.position.x, p.z - e.position.z) < r + e.radius) {
+          w.hitSet.add(e);
+          const v = w.vel.clone().normalize();
+          w.owner.strike(e, w.dmg, v.x * 5, v.z * 5, false, 'wave');
+          this.world.effects.spawnSparks(e.position.clone().setY(1.1), w.color, 5);
+        }
+      }
+    }
   }
 
   // ---------- KAGERO's Shadow Clone ----------
@@ -274,6 +318,7 @@ export class Allies {
   }
   update(dt) {
     if (!this.host) return this.clientUpdate(dt);
+    this.updateWaves(dt);
     this.drawMarks(this.markList());
     const enemies = this.world.enemies.list, arena = this.world.arena;
     // STAR HALO evolution: keep a permanent ring of shurikens round each owner who has it
@@ -451,6 +496,7 @@ export class Allies {
   serialize() {
     const r2 = this.r2, out = [];
     for (const n of this.needles) if (n.life > 0) out.push(['n', r2(n.mesh.position.x), r2(n.mesh.position.z), r2(n.mesh.rotation.y), n.color]);
+    for (const w of this.waves) if (w.life > 0) out.push(['w', r2(w.mesh.position.x), r2(w.mesh.position.z), r2(Math.atan2(w.vel.x, w.vel.z)), w.color, r2(w.life / w.max)]);
     for (const n of this.stars) if (n.life > 0) out.push(['s', r2(n.mesh.position.x), r2(n.mesh.position.z), 0, n.color]);
     for (const c of this.clones) if (c.life > 0) out.push(['c', r2(c.position.x), r2(c.position.z), r2(c.facing), r2(c.life), c.flick > 0 ? 1 : 0]);
     for (const m of this.markList()) out.push(['m', r2(m[0]), r2(m[1]), r2(m[2])]);
@@ -461,11 +507,17 @@ export class Allies {
   }
 
   applySnapshot(list) {
-    const used = { n: 0, s: 0, c: 0, d: 0, r: 0, v: 0 };
+    const used = { w: 0, n: 0, s: 0, c: 0, d: 0, r: 0, v: 0 };
     const marks = [];
     for (const s of list || []) {
       const [k, x, z, a, b] = s;
       if (k === 'm') { marks.push([x, z, a]); continue; }
+      if (k === 'w') {
+        const w = this.waves[used.w++]; if (!w) continue;
+        if (!w.mesh.visible) w.mesh.position.set(x, 1, z);
+        w.target.set(x, 1, z); w.ang = a; w.color = b; w.fade = s[5]; w.mesh.visible = true; w.life = 1;
+        continue;
+      }
       if (k === 's') {
         const n = this.stars[used.s++]; if (!n) continue;
         if (!n.mesh.visible) n.mesh.position.set(x, 1.1, z);
@@ -495,6 +547,7 @@ export class Allies {
       }
     }
     this.drawMarks(marks);
+    this.waves.slice(used.w).forEach((w) => { w.life = 0; w.mesh.visible = false; });
     this.needles.slice(used.n).forEach((n) => { n.life = 0; n.mesh.visible = false; });
     this.stars.slice(used.s).forEach((n) => { n.life = 0; n.mesh.visible = false; });
     this.clones.slice(used.c).forEach((c) => { c.life = 0; c.m.root.visible = false; });
@@ -506,6 +559,7 @@ export class Allies {
   clientUpdate(dt) {
     const k = 1 - Math.exp(-14 * dt);
     for (const n of this.needles) if (n.mesh.visible) n.mesh.position.lerp(n.target, k);
+    for (const w of this.waves) if (w.mesh.visible) { const p = w.mesh.position.lerp(w.target, k); this.poseWave(w, p.x, p.z, w.ang, w.color, w.fade ?? 1); }
     for (const n of this.stars) if (n.mesh.visible) { n.mesh.position.lerp(n.target, k); n.mesh.rotation.y += dt * 22; }
     for (const c of this.clones) if (c.m.root.visible) { c.position.lerp(c.target, k); this.poseClone(c, dt); }
     for (const d of this.drones) if (d.obj.visible) d.obj.position.lerp(d.target, k);
@@ -515,6 +569,7 @@ export class Allies {
 
   reset() {
     for (const n of this.needles) { n.life = 0; n.mesh.visible = false; }
+    for (const w of this.waves) { w.life = 0; w.mesh.visible = false; w.owner = null; }
     for (const n of this.stars) { n.life = 0; n.mesh.visible = false; }
     for (const c of this.clones) { c.life = 0; c.m.root.visible = false; c.owner = null; }
     for (const m of this.marks) m.visible = false;

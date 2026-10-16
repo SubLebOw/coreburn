@@ -11,9 +11,9 @@ export const HERO_STATS = {
     blurb: 'Gets in close, chains a 3-hit talon combo and blinks out of trouble.',
     hp: 180, speed: 7, dmg: 0.8, atkSpeed: 1, armor: 0,
     abilities: {
-      attack: { name: 'Talon Combo', short: 'SLASH', icon: '✦', desc: '3-hit combo, the 3rd hit is a heavy finisher' },
+      attack: { name: 'Talon Combo', short: 'SLASH', icon: '✦', desc: '3-hit combo, the 3rd hit is a heavy finisher', zdesc: '3-hit combo, the 3rd hit is a heavy finisher that throws a piercing BLADE WAVE' },
       mobility: { name: 'Blink', short: 'BLINK', icon: '➹', desc: 'Untouchable dash that cuts through enemies' },
-      ultimate: { name: 'Overdrive', short: 'OVER<br>DRIVE', icon: '⟲', desc: 'Whirlwind spin, half damage taken' },
+      ultimate: { name: 'Overdrive', short: 'OVER<br>DRIVE', icon: '⟲', desc: 'Whirlwind spin, half damage taken', zdesc: 'Whirlwind spin, half damage taken. Kills during it give you a Blink back' },
     },
     combo: [
       { damage: 12, knockback: 6, range: 2.4, duration: 0.24 },
@@ -31,8 +31,8 @@ export const HERO_STATS = {
     hp: 219, speed: 6.2, dmg: 1.18, // v1.15: +15% hp, +5% speed (both modes) atkSpeed: 1, armor: 0, // (armor = flat % damage reduction; his toughness comes from block + shield instead)
     abilities: {
       attack: { name: 'Shield Bash', short: 'BASH', icon: '⛊', desc: 'Bash + hammer-fist, huge knockback, blocks 40% from the front' },
-      mobility: { name: 'Shoulder Charge', short: 'CHARGE', icon: '⇛', desc: 'Charge that stuns what it hits (stops at walls)' },
-      ultimate: { name: 'Seismic Slam', short: 'SEISMIC<br>SLAM', icon: '✺', desc: 'Big AoE slam, taunts enemies to you, gives a shield' },
+      mobility: { name: 'Shoulder Charge', short: 'CHARGE', icon: '⇛', desc: 'Charge that stuns what it hits (stops at walls)', zdesc: 'Charge that CARRIES enemies with you, then slams them down stunned' },
+      ultimate: { name: 'Seismic Slam', short: 'SEISMIC<br>SLAM', icon: '✺', desc: 'Big AoE slam, taunts enemies to you, gives a shield', zdesc: 'Big AoE slam, taunt + shield. Taking hits fills RAGE: at full Rage it becomes a huge stunning QUAKE' },
     },
     combo: [
       { damage: 24, knockback: 11, range: 2.6, duration: 0.45, arc: 0.1 },

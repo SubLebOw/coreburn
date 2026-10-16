@@ -753,3 +753,11 @@ body.shrine-curse #hud::after { content: ''; position: fixed; inset: 0; pointer-
 #synergy-pop div { margin-top: 4px; } #synergy-pop b { color: #ffe39a; letter-spacing: 1px; margin-right: 8px; } #synergy-pop span { font-size: 13px; opacity: .9; }
 #synergy-pop.out { opacity: 0; transform: translateX(-50%) translateY(-12px); }
 @keyframes synIn { from { opacity: 0; transform: translateX(-50%) scale(.7); } }
+
+/* CoreBurnZ: Zaleks' RAGE bar on the Seismic Slam button */
+.rage { position: absolute; left: 6%; right: 6%; bottom: 3px; height: 8px; z-index: 2; border-radius: 4px; background: rgba(0,0,0,.6); border: 1px solid #ff5a2a88; overflow: visible; pointer-events: none; }
+.rage i { display: block; height: 100%; width: 0; border-radius: 3px; background: linear-gradient(90deg, #ff8a2a, #ff2a1a); transition: width .15s; }
+.rage b { position: absolute; left: 0; right: 0; top: -1px; font-size: 7px; line-height: 8px; text-align: center; color: #fff; font-weight: 900; letter-spacing: 1px; text-shadow: 0 0 2px #000; }
+.rage.full i { background: #ff2a1a; box-shadow: 0 0 8px #ff2a1a; animation: ragePulse .5s infinite alternate; }
+.ability.quake, #btn-spin.quake { border-color: #ff3a1a !important; box-shadow: 0 0 14px #ff3a1acc !important; }
+@keyframes ragePulse { from { opacity: .7; } to { opacity: 1; } }

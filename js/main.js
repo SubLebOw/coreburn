@@ -327,10 +327,10 @@ function openUpgradePicker() {
   if (coop.mode === 'host') coop.beginPicks(boss); // every friend picks their own card too
   hostPicking = true;
   const cardRng = mode === 'daily' ? rngFor(`daily:${seed()}:${boss ? 'boss' : 'cards'}:${loadout.tier}:${bossPicks}`) : Math.random;
-  const hand = boss ? loadout.rollBoss(3, cardRng) : loadout.maybeCurse(loadout.roll(3, cardRng), enemies.wave, cardRng);
+  const hand = boss ? loadout.rollBoss(3, cardRng) : loadout.maybeMythic(loadout.maybeCurse(loadout.roll(3, cardRng), enemies.wave, cardRng), enemies.wave, cardRng);
   hud.rerollHook = (b, handle) => { // CoreBurnZ reroll (yours only; friends reroll their own)
     loadout.rerolls--;
-    const h2 = b ? loadout.rollBoss(3) : loadout.maybeCurse(loadout.roll(3), enemies.wave);
+    const h2 = b ? loadout.rollBoss(3) : loadout.maybeMythic(loadout.maybeCurse(loadout.roll(3), enemies.wave), enemies.wave);
     hud.showPicker(h2, loadout, onPickCard, b, handle);
     sound.play('powerup');
   };

@@ -246,7 +246,7 @@ export class PowerUps {
       o.obj.visible = o.life > 2 || Math.floor(o.life * 8) % 2 === 0;
       const [h, d] = pull(o.obj, 10, 16);
       if (h && d < 1.0) {
-        h.heal(5);
+        if (!h.stats?.noOrbHeal) h.heal(5); // MYTHIC Glass Cannon: orbs don't heal
         this.world.sfx('heal');
         this.scene.remove(o.obj);
         this.orbs.splice(i, 1);

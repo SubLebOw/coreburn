@@ -228,6 +228,13 @@ export class Player {
     } else this.dashCooldown = 0;
     this.leechBudget = Math.max(0, this.leechBudget - dt * 6); // Core Leech: at most ~6 hp per second
     this.spinCooldown = Math.max(0, this.spinCooldown - dt);
+    if (this.stats.myClock) { // MYTHIC Overclock: every 30s, 5s of no cooldowns
+      this.clockT = (this.clockT || 0) + dt;
+      if (this.clockT % 30 < 5) { this.dashCharges = this.maxCharges; this.dashCooldown = 0; this.spinCooldown = 0; if (!this.clockOn) { this.clockOn = true; this.world.effects.spawnRing(this.position, 0xffd84a, 2.6, 0.4); this.world.sfx('powerup'); } }
+      else this.clockOn = false;
+    }
+    if (this.standT > 0) this.standT -= dt; // MYTHIC Last Stand buff
+    if (this.wraths?.length) this.wrathUpdate(dt);
     this.comboGrace -= dt;
     this.attackBuffer -= dt;
     this.hurtTimer -= dt;
@@ -403,7 +410,7 @@ export class Player {
         this.velocity.copy(this.dashDir).multiplyScalar(this.char.dashSpeed);
         this.dashHits();
         if (this.stats.trail > 0) this.dropTrail();
-        if (this.stateTime >= this.char.dashTime * this.stats.dashTime) this.state = 'normal';
+        if (this.stateTime >= this.char.dashTime * this.stats.dashTime) { this.state = 'normal'; if (this.tempestFrom) this.redTempest(); }
     }
   }
 
@@ -417,11 +424,13 @@ export class Player {
     if (this.kit !== 'sarrow') this.state = 'normal';
   }
 
-  useUltimate() {
+  useUltimate(echo = false) {
+    if (echo) this.echoT = performance.now() / 1000 + 4; // MYTHIC Echo Core: the recast hits at 50%
+    else if (this.stats.myEcho) this.mJobs.push({ t: 2, run: () => { if (!this.dead && RULES.z) { this.world.effects.spawnRing(this.position, 0xffd84a, 3, 0.4); this.useUltimate(true); } } });
     this.state = 'spin';
     this.stateTime = 0;
     this.spinTick = 0;
-    this.spinCooldown = this.spinCooldownMax;
+    if (!echo) this.spinCooldown = this.spinCooldownMax;
     this.ultDone = false;
     switch (this.kit) {
       case 'zaleks':
@@ -565,6 +574,7 @@ export class Player {
     this.facing = Math.atan2(direction.x, direction.z);
     this.spendCharge();
     this.dashHitSet = new Set();
+    this.tempestFrom = (this.stats.myTempest && (this.flow || 0) >= 5) ? this.position.clone() : null; // MYTHIC Red Tempest
     this.world.effects.spawnRing(this.position, 0x3ff6e0, 1.5, 0.3);
     this.world.sfx('blink');
     if (this.stats.m?.sAfter) { // MASTERY Afterimage: explodes where you started
@@ -685,6 +695,7 @@ export class Player {
       this.world.shake(1);
     }
     const radius = c.slamRadius * s.slamRadius * (quake ? ZK.quakeRadius : 1);
+    if (quake && s.myWrath) (this.wraths ||= []).push({ pos: this.position.clone(), t: 0, r: radius, hit: new Set(), fx: 0 }); // MYTHIC Titan's Wrath
     if (!echo && s.m?.zAfter) this.mJobs.push({ t: 0.7, run: () => { if (!this.dead) this.seismicSlam(0.6); } }); // MASTERY Aftershock
     this.world.effects.spawnRing(this.position, 0xffa030, radius, 0.6);
     this.world.effects.spawnRing(this.position, 0xff5a20, radius * 0.6, 0.45);
@@ -745,6 +756,11 @@ export class Player {
       const fin = this.throwN % this.char.finisherEvery === 0;
       this.world.allies?.throwStars(this, this.position, this.facing, nd.damage, opts, s.starFan, fin);
       this.world.allies?.cloneThrow(this, t, fin); // the shadow clone copies the throw
+      if (s.myCuts && this.throwN % 10 === 0) { // MYTHIC Thousand Cuts: a fan of 8 marking stars
+        const fo = { ...opts, color: 0xffd84a };
+        for (let i = 0; i < 8; i++) { const a = this.facing + (i - 3.5) * 0.22; this.world.allies?.fireNeedle(this, this.position, new THREE.Vector3(Math.sin(a), 0, Math.cos(a)), nd.damage * 0.8, fo); }
+        this.world.effects.spawnRing(this.position, 0xffd84a, 2.6, 0.3);
+      }
       if (fin) { this.world.effects.spawnRing(this.position, 0xffd27a, 2.2, 0.25); this.world.sfx('zap'); }
       else if (this.throwN % this.char.finisherEvery === this.char.finisherEvery - 1) { // TELL: the next throw is the finisher
         this.world.effects.spawnRing(this.position, 0xffd27a, 1.1, 0.4);
@@ -1005,6 +1021,8 @@ export class Player {
     const s = this.stats;
     let dmg = base * s.dmg * this.char.dmg * zHero(this.char.id).dmg * this.damageMult;
     if (e.isBoss && s.bossDmg > 1) dmg *= s.bossDmg; // CoreBurnZ: Bossfang relic
+    if (this.standT > 0) dmg *= 1.5;                                // MYTHIC Last Stand
+    if (kind === 'spin' && this.echoT > performance.now() / 1000) dmg *= 0.5; // MYTHIC Echo Core recast
     if (kind === 'beam' && RULES.z && e.wellUntil > performance.now() / 1000) dmg *= 1 + 0.3 + (s.wellAmp || 0); // CoreBurnZ: tether +30% inside a Gravity Well
     const crit = kind !== 'trail' && Math.random() < s.crit;
     if (crit) {
@@ -1196,6 +1214,14 @@ export class Player {
     if (source) this.lastHitBy = source;
     this.world.onPlayerHurt(this);
     this.world.sfx('hurt');
+    if (this.hp <= 0 && this.stats.myStand && RULES.z) { // MYTHIC Last Stand: once per boss wave
+      const w = this.world.enemies?.wave || 0;
+      if (w % 5 === 0 && this.standWave !== w) {
+        this.standWave = w; this.hp = 1; this.standT = 5; this.invulnTimer = 0.6;
+        this.world.effects.spawnRing(this.position, 0xffd84a, 3.2, 0.5); this.world.effects.spawnSparks(this.position.clone().setY(1.2), 0xffd84a, 16, 7);
+        this.world.sfx('revive');
+      }
+    }
     if (this.hp <= 0) {
       this.killedBy = source || this.lastHitBy || null;
       this.goDown();
@@ -1214,6 +1240,42 @@ export class Player {
     this.bubble.visible = false;
     this.guard.visible = false;
     this.shieldHp = 0; this.tauntTimer = 0;
+  }
+
+  // MYTHIC Red Tempest: the Blink path erupts, bursting bleed on everything along it
+  redTempest() {
+    const a = this.tempestFrom, b = this.position.clone(), fx = this.world.effects; this.tempestFrom = null;
+    const ab = new THREE.Vector3().subVectors(b, a).setY(0), len = ab.length() || 0.01; ab.divideScalar(len);
+    for (let d = 0; d <= len; d += 1.2) fx.spawnSparks(a.clone().addScaledVector(ab, d).setY(0.6), 0xff2a4a, 4, 4);
+    this.mJobs.push({ t: 0.25, run: () => {
+      for (let d = 0; d <= len; d += 2) fx.spawnRing(a.clone().addScaledVector(ab, d), 0xff3a5a, 1.6, 0.3);
+      for (const e of this.world.enemies.list) {
+        if (!e.canBeHit) continue;
+        const ap = new THREE.Vector3().subVectors(e.position, a).setY(0), t = Math.max(0, Math.min(len, ap.dot(ab)));
+        if (ap.addScaledVector(ab, -t).length() > 1.6 + e.radius) continue;
+        this.strike(e, this.char.dashDmg * this.stats.dashDmg * 0.6, 0, 0, false, 'trail');
+        this.world.allies?.addBleed(this, e, 3); this.world.allies?.burstBleed(this, e);
+      }
+      this.world.sfx('hit');
+    } });
+  }
+  // MYTHIC Titan's Wrath: a shockwave ring expanding for 3s, hitting each enemy once as it passes
+  wrathUpdate(dt) {
+    const c = this.char, s = this.stats;
+    for (let i = this.wraths.length - 1; i >= 0; i--) {
+      const w = this.wraths[i]; w.t += dt; w.fx -= dt;
+      if (w.t >= 3) { this.wraths.splice(i, 1); continue; }
+      const r = w.r * (1 + w.t * 0.9);
+      if (w.fx <= 0) { w.fx = 0.18; this.world.effects.spawnRing(w.pos, 0xff4a1a, r, 0.22); }
+      for (const e of this.world.enemies.list) {
+        if (!e.canBeHit || w.hit.has(e)) continue;
+        const dx = e.position.x - w.pos.x, dz = e.position.z - w.pos.z, d = Math.hypot(dx, dz) || 1;
+        if (d > r + e.radius || d < r - 1.6) continue;
+        w.hit.add(e);
+        this.strike(e, c.slamDmg * s.spinDmg * s.slamDmg * 0.8, dx / d * c.slamKnock, dz / d * c.slamKnock, true, 'spin');
+        this.stun(e, c.slamStun);
+      }
+    }
   }
 
   heal(amount) { this.hp = Math.min(this.maxHp, this.hp + amount); }

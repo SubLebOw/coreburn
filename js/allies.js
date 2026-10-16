@@ -266,6 +266,11 @@ export class Allies {
       if (m.chain) { if (m.life <= 0.0001 || m.life < 0.02) { m.life = 0.001; const c = m.chain; m.chain = 0; this.boomMine(m, c); } continue; }
       if (m.life <= 0 || !m.owner || m.owner.dead) { m.life = 0; m.mesh.visible = false; continue; }
       if (m.arm > 0) continue;
+      if (m.owner.stats.myField) { // MYTHIC Living Minefield: drift toward the nearest enemy
+        let best = null, bd = 12;
+        for (const e of this.world.enemies.list) { if (!e.canBeHit) continue; const d = Math.hypot(e.position.x - m.mesh.position.x, e.position.z - m.mesh.position.z); if (d < bd) { bd = d; best = e; } }
+        if (best && bd > 0.3) { const k = Math.min(bd, 3.2 * dt) / bd; m.mesh.position.x += (best.position.x - m.mesh.position.x) * k; m.mesh.position.z += (best.position.z - m.mesh.position.z) * k; }
+      }
       for (const e of this.world.enemies.list) if (e.canBeHit && Math.hypot(e.position.x - m.mesh.position.x, e.position.z - m.mesh.position.z) < 0.7 + e.radius) { this.boomMine(m); break; }
     }
   }
@@ -296,6 +301,13 @@ export class Allies {
       w.life -= dt;
       if (w.life <= 0 || !w.owner || w.owner.dead) { this.endWell(w); continue; }
       w.ring.rotation.z += dt * 4; w.obj.children[0].rotation.y += dt * 6;
+      if (w.owner.stats.myCollapse && (w.zap = (w.zap ?? 0.2) - dt) <= 0) { // MYTHIC Event Collapse: the black hole fires chain lightning
+        w.zap = 0.45; w.obj.children[0].rotation.y += 1;
+        const o = w.owner, near = this.world.enemies.list.filter((e) => e.canBeHit && e.position.distanceTo(w.pos) < w.radius * 1.8).sort((a, b) => a.position.distanceTo(w.pos) - b.position.distanceTo(w.pos)).slice(0, 4);
+        let from = w.pos.clone().setY(1);
+        for (const e of near) { const to = e.position.clone().setY(1); this.world.effects.spawnZap(from, to, 0xb08aff); o.strike(e, o.char.beam.damage * 1.2, 0, 0, false, 'drone'); from = to; }
+        if (near.length) this.world.sfx('zap');
+      }
       for (const e of this.world.enemies.list) {
         if (!e.canBeHit) continue;
         const dx = w.pos.x - e.position.x, dz = w.pos.z - e.position.z, d = Math.hypot(dx, dz);

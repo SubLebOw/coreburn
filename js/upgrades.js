@@ -145,7 +145,22 @@ export const EVOLUTIONS = {
   eSingular:EV({ name: 'Singularity', icon: '◎', heroes: O, needs: ['oGrapple', 'oVortex'], text: 'Gravity Well +40% bigger, +1.5s, and detonates when it ends' }),
   eLegion: EV({ name: 'Shadow Legion', icon: '⧉', heroes: N, needs: ['nShade', 'nMirror'], text: 'Shadow Clone +15% of your damage and lasts 2s longer' }),
 };
-export const GROUP_LABELS = { evolved: 'EVOLVED', attack: 'ATTACK', mobility: 'MOBILITY', ultimate: 'ULTIMATE', core: 'CORE', cursed: 'CURSED', boss: 'BOSS RELIC' };
+// COREBURNZ MYTHIC CARDS (v1.27): from wave 75, about one offer per 5 waves takes a slot in a normal pick.
+// Hold at most 3. They change how a hero plays (effects live in player.js / allies.js, read from stats.my*).
+const MY = (o) => ({ group: 'mythic', color: 0xffd84a, max: 1, ...o, desc: () => o.text });
+export const MYTHICS = {
+  myCuts:    MY({ name: 'Thousand Cuts', icon: '✷', heroes: N, text: 'Every 10th shuriken splits into a fan of 8 that all apply marks' }),
+  myTempest: MY({ name: 'Red Tempest', icon: '♆', heroes: S, text: 'At full Flow, Blink leaves a blade trail that bursts bleed along its path' }),
+  myWrath:   MY({ name: "Titan's Wrath", icon: '◉', heroes: Z, text: 'A full-Rage slam leaves a shockwave ring that keeps expanding for 3s' }),
+  myField:   MY({ name: 'Living Minefield', icon: '❈', heroes: I, text: 'Armed mines drift toward the nearest enemy before detonating' }),
+  myCollapse:MY({ name: 'Event Collapse', icon: '●', heroes: O, text: 'Gravity Well becomes a mini black hole that fires chain lightning while it lasts' }),
+  myEcho:    MY({ name: 'Echo Core', icon: '⟲', text: 'Your ultimate recasts itself 2s later at 50% power' }),
+  myGlass:   MY({ name: 'Glass Cannon', icon: '◈', text: 'x2 damage, but health orbs no longer heal you' }),
+  myClock:   MY({ name: 'Overclock', icon: '⧗', text: 'Every 30s: 5s with no Blink or ultimate cooldowns' }),
+  myStand:   MY({ name: 'Last Stand', icon: '♛', text: 'Once per boss wave, lethal damage leaves you at 1 HP with +50% damage for 5s' }),
+};
+export const MYTHIC_FROM_WAVE = 75, MYTHIC_EVERY = 5, MYTHIC_MAX = 3;
+export const GROUP_LABELS = { mythic: 'MYTHIC', evolved: 'EVOLVED', attack: 'ATTACK', mobility: 'MOBILITY', ultimate: 'ULTIMATE', core: 'CORE', cursed: 'CURSED', boss: 'BOSS RELIC' };
 export const cardForHero = (id, hero) => { const u = UPGRADES[id]; return !!u && (!u.heroes || !hero || u.heroes.includes(hero)); };
 // The card's group label, using the hero's own ability names (e.g. "PHASE HOP" for Iskra)
 export function groupLabel(group, kit) {
@@ -174,12 +189,13 @@ export class Loadout {
     this.levels = {};
     this.rerolls = RULES.z ? 2 : 0; // CoreBurnZ: 2 rerolls per run on the pick screen
     this.patches = 0;
+    this.mythicAt = -99; this.forceMythic = false;
     this.version = 0; // bumps on every change (the HUD redraws when it changes)
     this.recompute();
   }
 
   level(id) { return id === 'patch' ? this.patches : (this.levels[id] || 0); }
-  def(id) { return id === 'patch' ? FALLBACK : (UPGRADES[id] || CURSES[id] || BOSS_CARDS[id] || EVOLUTIONS[id]); }
+  def(id) { return id === 'patch' ? FALLBACK : (UPGRADES[id] || CURSES[id] || BOSS_CARDS[id] || EVOLUTIONS[id] || MYTHICS[id]); }
   static isCurse(id) { return !!CURSES[id]; }
 
   // 3 different random cards that aren't maxed yet (Reactor Patch fills any gaps)
@@ -216,6 +232,19 @@ export class Loadout {
     const hand = [];
     while (hand.length < count && open.length) hand.push(open.splice(Math.floor(rng() * open.length), 1)[0]);
     if (!hand.length) hand.push('patch');
+    return hand;
+  }
+
+  // CoreBurnZ MYTHIC: wave 75+, max 3 held, roughly one offer per 5 waves (the middle card). forceMythic = dev test.
+  maybeMythic(hand, wave, rng = Math.random) {
+    if (!RULES.z) return hand;
+    const held = Object.keys(MYTHICS).filter((id) => this.level(id)).length;
+    const due = this.forceMythic || (wave >= MYTHIC_FROM_WAVE && wave - (this.mythicAt ?? -99) >= MYTHIC_EVERY);
+    if (!due || held >= MYTHIC_MAX) return hand;
+    const open = Object.keys(MYTHICS).filter((id) => !this.level(id) && (!MYTHICS[id].heroes || !this.hero || MYTHICS[id].heroes.includes(this.hero)) && !hand.includes(id));
+    if (!open.length) return hand;
+    this.forceMythic = false; this.mythicAt = wave;
+    hand[Math.min(1, hand.length - 1)] = open[Math.floor(rng() * open.length)];
     return hand;
   }
 
@@ -306,6 +335,10 @@ export class Loadout {
     if (L('eTempest')) { s.stormCount += 3; s.stormTime += 2; }
     if (L('eHive')) { s.drones += 1; s.droneDmg *= 1.4; }
     s.halo = L('eHalo') ? 3 : 0;
+    // CoreBurnZ MYTHICS
+    s.myCuts = L('myCuts'); s.myTempest = L('myTempest'); s.myWrath = L('myWrath'); s.myField = L('myField'); s.myCollapse = L('myCollapse');
+    s.myEcho = L('myEcho'); s.myClock = L('myClock'); s.myStand = L('myStand'); s.noOrbHeal = L('myGlass');
+    if (L('myGlass')) s.dmg *= 2;
     // CoreBurnZ v1.26 kits
     s.bleedDmg = 1 + 0.25 * L('sDeep'); s.bleedCap = L('sDeep'); s.hemo = L('sHemo'); s.burstDmg = 1 + 0.3 * L('sRip'); s.unbroken = L('sUnbroken'); s.crimson = L('eCrimson');
     s.mines = L('iMineN'); s.mineDmg = 1 + 0.2 * L('iBlast'); s.mineR = 1 + 0.1 * L('iBlast'); s.mineSlow = L('iTar'); s.mineChain = L('iChain');

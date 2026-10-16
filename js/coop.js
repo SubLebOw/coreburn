@@ -277,7 +277,7 @@ export class Coop {
         if (!RULES.z || !h || !h.pendingPick || !(h.loadout.rerolls > 0)) break;
         h.loadout.rerolls--;
         const boss = h.loadout.def(h.pendingPick[0])?.group === 'boss';
-        h.pendingPick = boss ? h.loadout.rollBoss(3) : h.loadout.roll(3);
+        h.pendingPick = boss ? h.loadout.rollBoss(3) : h.loadout.maybeMythic(h.loadout.roll(3), this.ctx.enemies?.wave || 0);
         this.net.send(conn, { t: 'pick', cards: h.pendingPick, boss });
         break;
       }
@@ -511,7 +511,7 @@ export class Coop {
     this.pickTimer = 0;
     for (const h of this.heroes) {
       if (h === this.ctx.player) continue;
-      h.pendingPick = boss ? h.loadout.rollBoss(3) : h.loadout.roll(3); // CoreBurnZ boss relic pick
+      h.pendingPick = boss ? h.loadout.rollBoss(3) : h.loadout.maybeMythic(h.loadout.roll(3), this.ctx.enemies?.wave || 0); // CoreBurnZ boss relic pick
       this.net.send(this.connOf(h), { t: 'pick', cards: h.pendingPick, boss });
     }
   }

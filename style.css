@@ -764,3 +764,13 @@ body.shrine-curse #hud::after { content: ''; position: fixed; inset: 0; pointer-
 .rage.flow i { background: linear-gradient(90deg, #3ff6e0, #9ffff5); }
 .rage.flow.full i { background: #9ffff5; box-shadow: 0 0 8px #3ff6e0; }
 .rage.flow b { font-size: 6px; letter-spacing: 0; }
+
+/* CoreBurnZ MYTHIC cards: bright gold, shimmering border */
+.ucard.mythic { --c: #ffe066; border: 2px solid #ffd84a !important; background: linear-gradient(160deg, #4a3606f0, #20160480 55%, #3a2a06f0) !important; box-shadow: 0 0 30px #ffd84a99, inset 0 0 26px #ffd84a33 !important; animation: mythGlow 1.2s ease-in-out infinite; position: relative; overflow: hidden; }
+.ucard.mythic::after { content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 35%, #fff6c055 50%, transparent 65%); background-size: 250% 100%; animation: mythShine 2.2s linear infinite; pointer-events: none; }
+.ucard.mythic .group { color: #ffe066 !important; letter-spacing: 5px; font-weight: 900; text-shadow: 0 0 10px #ffc23a; }
+.ucard.mythic .uname { color: #fff1b0 !important; }
+.ucard.mythic .icon { color: #ffe066 !important; text-shadow: 0 0 16px #ffd84a; }
+.ucard.mythic .lvl b { color: #ffe066; }
+@keyframes mythGlow { 50% { box-shadow: 0 0 46px #ffd84acc, inset 0 0 30px #ffd84a44; } }
+@keyframes mythShine { from { background-position: 150% 0; } to { background-position: -100% 0; } }

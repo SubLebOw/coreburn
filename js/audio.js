@@ -272,6 +272,11 @@ const SFX = {
   },
   // ---- power-ups ----
   // grabbing a power-up: sparkly rising arpeggio
+  // MYTHIC card offered: a shimmering bell chord
+  mythic(a, t) {
+    [392, 587.3, 784, 1174.7, 1568].forEach((f, i) => a.tone(t + i * 0.07, { type: 'sine', f0: f, f1: f * 1.004, dur: 0.9 - i * 0.1, vol: 0.12 }));
+    a.noise(t, { dur: 0.6, vol: 0.05, filter: 'highpass', f0: 6000, f1: 9000 });
+  },
   powerup(a, t) {
     [523.3, 659.3, 784, 1046.5].forEach((f, i) => a.tone(t + i * 0.05, { type: 'triangle', f0: f, dur: 0.18, vol: 0.14 }));
   },

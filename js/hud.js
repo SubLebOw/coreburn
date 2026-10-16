@@ -6,6 +6,7 @@
 import { MASTERIES, masteryPoints, spentOn, getMastery, openMasteryPanel } from './mastery.js';
 import { UPGRADES, FALLBACK, GROUP_LABELS, groupLabel, weaponMult, tierColor } from './upgrades.js';
 import { HERO_STATS } from './hero-stats.js';
+import { sound } from './audio.js';
 import { RULES, Z_TUNING } from './rules.js';
 const zab = (x) => (RULES.z && x.z ? { ...x, ...x.z } : x); // CoreBurnZ ability overrides (Orin's Gravity Well)
 import { xpNeeded, heroReward } from './progress.js';
@@ -125,10 +126,10 @@ export class Hud {
       const cursed = def.group === 'cursed';
       const lv = loadout.level(id);
       const b = document.createElement('button');
-      b.className = 'ucard' + (cursed ? ' cursed' : '') + (def.group === 'boss' ? ' relic' : '') + (def.group === 'evolved' ? ' evolved' : '');
+      b.className = 'ucard' + (cursed ? ' cursed' : '') + (def.group === 'boss' ? ' relic' : '') + (def.group === 'evolved' ? ' evolved' : '') + (def.group === 'mythic' ? ' mythic' : '');
       b.style.setProperty('--c', hex(def.color));
-      const lvl = def.group === 'evolved' ? `<b>EVOLUTION</b> · ${def.needs.map((n) => loadout.def(n).name).join(' + ')}` : def.group === 'boss' ? (lv ? `Relic ${lv} → <b>${lv + 1}</b>/${def.max}` : '<b>RARE</b> · boss relic') : cursed ? `<b>CURSED</b> · ${def.bane}` : id === 'patch' ? `Taken ${lv}x` : (lv === 0 ? `<b>NEW</b> · Lv 1/${def.max}` : `Lv ${lv} → <b>${lv + 1}</b>/${def.max}`);
-      b.innerHTML = `<span class="key">${i + 1}</span><div class="icon"></div><div class="ubody"><div class="group">${def.group === 'cursed' || def.group === 'boss' || def.group === 'evolved' ? GROUP_LABELS[def.group] : groupLabel(def.group, HERO_STATS[loadout.hero]?.abilities)}</div><div class="uname"></div><div class="effect"></div><div class="lvl">${lvl}</div></div>`;
+      const lvl = def.group === 'mythic' ? `<b>MYTHIC</b> · ${Object.keys(loadout.levels).filter((k) => loadout.def(k)?.group === 'mythic').length}/3 held` : def.group === 'evolved' ? `<b>EVOLUTION</b> · ${def.needs.map((n) => loadout.def(n).name).join(' + ')}` : def.group === 'boss' ? (lv ? `Relic ${lv} → <b>${lv + 1}</b>/${def.max}` : '<b>RARE</b> · boss relic') : cursed ? `<b>CURSED</b> · ${def.bane}` : id === 'patch' ? `Taken ${lv}x` : (lv === 0 ? `<b>NEW</b> · Lv 1/${def.max}` : `Lv ${lv} → <b>${lv + 1}</b>/${def.max}`);
+      b.innerHTML = `<span class="key">${i + 1}</span><div class="icon"></div><div class="ubody"><div class="group">${def.group === 'cursed' || def.group === 'boss' || def.group === 'evolved' || def.group === 'mythic' ? GROUP_LABELS[def.group] : groupLabel(def.group, HERO_STATS[loadout.hero]?.abilities)}</div><div class="uname"></div><div class="effect"></div><div class="lvl">${lvl}</div></div>`;
       b.querySelector('.icon').textContent = def.icon;
       b.querySelector('.uname').textContent = def.name;
       b.querySelector('.effect').textContent = def.desc(lv);
@@ -136,6 +137,7 @@ export class Hud {
       b.addEventListener('click', (e) => { e.stopPropagation(); pick(id); });
       box.appendChild(b);
     });
+    if (cards.some((id) => loadout.def(id)?.group === 'mythic')) sound.play('mythic'); // distinct Mythic chime
     // COREBURNZ REROLL: swap all 3 cards (2 per run, each player their own)
     const rr = this.rerollHook;
     document.querySelectorAll('.reroll-btn').forEach((x) => x.remove());

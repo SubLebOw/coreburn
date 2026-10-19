@@ -750,6 +750,7 @@ export class Player {
     if (this.fireCd > 0) return;
     const nd = this.char.needle, s = this.stats;
     this.fireCd = nd.rate / this.char.atkSpeed;
+    if (this.kit === 'axiom') this.axAtkT = this.fireCd + 0.15; // drones fire with him (v1.28.1)
     const t = this.aimTarget(dir, moving, nd.aimRange);
     let aim;
     if (t) aim = new THREE.Vector3(t.position.x - this.position.x, 0, t.position.z - this.position.z).normalize();
@@ -1124,7 +1125,8 @@ export class Player {
   axiomOnStrike(e, kind, killed) {
     if (!killed) return;
     const c = this.char, s = this.stats, ax = this.swarm;
-    if (this.dashCharges < this.maxCharges && this.axRefund < c.refundCap) { const r = Math.min(c.killRefund, c.refundCap - this.axRefund); this.axRefund += r; this.dashCooldown = Math.max(0, this.dashCooldown - r); }
+    const cap = (this.world.enemies?.wave || 0) < 30 ? c.refundEarly : c.refundCap; // v1.28.1: 1s per Reforge before wave 30
+    if (this.dashCharges < this.maxCharges && this.axRefund < cap) { const r = Math.min(c.killRefund, cap - this.axRefund); this.axRefund += r; this.dashCooldown = Math.max(0, this.dashCooldown - r); }
     if (kind !== 'adrone' && kind !== 'adroneH') return;
     if (s.axFeedback && Math.random() < 0.1 * s.axFeedback) { const t = ax?.nearest(e.position, 8); if (t) this.world.allies.fireNeedle(this, e.position, new THREE.Vector3(t.position.x - e.position.x, 0, t.position.z - e.position.z), c.needle.damage * c.droneDmg, { color: 0xff3a4a, kind: 'adrone' }); }
     if (s.axEvo && ax && ++this.axKills % 5 === 0 && ax.mine(this, 'evo').length < 4) { const d = ax.add(this, 'evo', 12); }
@@ -1258,11 +1260,11 @@ export class Player {
     if (this.state === 'dash' && (this.kit === 'sarrow' || this.kit === 'orin')) return false; // blinking / grappling = untouchable
     if (this.phaseTimer > 0) return false;               // ISKRA: just phased
     if (this.invulnTimer > 0) return false;              // just revived
-    if (this.kit === 'axiom' && this.world.allies?.axiom.shielded(this)) { this.world.effects.spawnSparks(this.position.clone().setY(1.2), 0xff5a5a, 4); return false; } // REFORGE barrier
     if (this.world.powerups && this.world.powerups.absorb(opts, this)) return false; // SHIELD
     const c = this.char;
     if (this.state === 'spin' && c.spinGuard) amount *= 1 - c.spinGuard; // overdrive = tougher
     amount *= 1 - (c.armor || 0);                         // ZALEKS' plating
+    if (this.kit === 'axiom' && this.world.allies?.axiom.shielded(this)) { amount *= 1 - c.barrierCut; this.world.effects.spawnSparks(this.position.clone().setY(1.2), 0xff5a5a, 4); } // REFORGE barrier: -60% damage (v1.28.1, was immunity)
     if (this.kit === 'zaleks') {
       if (this.state === 'dash') amount *= 1 - c.chargeGuard;
       // frontal block while swinging

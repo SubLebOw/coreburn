@@ -1,11 +1,11 @@
 // axiom.js: AXIOM's drone army (CoreBurnZ v1.28). Pooled meshes, cheap distance checks.
 // Solo / co-op host simulate and fire; friends just draw the host's snapshot ('x' entries).
 // Drones: permanent (count against capacity), 'asc' (Ascension extras, explode at the end) or
-// 'evo' (Extinction Protocol, 12s). Elites and bosses that touch a drone wear it down; normal enemies can't.
+// 'evo' (Extinction Protocol, 12s). Elites and bosses that touch a drone wear it down fast; normal enemies chip them slowly (v1.28.1).
 import * as THREE from 'three';
 
 const POOL = 48;
-export const AX = { hp: 2.5, eliteTouch: 1, bossTouch: 2.2, ringR: 1.6, wingR: 2.6, ascBoom: 2.5, evoLife: 12, evoMax: 4, eliteEvery: 20, eliteMax: 3 };
+export const AX = { hp: 2.5, eliteTouch: 1, bossTouch: 2.2, normTouch: 0.15, ringR: 1.6, wingR: 2.6, ascBoom: 2.5, evoLife: 12, evoMax: 4, eliteEvery: 20, eliteMax: 3 };
 
 export class AxiomSwarm {
   constructor(scene, world, allies) {
@@ -78,12 +78,14 @@ export class AxiomSwarm {
       const o = d.owner;
       if (!o || o.dead && !o.uploading || o.kit !== 'axiom') { this.kill(d, false); continue; }
       if (d.temp === 'evo' && (d.life -= dt) <= 0) { this.kill(d); continue; }
-      // elites / bosses wear drones down on contact
+      // v1.28.1: normal enemies chip drones slowly on contact; elites / bosses wear them down fast
+      let chip = false; // normal enemies: one chip rate per drone, however many are touching it
       for (const e of enemies) {
-        if (!e.canBeHit || !(e.elite || e.isBoss)) continue;
+        if (!e.canBeHit) continue;
         if (Math.abs(e.position.x - d.obj.position.x) > 3 || Math.abs(e.position.z - d.obj.position.z) > 3) continue;
-        if (Math.hypot(e.position.x - d.obj.position.x, e.position.z - d.obj.position.z) < (e.radius || 0.6) + 0.5) d.hp -= dt * (e.isBoss ? AX.bossTouch : AX.eliteTouch);
+        if (Math.hypot(e.position.x - d.obj.position.x, e.position.z - d.obj.position.z) < (e.radius || 0.6) + 0.5) { if (e.isBoss || e.elite) d.hp -= dt * (e.isBoss ? AX.bossTouch : AX.eliteTouch); else chip = true; }
       }
+      if (chip) d.hp -= dt * AX.normTouch;
       if (d.hp <= 0) { this.kill(d); this.world.sfx('hit'); continue; }
       (byOwner.get(o) || byOwner.set(o, []).get(o)).push(d);
     }
@@ -110,7 +112,10 @@ export class AxiomSwarm {
       o.axEliteT = (o.axEliteT || 0) + dt;
       if (o.axEliteT >= AX.eliteEvery) { o.axEliteT = 0; const d = ds.find((x) => !x.temp && !x.elite); if (d && ds.filter((x) => x.elite).length < AX.eliteMax) { d.elite = true; this.world.effects.spawnRing(d.obj.position.clone().setY(0.1), 0xffd84a, 1.6, 0.4); } }
     }
-    // synchronised volleys on their own timer (they fight even while he moves)
+    // v1.28.1: volleys are linked to his attack. Drones only fire while he's firing Pulse Command
+    // (the window covers one bolt interval); Overclock / Ascension / Servos still speed them up.
+    o.axAtkT = (o.axAtkT || 0) - dt;
+    if (o.axAtkT <= 0) { o.axCd = Math.max(0, (o.axCd ?? 0) - dt); return; }
     const rate = (1 + s.axServo + (o.axClockT > 0 ? c.overclockRate : 0) + (asc ? c.ascendRate : 0)) * c.atkSpeed;
     o.axCd = (o.axCd ?? 0.2) - dt;
     if (o.axCd > 0) return;

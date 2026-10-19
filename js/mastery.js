@@ -40,7 +40,7 @@ export const MASTERIES = {
     { id: 'oShell', row: 2, name: 'Magnet Shell', desc: 'Take 10% less damage while drones fly' },
   ],
   axiom: [
-    { id: 'aNet', row: 0, name: 'Network Efficiency', desc: 'Start each run with 3 drones instead of 2' },
+    { id: 'aNet', row: 0, name: 'Network Efficiency', desc: 'Start each run with 2 drones instead of 1' },
     { id: 'aBolt', row: 0, name: 'Focused Pulse', desc: '+6% damage' },
     { id: 'aRep', row: 1, name: 'Perfect Replication', desc: 'Reforge has a 20% chance to build an extra drone' },
     { id: 'aRange', row: 1, name: 'Long Optics', desc: 'Drones reach 20% further' },

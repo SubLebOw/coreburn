@@ -96,12 +96,12 @@ export const HERO_STATS = {
     hp: 140, speed: 6.9, dmg: 1, atkSpeed: 1, armor: 0,
     abilities: {
       attack: { name: 'Pulse Command', short: 'PULSE', icon: '◉', desc: 'A red bolt every 0.55s, and every drone fires a 25% bolt with it' },
-      mobility: { name: 'Reforge', short: 'REFORGE', icon: '⚙', desc: 'Drones shield you for 0.75s while you build a drone (or overclock them +35% for 5s at max). Kills cut the cooldown' },
+      mobility: { name: 'Reforge', short: 'REFORGE', icon: '⚙', desc: 'Drones shield you (-60% damage) for 0.75s while you build a drone (or overclock them +35% for 5s at max). Kills cut the cooldown' },
       ultimate: { name: 'Ascension Protocol', short: 'ASCEND', icon: '⟁', desc: '10s: levitate, drones spread into wings, +75% drone fire rate, +1 pierce, up to 2 extra drones that explode at the end' },
     },
     needle: { damage: 16, rate: 0.55, speed: 30, range: 14, pierce: 0, aimRange: 13, moveWhileFiring: 0.85 },
-    droneDmg: 0.25, droneRate: 0.55, droneRange: 11, startDrones: 2, droneCap: 6,
-    dashCd: 12, dashCharges: 1, barrier: 0.75, overclock: 5, overclockRate: 0.35, killRefund: 0.3, refundCap: 3,
+    droneDmg: 0.25, droneRate: 0.55, droneRange: 11, startDrones: 1, droneCap: 6, // v1.28.1: 1 drone to start (2 with Network Efficiency)
+    dashCd: 12, dashCharges: 1, barrier: 0.75, barrierCut: 0.6, overclock: 5, overclockRate: 0.35, killRefund: 0.3, refundCap: 3, refundEarly: 1,
     ultCd: 22, ascendTime: 10, ascendRate: 0.75, ascendTemp: 2,
   },
 };

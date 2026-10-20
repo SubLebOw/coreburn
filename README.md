@@ -232,8 +232,8 @@ js/touch.js        Phone controls: floating virtual joystick and on-screen butto
 js/effects.js      Sparks, rings and red attack warnings (pooled so it stays fast on phones)
 js/hud.js          Updates the health bar, score, cooldowns, boss bar and banners
 js/audio.js        All sound: procedural sound effects + looping music (Web Audio, no sound files)
-js/ads-config.js   THE ONE PLACE for AdMob IDs and ad frequency settings
-js/ads.js          Interstitial + rewarded revive + consent (UMP). Does nothing on the website
+js/monetize-config.js   THE ONE PLACE for AdMob IDs and ad frequency settings
+js/monetize.js     Interstitial + rewarded revive + consent (UMP). Does nothing on the website
 js/updater.js      Android app: downloads new game versions from GitHub Pages (see below)
 js/native.js       Tiny helper: "are we inside the Android app?"
 js/share.js        Share-my-score (phone share sheet / post on X) and Copy on the game over screen
@@ -305,7 +305,7 @@ The game over screen has **SHARE SCORE** and **COPY** buttons. The text names wh
 
 ### Ads (currently Google TEST ads)
 
-All IDs live in `js/ads-config.js`. Right now they're Google's official test IDs, which is safe to click.
+All IDs live in `js/monetize-config.js`. Right now they're Google's official test IDs, which is safe to click.
 - **Interstitial:** only on the game over screen, when you choose to restart, at most every 3rd death and
   at least 2 minutes apart. Never during a fight.
 - **Rewarded revive:** on the game over screen, "REVIVE (watch an ad)" brings you back with half health,
@@ -314,7 +314,7 @@ All IDs live in `js/ads-config.js`. Right now they're Google's official test IDs
   in AdMob; an "Ad privacy choices" link appears on the title screen when needed.
 - On the website, ads do nothing and the revive button never shows.
 
-To go live: create your AdMob app, put your real App ID + ad unit IDs in `js/ads-config.js`, set
+To go live: create your AdMob app, put your real App ID + ad unit IDs in `js/monetize-config.js`, set
 `testMode: false`, rebuild with `npm run android:build`, and upload the new `.aab`.
 **Never click your own real ads.** Add your phone to `testDeviceIds` instead.
 

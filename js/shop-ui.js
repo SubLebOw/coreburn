@@ -3,7 +3,7 @@
 // (if you have the scrap) or to equip / unequip it. Rare items can't be bought: golden bosses drop them.
 const $ = (id) => document.getElementById(id);
 const hex = (c) => '#' + c.toString(16).padStart(6, '0');
-import { ACHIEVEMENTS, rewardText } from './achievements.js';
+import { ACHIEVEMENTS, rewardText } from './achievements.js?v=1.30.1';
 const TABS = [['skin', 'SKINS'], ['talon', 'TALONS'], ['perk', 'PERKS'], ['ach', 'MILESTONES']];
 const NOTES = {
   skin: 'Skins recolour whichever hero you pick. Solo runs only (co-op keeps everyone easy to tell apart).',

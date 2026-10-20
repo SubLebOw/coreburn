@@ -17,6 +17,7 @@ const MIN_NATIVE_BUILD = 1; // android versionCode required for this update
 const SITE = 'https://sublebow.github.io/coreburn';
 
 const version = readFileSync('js/version.js', 'utf8').match(/GAME_VERSION\s*=\s*'([^']+)'/)[1];
+execSync('node scripts/bust.mjs', { stdio: 'inherit' });
 execSync('node scripts/build-web.mjs', { stdio: 'inherit' });
 
 mkdirSync('updates', { recursive: true });

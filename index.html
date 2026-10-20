@@ -10,12 +10,19 @@
   <meta name="description" content="COREBURN - an endless arena brawler. Play as Sarrow, a scavenger with a burning energy core, and carve through the machine cult called the Grindchoir.">
   <title>COREBURN - Endless Arena Brawler</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cpolygon points=%2250,4 90,27 90,73 50,96 10,73 10,27%22 fill=%22%231d2024%22 stroke=%22%23e0702a%22 stroke-width=%226%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2218%22 fill=%22%233ff6e0%22/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=1.30.1">
 
   <!-- The "import map" tells the browser where to find Three.js (a copy lives in vendor/
        so the game also works offline inside the Android app).
        That lets our JS files simply write: import * as THREE from 'three';
        No install or build step needed. -->
+  <script>
+  // Boot failsafe: if the game modules fail to start, show a reload banner. Never touches storage.
+  (function(){var shown=false;function show(msg){if(shown||window.__cbReady)return;shown=true;var b=document.createElement('div');b.style.cssText='position:fixed;left:0;right:0;top:0;z-index:2147483647;background:#b3261e;color:#fff;font:600 16px sans-serif;padding:12px;text-align:center;cursor:pointer';b.innerHTML='Game failed to load \u2014 tap to reload<div style="font:400 11px monospace;opacity:.85;margin-top:4px;word-break:break-all"></div>';b.lastChild.textContent=msg||'';b.onclick=function(){var u=location.pathname+'?r='+Date.now()+location.hash;location.replace(u);};(document.body||document.documentElement).appendChild(b);}
+  window.addEventListener('error',function(e){var t=e.target;if(t&&t.tagName==='SCRIPT'){show('Script failed: '+(t.src||''));}else if(!window.__cbReady){show((e.message||'error')+' @ '+(e.filename||'')+':'+(e.lineno||''));}},true);
+  window.addEventListener('unhandledrejection',function(e){if(!window.__cbReady)show('Rejection: '+(e.reason&&(e.reason.stack||e.reason.message)||e.reason));});
+  setTimeout(function(){show('Timed out waiting for game start (6s)');},6000);})();
+  </script>
   <script type="importmap">
     {
       "imports": {
@@ -291,6 +298,6 @@
   </div>
 
   <!-- Our game code. type="module" lets files import each other. -->
-  <script type="module" src="js/main.js"></script>
+  <script type="module" src="js/main.js?v=1.30.1"></script>
 </body>
 </html>

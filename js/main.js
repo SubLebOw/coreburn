@@ -4,6 +4,7 @@
 //   2. creates the arena, Sarrow, the waves, power-ups, the HUD and the controls
 //   3. runs the game loop ~60 times a second: update everything, then draw
 //   4. handles SLOW-MO (everything but Sarrow runs slower) and the fade between arenas
+import './fullscreen.js';
 import { Allies } from './allies.js';
 import * as THREE from 'three';
 import { Input } from './input.js';

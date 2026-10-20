@@ -295,7 +295,10 @@ body.slowmo #slowmo-tint { opacity: 1; }
 .ucard:nth-child(2) { animation-delay: .07s; } .ucard:nth-child(3) { animation-delay: .14s; }
 .ucard:hover, .ucard:focus-visible { transform: translateY(-4px) scale(1.03); outline: none; }
 .ucard:active { transform: scale(.97); }
-@keyframes cardin { from { opacity: 0; transform: translateY(24px) scale(.9); } }
+/* v1.29.1: entrance animates transform only (never opacity) and is dropped once finished,
+   so a card can't get stuck invisible at its first keyframe when the compositor skips a frame. */
+@keyframes cardin { from { transform: translateY(24px) scale(.9); } }
+.ucard.in:not(.mythic):not(.nope) { animation: none; }
 .ucard .key { align-self: flex-start; font-size: 11px; font-weight: 900; color: #000; background: var(--c); border-radius: 4px; padding: 0 6px; }
 body.touch .ucard .key { display: none; }
 .ucard .icon { width: 58px; height: 58px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; color: var(--c); background: #0008; border: 2px solid var(--c); box-shadow: 0 0 16px var(--c); }
@@ -774,3 +777,13 @@ body.shrine-curse #hud::after { content: ''; position: fixed; inset: 0; pointer-
 .ucard.mythic .lvl b { color: #ffe066; }
 @keyframes mythGlow { 50% { box-shadow: 0 0 46px #ffd84acc, inset 0 0 30px #ffd84a44; } }
 @keyframes mythShine { from { background-position: 150% 0; } to { background-position: -100% 0; } }
+
+/* ---------- Fullscreen toggle (v1.29.1) ---------- */
+.fs-btn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 11px; font-weight: 800; letter-spacing: 1px; color: #dfe; cursor: pointer;
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); border-radius: 8px; padding: 5px 10px; touch-action: manipulation; }
+.fs-btn:hover { background: rgba(255,255,255,.12); }
+.fs-btn .fs-ico { width: 14px; height: 14px; display: inline-block; }
+.fs-btn .fs-ico svg { width: 100%; height: 100%; display: block; }
+.fs-btn.hidden { display: none !important; }
+.fs-menu { margin: 8px auto 0; }
+.pause-panel .fs-pause { margin: 10px auto 0; }

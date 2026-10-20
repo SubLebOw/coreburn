@@ -135,8 +135,11 @@ export class Hud {
       b.querySelector('.effect').textContent = def.desc(lv);
       b.addEventListener('pointerdown', (e) => e.stopPropagation());
       b.addEventListener('click', (e) => { e.stopPropagation(); pick(id); });
+      b.addEventListener('animationend', (e) => { if (e.target === b && e.animationName === 'cardin') b.classList.add('in'); });
+      setTimeout(() => b.classList.add('in'), 700); // safety net if animationend never fires
       box.appendChild(b);
     });
+    void box.offsetWidth; // force layout now so every card (incl. the first) gets painted
     if (cards.some((id) => loadout.def(id)?.group === 'mythic')) sound.play('mythic'); // distinct Mythic chime
     // COREBURNZ REROLL: swap all 3 cards (2 per run, each player their own)
     const rr = this.rerollHook;

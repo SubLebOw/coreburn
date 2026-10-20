@@ -98,6 +98,12 @@ export class WaveManager {
   startWave(n) {
     this.wave = n;
     this.stats = waveStats(n);
+    if (RULES.z) { // v1.29 CoreBurnZ: dangerous from wave 1, and enemy health outpaces builds late so OP is earned
+      const z = Z_TUNING.waves;
+      this.stats.hpMult = (1 + z.hpStep * (n - 1)) * (1 + z.lateHp * Math.max(0, n - z.lateFrom));
+      this.stats.dmgMult *= z.dmg;
+      this.stats.speedMult *= z.speed;
+    }
     this.stats.hpMult *= this.world.coopHp || 1; // co-op: tougher enemies
     // MUTATOR wave? (see mutators.js; main.js decides which one)
     const mut = this.mutator = isBossWave(n) ? null : (this.world.mutatorFor?.(n) || null);
@@ -127,7 +133,7 @@ export class WaveManager {
       return;
     }
 
-    const total = Math.round((4 + 2 * n) * (this.world.coopCount || 1) * (mut?.count || 1) * (this.curseCount || 1)); // co-op / SWARM: more enemies
+    const total = Math.round((4 + 2 * n + (RULES.z ? Z_TUNING.waves.extra : 0)) * (this.world.coopCount || 1) * (mut?.count || 1) * (this.curseCount || 1)); // co-op / SWARM: more enemies
     const pool = (RULES.z ? UNLOCKS.concat(Z_UNLOCKS) : UNLOCKS).filter((u) => n >= u.wave);
     const totalWeight = pool.reduce((s, u) => s + u.weight, 0);
     const rng = this.world.waveRng?.(n) || Math.random; // daily challenge: the same mix + elites for everyone
@@ -138,7 +144,7 @@ export class WaveManager {
       this.queue.push(pick.type);
       this.eliteQueue.push(rng() < this.stats.eliteChance);
     }
-    this.maxAlive = Math.min(Math.round((6 + n) * Math.min(1.5, this.world.coopCount || 1)), this.world.coopCount > 1 ? 20 : SCREEN_CAP);
+    this.maxAlive = Math.min(Math.round((6 + n + (RULES.z ? Z_TUNING.waves.extra : 0)) * Math.min(1.5, this.world.coopCount || 1)), this.world.coopCount > 1 ? 20 : SCREEN_CAP);
     this.world.onWaveStart(n);
   }
 

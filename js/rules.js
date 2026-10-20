@@ -9,16 +9,21 @@ export const Z_TUNING = {
   ultCoolStep: 0.10, // Ultimate Coolant: -10% per pick (classic -5%)
   arcRange: 1.5,     // ARC TALONS chain range x1.5 (6 m -> 9 m)
   bossHp: 1.1 * 1.05, // bosses +10% health, then +5% more in v1.14 (x1.155 total)
-  shieldMax: 2,      // SHIELD pick-ups give a charge that blocks the next hit (max 2)
+  shieldMax: 2,
+  // v1.29 balance pass (Caleb: start hard, power earned through picks, strong builds still need several hits)
+  waves: { hpStep: 0.15, lateHp: 0.012, lateFrom: 25, dmg: 1.15, speed: 1.04, extra: 2 }, // classic: 0.14/wave, no late bonus
+  tierStep: 0.24,    // weapon tier per card (classic 0.28): slower per-pick snowball
+  waveHeal: 12,      // health on wave clear (classic 25)
+      // SHIELD pick-ups give a charge that blocks the next hit (max 2)
 };
 // CoreBurnZ per-hero tuning (v1.14, from the bot autoplayer + kit sim). Classic is untouched.
-export const Z_HERO = {
-  sarrow: { hp: 1.25, dmg: 1.25 }, // v1.25: +~9% hp/dmg
-  zaleks: { hp: 1.4, dmg: 1.6, speed: 1.15 },
-  iskra: { hp: 1.2, dmg: 1.1 }, // v1.25: +~10% hp/dmg
-  orin: { hp: 1.1, dmg: 0.97 }, // v1.25: +10% hp/dmg
-  ninja: { hp: 1, dmg: 1 },
-  axiom: { hp: 1, dmg: 1 },
+export const Z_HERO = { // v1.29: everyone starts weaker (was sarrow 1.25/1.25, zaleks 1.4/1.6, iskra 1.2/1.1, orin 1.1/0.97, ninja 1/1, axiom 1/1)
+  sarrow: { hp: 1.1, dmg: 1.1 },
+  zaleks: { hp: 1.25, dmg: 1.4, speed: 1.15 },
+  iskra: { hp: 0.95, dmg: 0.85 },
+  orin: { hp: 0.85, dmg: 0.75 },
+  ninja: { hp: 0.85, dmg: 0.82 },
+  axiom: { hp: 1.15, dmg: 1.1 }, // the only buff: he was already the weakest in bot play
 };
 // Classic per-hero tuning (v1.14 bot pass): weak heroes buffed up towards ORIN, nobody nerfed.
 export const C_HERO = {}; // classic stays exactly as v1.13 (balance pass comes later)

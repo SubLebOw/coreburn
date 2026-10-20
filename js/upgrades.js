@@ -25,7 +25,7 @@ export const WEAPON_TIER_STEP = 0.28; // = 0.14 enemy health per wave x 2 waves 
 export const PICK_EVERY = 2;          // waves between upgrade picks
 export const isPickWave = (n) => n > 0 && n % PICK_EVERY === 0;
 
-export function weaponMult(tier) { return 1 + WEAPON_TIER_STEP * tier; }
+export function weaponMult(tier) { return 1 + (RULES.z ? Z_TUNING.tierStep : WEAPON_TIER_STEP) * tier; }
 
 // Talon colour by tier: teal -> cyan -> white-gold -> violet -> crimson (every 6 tiers, blended)
 const TIER_COLOURS = [0x7ffff2, 0x3fc8ff, 0xffe6a0, 0xb070ff, 0xff3048];

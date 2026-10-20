@@ -36,7 +36,7 @@ import { BOSS_ROTATION } from './bosses.js';
 import { Leaderboard } from './leaderboard.js';
 import { UPGRADES } from './upgrades.js';
 import { RanksUI } from './ranks-ui.js';
-import { RULES, setRules } from './rules.js';
+import { RULES, setRules, Z_TUNING } from './rules.js';
 import { rotation } from './bosses.js';
 import { progress, xpForRun, ARENA_SKINS, skinFor, variantById } from './progress.js';
 import { Wardrobe } from './cosmetics.js';
@@ -227,8 +227,9 @@ const world = {
     const bonus = 25 * n * combo.mult;
     score += bonus;
     if (!isBossWave(n)) {
-      world.player.heal(25);
-      hud.showBanner(`WAVE ${n} CLEARED`, `+${bonus} pts · +25 health`);
+      const wh = RULES.z ? Z_TUNING.waveHeal : 25;
+      world.player.heal(wh);
+      hud.showBanner(`WAVE ${n} CLEARED`, `+${bonus} pts · +${wh} health`);
     }
     if (RULES.z && shrine.onWaveCleared(n)) { // CoreBurnZ: survived the shrine's 3 cursed waves
       bossPicks++; upgradeTimer = Math.max(upgradeTimer, 1.3);

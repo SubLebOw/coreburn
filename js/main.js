@@ -44,6 +44,7 @@ import { Wardrobe } from './cosmetics.js';
 import { CosmeticsUI } from './cosmetics-ui.js';
 import { Shrine } from './shrine.js';
 import { getMastery } from './mastery.js';
+import { readSave, writeSave, deleteSave } from './saves.js';
 
 const IS_TOUCH = isTouchDevice();
 if (IS_TOUCH) document.body.classList.add('touch'); // shows the touch controls (see style.css)
@@ -156,6 +157,7 @@ const world = {
     if (mode !== 'rush') st.bestWave = Math.max(st.bestWave, n); // rush waves jump by 5: they don't count
     if (n >= 10 && mode !== 'rush' && !coop.mode && !st.heroWave10.includes(player.char.id)) st.heroWave10.push(player.char.id);
     milestones();
+    autosave(n);
     const next = arenaForWave(n), cur = arena.current;
     if (next.index !== cur.index || next.loop !== cur.loop) {
       transition = { t: 0, index: next.index, loop: next.loop, wave: n, swapped: false };
@@ -387,18 +389,55 @@ let heroId = CHARACTERS[localStorage.getItem('coreburn-hero')] && (!CHARACTERS[l
 function showCharacterSelect() {
   state = 'select';
   hud.hideOverlay();
-  const chars = heroOrder(RULES.z).map((id) => ({ ...CHARACTERS[id], locked: CHARACTERS[id].secret && !meta.data.unlocked[id], hlv: RULES.z ? progress.heroInfo(id) : null }));
+  const canSave = mode === 'endless' && !coop.mode;
+  const chars = heroOrder(RULES.z).map((id) => ({ ...CHARACTERS[id], locked: CHARACTERS[id].secret && !meta.data.unlocked[id], hlv: RULES.z ? progress.heroInfo(id) : null, save: canSave ? getSave(id) : null }));
   if (!chars.find((c) => c.id === heroId) || chars.find((c) => c.id === heroId)?.locked) heroId = 'sarrow';
   hud.showSelect(chars, heroId, (id) => {
     heroId = id;
     localStorage.setItem('coreburn-hero', id);
-    startGame(id);
+    const sv = canSave && getSave(id);
+    if (!sv) { startGame(id); return; }
+    hud.showContinue(CHARACTERS[id], sv, () => startGame(id, sv), () => { deleteSave(RULES.z, id); startGame(id); }, () => showCharacterSelect());
   });
 }
 
+// ---------- SAVED RUNS (v1.30.0): one per hero per rule set, solo endless only ----------
+const getSave = (id) => readSave(RULES.z, id, (c) => !!player.loadout.def(c) && c !== 'patch');
+const savable = () => mode === 'endless' && !coop.mode && state !== 'title';
+let waveSnap = null; // the snapshot taken as the current wave began
+function snapshot(n) {
+  const L = player.loadout, ax = allies.axiom;
+  return { wave: n, score, kills, runClock, runTime, hp: Math.round(player.hp * 10) / 10, maxHp: player.maxHp,
+    levels: { ...L.levels }, tier: L.tier, patches: L.patches, rerolls: L.rerolls, mythicAt: L.mythicAt, comboBest: combo.best,
+    curse: shrine.curse ? { ...shrine.curse } : null, shrineLast: shrine.lastWave, mutator: enemies.mutator?.id || null,
+    drones: player.char.id === 'axiom' && ax ? ax.perm(player) : null, uploadUsed: !!player.uploadUsed, revived: revivedThisRun,
+    run: { bosses: run.bosses, mutators: run.mutators, jackpot: run.jackpot } };
+}
+function autosave(n) {
+  if (!savable() || restoring) return;
+  waveSnap = snapshot(n);
+  if (n >= 2) writeSave(RULES.z, player.char.id, waveSnap); // wave 1 only saves on SAVE & QUIT
+}
+let restoring = false;
+function restoreRun(sv) {
+  const L = player.loadout;
+  L.levels = { ...sv.levels }; L.tier = sv.tier | 0; L.patches = sv.patches | 0; L.rerolls = sv.rerolls | 0; L.mythicAt = sv.mythicAt ?? -99;
+  L.version++; L.recompute(); player.applyLoadout(); // same code path as picking the cards
+  player.hp = Math.max(1, Math.min(player.maxHp, sv.hp));
+  score = sv.score; kills = sv.kills | 0; runClock = sv.runClock || 0; runTime = sv.runTime || 0;
+  combo.best = sv.comboBest || 0;
+  if (sv.curse) { shrine.curse = { ...sv.curse }; shrine.showCurse(sv.curse.left); }
+  shrine.lastWave = sv.shrineLast ?? -99;
+  if (sv.drones != null) player.axSavedDrones = sv.drones;
+  player.uploadUsed = !!sv.uploadUsed; revivedThisRun = !!sv.revived;
+  Object.assign(run, sv.run || {});
+}
+
 let rushWon = false;
-function startGame(id = heroId) {
+function startGame(id = heroId, sv = null) {
   if (typeof id !== 'string') id = heroId;
+  if (!sv || !sv.wave) sv = null;
+  waveSnap = null;
   if (coop.mode) mode = 'endless'; // ranked modes are solo
   modeKey = mode === 'daily' ? dailyKey() : mode === 'rush' ? weekKey() : '';
   world.waveStep = mode === 'rush' ? 5 : 1;
@@ -445,6 +484,14 @@ function startGame(id = heroId) {
   hud.setMutator(null);
   hud.setModeTag((RULES.z ? 'COREBURNZ ' : '') + (mode === 'daily' ? `DAILY ${modeKey}` : mode === 'rush' ? `BOSS RUSH ${modeKey}` : ''));
   if (mode === 'rush') { player.loadout.tier = rushTierBefore(1); player.loadout.version++; player.loadout.recompute(); player.applyLoadout(); player.hp = player.maxHp; }
+  if (sv) {
+    restoring = true;
+    try { restoreRun(sv); if (sv.mutator) world.forceMutator = sv.mutator; enemies.startWave(sv.wave); }
+    finally { restoring = false; world.forceMutator = null; }
+    waveSnap = sv;
+    hud.showToast('RUN CONTINUED', `Wave ${sv.wave} · ${player.loadout.picked.length} cards`, '#3ff6e0');
+    return;
+  }
   enemies.startWave(mode === 'rush' ? 5 : 1);
 }
 
@@ -607,6 +654,7 @@ function awardScrap(r) {
 }
 
 function gameOver() {
+  if (!coop.mode && mode === 'endless') { deleteSave(RULES.z, player.char.id); waveSnap = null; } // death ends the saved run
   state = 'gameover';
   gameOverTime = performance.now();
   const newBest = mode === 'endless' && score > best.score; // ranked modes have their own boards
@@ -850,8 +898,8 @@ const pauseBtn = $p('pause-btn'), pauseOv = $p('pause-overlay');
 let coopMenu = false;
 function openPause() {
   if (state !== 'playing' || world.runOver) return;
-  if (coop.mode) { coopMenu = true; $p('pause-sub').textContent = 'Co-op keeps running while this menu is open'; $p('pause-restart').classList.add('hidden'); $p('pause-menu').innerHTML = '&#10006; LEAVE GAME'; }
-  else { state = 'paused'; $p('pause-sub').textContent = 'Wave ' + Math.max(1, enemies.wave) + ' · ' + document.getElementById('run-timer').textContent; $p('pause-restart').classList.remove('hidden'); $p('pause-menu').innerHTML = '&#9776; MENU'; sound.setSlowmo?.(false); }
+  if (coop.mode) { coopMenu = true; $p('pause-sub').textContent = 'Co-op keeps running while this menu is open'; $p('pause-restart').classList.add('hidden'); $p('pause-save').classList.add('hidden'); $p('pause-menu').innerHTML = '&#10006; LEAVE GAME'; }
+  else { state = 'paused'; $p('pause-sub').textContent = 'Wave ' + Math.max(1, enemies.wave) + ' · ' + document.getElementById('run-timer').textContent; $p('pause-restart').classList.remove('hidden'); $p('pause-menu').innerHTML = '&#9776; MENU'; $p('pause-save').classList.toggle('hidden', mode !== 'endless'); sound.setSlowmo?.(false); }
   pauseOv.classList.remove('hidden');
 }
 function closePause() { pauseOv.classList.add('hidden'); coopMenu = false; if (state === 'paused') state = 'playing'; }
@@ -860,6 +908,14 @@ for (const el of [pauseBtn, pauseOv]) el.addEventListener('pointerdown', (e) => 
 pauseBtn.addEventListener('click', (e) => { e.stopPropagation(); pauseBtn.blur(); openPause(); });
 $p('pause-resume').addEventListener('click', (e) => { e.stopPropagation(); closePause(); });
 $p('pause-restart').addEventListener('click', (e) => { e.stopPropagation(); closePause(); world.runOver = true; showCharacterSelect(); });
+$p('pause-save').addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (state !== 'paused' || coop.mode || mode !== 'endless') return;
+  const snap = waveSnap || snapshot(Math.max(1, enemies.wave));
+  const ok = writeSave(RULES.z, player.char.id, snap);
+  closePause(); world.runOver = true; resetWorld(); showTitle();
+  hud.showToast(ok ? 'RUN SAVED' : 'SAVE FAILED', ok ? `${displayName(player.char)} · continue from wave ${snap.wave} on hero select` : 'Storage is full or blocked', ok ? '#3ff6e0' : '#ff3a4a');
+});
 $p('pause-menu').addEventListener('click', (e) => { e.stopPropagation(); closePause(); world.runOver = true; if (coop.mode) coop.leave(); else { resetWorld(); showTitle(); } });
 window.addEventListener('keydown', (e) => {
   if (e.code !== 'Escape' && e.code !== 'KeyP') return;

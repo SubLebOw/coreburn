@@ -787,3 +787,16 @@ body.shrine-curse #hud::after { content: ''; position: fixed; inset: 0; pointer-
 .fs-btn.hidden { display: none !important; }
 .fs-menu { margin: 8px auto 0; }
 .pause-panel .fs-pause { margin: 10px auto 0; }
+
+/* ---------- Saved runs (v1.30.0) ---------- */
+.ucard.hero .save-badge { position: absolute; top: 8px; right: 8px; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: .06em; color: #0c1114; background: #3ff6e0; box-shadow: 0 0 10px rgba(63,246,224,.45); pointer-events: none; }
+.ucard.hero.has-save { box-shadow: inset 0 0 0 1px rgba(63,246,224,.55); }
+#continue-overlay { position: fixed; inset: 0; z-index: 70; background: rgba(8,10,12,.78); display: flex; align-items: center; justify-content: center; }
+#continue-overlay.hidden { display: none; }
+.cont-panel h2 { color: var(--c); }
+.cont-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 4px 0 14px; }
+.cont-stats span { display: flex; flex-direction: column; align-items: center; font-size: 10px; letter-spacing: .12em; opacity: .75; }
+.cont-stats b { font-size: 20px; letter-spacing: 0; opacity: 1; color: #fff; }
+.cont-panel .cont-go { border-color: var(--c); }
+.cont-panel .cont-new.armed { border-color: #ff3a4a; color: #ff8a94; }
+.ucard.hero { position: relative; }

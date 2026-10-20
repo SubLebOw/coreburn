@@ -206,6 +206,7 @@ export class Hud {
       b.querySelector('.group').innerHTML = `<span class="ptag">${c.tag}</span> ${c.title.toUpperCase()}`;
       b.querySelector('.uname').textContent = c.name;
       b.querySelector('.effect').textContent = c.blurb;
+      if (c.save) { const sb = document.createElement('div'); sb.className = 'save-badge'; sb.textContent = `SAVED · WAVE ${c.save.wave}`; b.appendChild(sb); b.classList.add('has-save'); }
       if (c.hlv) { // CoreBurnZ: this hero's own level + the next reward
         const h = c.hlv, d = document.createElement('div');
         d.className = 'hlvl';
@@ -254,6 +255,36 @@ export class Hud {
     setTimeout(() => { box.style.pointerEvents = ''; }, 250);
     this.upgradeOverlay.classList.add('select');
     this.upgradeOverlay.classList.remove('hidden');
+  }
+
+  // SAVED RUN prompt (v1.30.0): CONTINUE wave N, or NEW RUN (two taps: it overwrites the save)
+  showContinue(c, sv, onContinue, onNew, onBack) {
+    let ov = document.getElementById('continue-overlay');
+    if (!ov) { ov = document.createElement('div'); ov.id = 'continue-overlay'; document.body.appendChild(ov); for (const ev of ['pointerdown', 'click']) ov.addEventListener(ev, (e) => e.stopPropagation()); }
+    const hex = '#' + c.color.toString(16).padStart(6, '0');
+    const mins = Math.floor((sv.runClock || 0) / 60), secs = String(Math.floor((sv.runClock || 0) % 60)).padStart(2, '0');
+    const cards = Object.values(sv.levels || {}).filter((v) => v > 0).length;
+    ov.innerHTML = `<div class="pause-panel cont-panel" style="--c:${hex}"><h2>${c.name}</h2><div class="pause-sub">Saved run · ${RULES.z ? 'CoreBurnZ' : 'Classic'}</div>
+      <div class="cont-stats"><span><b>${sv.wave}</b>WAVE</span><span><b>${Math.round(sv.score).toLocaleString()}</b>SCORE</span><span><b>${cards}</b>CARDS</span><span><b>${mins}:${secs}</b>TIME</span></div>
+      <button class="big-btn cont-go">&#9654; CONTINUE <small>wave ${sv.wave}</small></button>
+      <button class="big-btn cont-new">&#8635; NEW RUN <small>overwrites this save</small></button>
+      <button class="big-btn cont-back">&#8592; BACK</button></div>`;
+    ov.classList.remove('hidden');
+    let armed = false, done = false;
+    const close = (fn) => { if (done) return; done = true; ov.classList.add('hidden'); window.removeEventListener('keydown', onKey, true); fn(); };
+    const newBtn = ov.querySelector('.cont-new');
+    ov.querySelector('.cont-go').addEventListener('click', () => close(onContinue));
+    ov.querySelector('.cont-back').addEventListener('click', () => close(onBack));
+    newBtn.addEventListener('click', () => {
+      if (!armed) { armed = true; newBtn.classList.add('armed'); newBtn.innerHTML = `&#9888; TAP AGAIN TO CONFIRM <small>wave ${sv.wave} save will be lost</small>`; return; }
+      close(onNew);
+    });
+    const onKey = (e) => {
+      if (e.repeat) return;
+      if (['Enter', 'NumpadEnter', 'Space', 'KeyJ'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); close(onContinue); }
+      else if (e.code === 'Escape') { e.preventDefault(); e.stopPropagation(); close(onBack); }
+    };
+    setTimeout(() => { if (!done) window.addEventListener('keydown', onKey, true); }, 250);
   }
 
   // MILESTONE popup (bottom centre). big = the secret hero unlock

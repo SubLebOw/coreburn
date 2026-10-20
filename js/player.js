@@ -1076,7 +1076,7 @@ export class Player {
   axCap() { return this.char.droneCap + (this.stats.axCap || 0); }
   axiomTick(dt, input) {
     const ax = this.swarm; if (!ax || this.world.netClient) return;
-    if (this.axNeedStart) { this.axNeedStart = false; ax.clearOwner(this); for (let i = 0; i < this.char.startDrones + (this.stats.m?.aNet ? 1 : 0); i++) ax.add(this); }
+    if (this.axNeedStart) { this.axNeedStart = false; ax.clearOwner(this); const n = this.axSavedDrones ?? (this.char.startDrones + (this.stats.m?.aNet ? 1 : 0)); this.axSavedDrones = null; for (let i = 0; i < n; i++) ax.add(this); }
     if (this.axClockT > 0) this.axClockT -= dt;
     if (this.ascendT > 0) {
       this.ascendT -= dt;

@@ -24,7 +24,7 @@ export class ShopUI {
     this.refreshTitle();
   }
 
-  refreshTitle() { $('shop-scrap').textContent = `${this.meta.scrap.toLocaleString()} scrap`; }
+  refreshTitle() { $('shop-scrap').textContent = `${this.meta.scrap.toLocaleString()} scrap`; $('mp-scrap').textContent = this.meta.scrap.toLocaleString(); }
 
   // fromGameOver: show PLAY AGAIN in the shop and come back to the results on BACK
   open(fromGameOver = false) {

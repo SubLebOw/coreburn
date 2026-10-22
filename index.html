@@ -129,11 +129,13 @@
 
   <!-- Upgrade picker: shown after every boss (filled in by hud.js) -->
   <div id="upgrade-overlay" class="hidden">
+    <button id="sel-back-btn" type="button" aria-label="Back to main menu">&#8592; BACK <kbd>ESC</kbd></button>
     <div id="upgrade-box">
       <div id="upgrade-title">CHOOSE AN UPGRADE</div>
       <div id="upgrade-sub"></div>
       <div id="tw-vote" class="hidden"></div>
       <div id="upgrade-cards"></div>
+      <div id="sc-wrap" class="sel-only"><div id="sc-stage"></div><div id="sc-side"><div id="sc-info"></div><button id="sc-go" type="button" class="big-btn">SELECT &#9654;</button></div></div>
       <div id="upgrade-hint" class="kb-only">Press 1, 2 or 3 · or click a card</div>
       <button id="sel-cos-btn" class="link-btn sel-only">&#127890; Cosmetics &amp; arena skins</button>
     </div>
@@ -225,9 +227,17 @@
     </div>
   </div>
 
+  <!-- Menu atmosphere (title + hero select only): teal light, lava glow, vignette. Pure CSS. -->
+  <div id="menu-atmo" aria-hidden="true"></div>
+
   <!-- Title screen + game over screen -->
   <div id="overlay">
     <div class="panel" id="title-panel">
+      <div id="m-profile">
+        <div class="mp-hex" aria-hidden="true"><svg viewBox="0 0 100 100"><polygon points="50,4 90,27 90,73 50,96 10,73 10,27" fill="#11161a" stroke="currentColor" stroke-width="6"/><circle cx="50" cy="50" r="16" fill="currentColor"/></svg></div>
+        <div class="mp-main"><b id="mp-name">PLAYER</b><div id="lvl-bar"><span id="lvl-text">LEVEL 1</span><span id="lvl-title"></span><i><b id="lvl-fill"></b></i></div></div>
+        <div class="mp-scrap"><span>&#11042;</span><b id="mp-scrap">0</b><small>SCRAP</small></div>
+      </div>
       <div class="m-brand">
         <h1>COREBURN</h1>
         <h2>Endless Arena Brawler</h2>
@@ -243,7 +253,6 @@
         <button id="daily-btn" class="mode-btn">DAILY<small>challenge</small></button>
         <button id="rush-btn" class="mode-btn">BOSS RUSH<small>weekly</small></button>
       </div>
-      <div id="lvl-bar"><span id="lvl-text">LEVEL 1</span><span id="lvl-title"></span><i><b id="lvl-fill"></b></i></div>
       <div class="best" id="best-text"></div>
       <div class="m-icons">
         <button id="shop-btn" class="m-icon shop" title="Shop"><span>&#9670;</span>SHOP<small id="shop-scrap">0 scrap</small></button>

@@ -7,7 +7,7 @@
 //   fan         - two sweeping fans of magenta blade-waves
 //   summon      - calls in hounds
 import * as THREE from 'three';
-import { Boss } from './boss.js?v=1.30.1';
+import { Boss } from './boss.js?v=1.30.2';
 
 const BLADE_MAT = new THREE.MeshBasicMaterial({ color: 0xff4fd8 });
 const EYE_MAT = new THREE.MeshBasicMaterial({ color: 0x9ffcff });

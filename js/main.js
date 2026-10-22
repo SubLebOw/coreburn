@@ -4,48 +4,48 @@
 //   2. creates the arena, Sarrow, the waves, power-ups, the HUD and the controls
 //   3. runs the game loop ~60 times a second: update everything, then draw
 //   4. handles SLOW-MO (everything but Sarrow runs slower) and the fade between arenas
-import('./screenmode.js?v=1.30.1').catch((e) => console.warn('screenmode optional module failed', e)); // optional, never blocks boot
-import { Allies } from './allies.js?v=1.30.1';
+import('./screenmode.js?v=1.30.2').catch((e) => console.warn('screenmode optional module failed', e)); // optional, never blocks boot
+import { Allies } from './allies.js?v=1.30.2';
 import * as THREE from 'three';
-import { Input } from './input.js?v=1.30.1';
-import { isTouchDevice, setupTouchControls } from './touch.js?v=1.30.1';
-import { createArena, arenaForWave } from './arena.js?v=1.30.1';
-import { Player } from './player.js?v=1.30.1';
-import { WaveManager, isBossWave } from './waves.js?v=1.30.1';
-import { Projectiles } from './projectiles.js?v=1.30.1';
-import { Effects } from './effects.js?v=1.30.1';
-import { Hud } from './hud.js?v=1.30.1';
-import { PowerUps } from './powerups.js?v=1.30.1';
-import { sound } from './audio.js?v=1.30.1';
-import { ads } from './monetize.js?v=1.30.1';
-import { checkForUpdates } from './updater.js?v=1.30.1';
-import { GAME_VERSION } from './version.js?v=1.30.1';
-import { shareScore, copyScore } from './share.js?v=1.30.1';
-import { IS_NATIVE } from './native.js?v=1.30.1';
-import { Combo } from './combo.js?v=1.30.1';
-import { CHARACTERS, CHARACTER_ORDER, heroOrder, displayName } from './characters.js?v=1.30.1';
-import { isPickWave } from './upgrades.js?v=1.30.1';
-import { Coop } from './coop.js?v=1.30.1';
-import { meta, scrapForRun, RARE_DROPS, SHOP } from './meta.js?v=1.30.1';
-import { MUTATORS, isMutatorWave, rollMutator } from './mutators.js?v=1.30.1';
-import { GOLD_TIME } from './golden.js?v=1.30.1';
-import { ShopUI } from './shop-ui.js?v=1.30.1';
-import { Twitch } from './twitch.js?v=1.30.1';
-import { checkAchievements, rewardText } from './achievements.js?v=1.30.1';
-import { rngFor, dailyKey, weekKey, rushOrder, RUSH_BOSSES, rushTierBefore, rushScore, rushLabel, formatTime, dailyStartCard } from './modes.js?v=1.30.1';
-import { BOSS_ROTATION } from './bosses.js?v=1.30.1';
-import { Leaderboard } from './leaderboard.js?v=1.30.1';
-import { UPGRADES } from './upgrades.js?v=1.30.1';
-import { RanksUI } from './ranks-ui.js?v=1.30.1';
-import { RULES, setRules, Z_TUNING } from './rules.js?v=1.30.1';
-import { rotation } from './bosses.js?v=1.30.1';
-import { progress, xpForRun, ARENA_SKINS, skinFor, variantById } from './progress.js?v=1.30.1';
-import { Wardrobe } from './cosmetics.js?v=1.30.1';
-import { CosmeticsUI } from './cosmetics-ui.js?v=1.30.1';
-import { Shrine } from './shrine.js?v=1.30.1';
-import { getMastery } from './mastery.js?v=1.30.1';
-import { readSave, writeSave, deleteSave } from './saves.js?v=1.30.1';
-import { Showcase } from './showcase.js?v=1.30.1';
+import { Input } from './input.js?v=1.30.2';
+import { isTouchDevice, setupTouchControls } from './touch.js?v=1.30.2';
+import { createArena, arenaForWave } from './arena.js?v=1.30.2';
+import { Player } from './player.js?v=1.30.2';
+import { WaveManager, isBossWave } from './waves.js?v=1.30.2';
+import { Projectiles } from './projectiles.js?v=1.30.2';
+import { Effects } from './effects.js?v=1.30.2';
+import { Hud } from './hud.js?v=1.30.2';
+import { PowerUps } from './powerups.js?v=1.30.2';
+import { sound } from './audio.js?v=1.30.2';
+import { ads } from './monetize.js?v=1.30.2';
+import { checkForUpdates } from './updater.js?v=1.30.2';
+import { GAME_VERSION } from './version.js?v=1.30.2';
+import { shareScore, copyScore } from './share.js?v=1.30.2';
+import { IS_NATIVE } from './native.js?v=1.30.2';
+import { Combo } from './combo.js?v=1.30.2';
+import { CHARACTERS, CHARACTER_ORDER, heroOrder, displayName } from './characters.js?v=1.30.2';
+import { isPickWave } from './upgrades.js?v=1.30.2';
+import { Coop } from './coop.js?v=1.30.2';
+import { meta, scrapForRun, RARE_DROPS, SHOP } from './meta.js?v=1.30.2';
+import { MUTATORS, isMutatorWave, rollMutator } from './mutators.js?v=1.30.2';
+import { GOLD_TIME } from './golden.js?v=1.30.2';
+import { ShopUI } from './shop-ui.js?v=1.30.2';
+import { Twitch } from './twitch.js?v=1.30.2';
+import { checkAchievements, rewardText } from './achievements.js?v=1.30.2';
+import { rngFor, dailyKey, weekKey, rushOrder, RUSH_BOSSES, rushTierBefore, rushScore, rushLabel, formatTime, dailyStartCard } from './modes.js?v=1.30.2';
+import { BOSS_ROTATION } from './bosses.js?v=1.30.2';
+import { Leaderboard } from './leaderboard.js?v=1.30.2';
+import { UPGRADES } from './upgrades.js?v=1.30.2';
+import { RanksUI } from './ranks-ui.js?v=1.30.2';
+import { RULES, setRules, Z_TUNING } from './rules.js?v=1.30.2';
+import { rotation } from './bosses.js?v=1.30.2';
+import { progress, xpForRun, ARENA_SKINS, skinFor, variantById } from './progress.js?v=1.30.2';
+import { Wardrobe } from './cosmetics.js?v=1.30.2';
+import { CosmeticsUI } from './cosmetics-ui.js?v=1.30.2';
+import { Shrine } from './shrine.js?v=1.30.2';
+import { getMastery } from './mastery.js?v=1.30.2';
+import { readSave, writeSave, deleteSave } from './saves.js?v=1.30.2';
+import { Showcase } from './showcase.js?v=1.30.2';
 
 const IS_TOUCH = isTouchDevice();
 if (IS_TOUCH) document.body.classList.add('touch'); // shows the touch controls (see style.css)
@@ -1114,7 +1114,7 @@ frame();
 // Android app. It only loads when you run the game on your own computer (http://localhost...).
 const LOCAL_DEV = !IS_NATIVE && ['localhost', '127.0.0.1'].includes(location.hostname);
 if (LOCAL_DEV) {
-  import('./dev.local.js?v=1.30.1')
+  import('./dev.local.js?v=1.30.2')
     .then((m) => m.install({ player, enemies, world, progress, allies, arena, powerups, projectiles, effects, hud, sound, ads, startGame, snapCamera: () => updateCamera(0, true), getScore: () => score, combo, meta, twitch, input, getState: () => state, getLastRun: () => lastRun, getMode: () => mode, bursts, openPicker: () => { normalPick = true; openUpgradePicker(); } }))
     .catch(() => {}); // no dev file = no helpers, that's fine
 }

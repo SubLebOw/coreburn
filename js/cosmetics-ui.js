@@ -3,9 +3,9 @@
 // capes, auras, talon trails and banners you've unlocked by levelling up, and see that hero's five
 // ARENA SKINS (with a spinning 3D preview). Arena skins: AUTO (CoreBurnZ only) / ALWAYS / OFF.
 import * as THREE from 'three';
-import { COSMETICS, ARENA_SKINS, SLOTS, SLOT_LABEL, HERO_IDS, xpNeeded, SKIN_VARIANTS, TITLES, PLATES, ACCOUNT_MAX } from './progress.js?v=1.30.1';
-import { CHARACTERS } from './characters.js?v=1.30.1';
-import { Wardrobe } from './cosmetics.js?v=1.30.1';
+import { COSMETICS, ARENA_SKINS, SLOTS, SLOT_LABEL, HERO_IDS, xpNeeded, SKIN_VARIANTS, TITLES, PLATES, ACCOUNT_MAX } from './progress.js?v=1.30.2';
+import { CHARACTERS } from './characters.js?v=1.30.2';
+import { Wardrobe } from './cosmetics.js?v=1.30.2';
 
 const $ = (id) => document.getElementById(id);
 const hex = (c) => '#' + c.toString(16).padStart(6, '0');

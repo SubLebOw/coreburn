@@ -40,8 +40,11 @@ import { UPGRADES } from './upgrades.js?v=1.31.1';
 import { RanksUI } from './ranks-ui.js?v=1.31.1';
 import { RULES, setRules, Z_TUNING } from './rules.js?v=1.31.1';
 import { rotation } from './bosses.js?v=1.31.1';
-import { progress, xpForRun, ARENA_SKINS, skinFor, variantById } from './progress.js?v=1.31.1';
+import { progress, xpForRun, ARENA_SKINS, skinFor, variantById, progressHooks } from './progress.js?v=1.31.1';
+// Phase 3B gear: scrap-bought cosmetics are owned in the scrap save, earned ones read the lifetime stats
+progressHooks.shopOwns = (id) => meta.owns(id); progressHooks.stats = () => meta.data.stats;
 import { Wardrobe } from './cosmetics.js?v=1.31.1';
+import { HeroPreview } from './hero-preview.js?v=1.31.1';
 import { CosmeticsUI } from './cosmetics-ui.js?v=1.31.1';
 import { Shrine } from './shrine.js?v=1.31.1';
 import { getMastery } from './mastery.js?v=1.31.1';
@@ -89,8 +92,10 @@ const scStage = document.getElementById('sc-stage'), selOverlay = document.getEl
 hud.onSelectHero = (c) => showcase.setHero(c.id, c.color, () => {
   const v = progress.variantOf(c.id), m = c.build(v ? v.tint : (coop.mode ? null : meta.skinColor)); // same look as the run: hero variant, else the shop skin
   if (v && m.core) m.core.material.color.setHex(v.glow);
+  scWardrobe.dress({ model: m, char: c, position: m.root.position, state: 'normal' }); // the same gear you wear in the run
   return m;
 });
+const scWardrobe = new Wardrobe(showcase.scene, progress); for (const s of scWardrobe.trail) showcase.scene.remove(s.m);
 const effects = new Effects(scene);
 const projectiles = new Projectiles(scene);
 const env = { hemi, sun, baseHemi: 1.2 };
@@ -868,7 +873,8 @@ document.getElementById('lb-name-save').addEventListener('click', saveName);
 nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveName(e); });
 
 // COSMETICS screen (title + hero select)
-const cosmeticsUI = new CosmeticsUI(progress, {
+const heroPreview = new HeroPreview(progress, meta); // ONE 3D preview shared by Looks + Shop
+const cosmeticsUI = new CosmeticsUI(progress, { preview: heroPreview,
   onClose: () => { if (state === 'select') showCharacterSelect(); },
   onChange: () => { if (state !== 'playing') applyLook(); coop.sendLook?.(); },
 });
@@ -907,7 +913,7 @@ for (const b of document.querySelectorAll('#rules-row button')) {
 }
 
 // The unlock shop (title screen)
-const shop = new ShopUI(meta, SHOP, { onClose: (fromGameOver) => { if (!fromGameOver) hud.showTitle(best); } });
+const shop = new ShopUI(meta, SHOP, { progress, preview: heroPreview, onChange: () => { if (state !== 'playing') applyLook(); coop.sendLook?.(); cosmeticsUI.refreshBadge(); }, onClose: (fromGameOver) => { if (!fromGameOver) hud.showTitle(best); } });
 hud.refreshScrap = () => shop.refreshTitle();
 document.getElementById('shop-btn').addEventListener('click', (e) => { e.stopPropagation(); if (state === 'title') shop.open(); });
 document.getElementById('shop-btn').addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -1138,7 +1144,7 @@ function frame() {
   renderer.render(scene, camera);
   if (state === 'select' && selOverlay.classList.contains('select') && !selOverlay.classList.contains('hidden')) {
     if (!scHid && player.model) { scHid = player.model.root; scWasVisible = scHid.visible; scHid.visible = false; } // the arena hero would stand behind the showcase
-    showcase.render(dt, scStage);
+    showcase.render(dt, scStage); scWardrobe.update(dt);
   } else if (showcase.model || scHid) { // left hero select: drop the showcase model, give the arena hero back
     showcase.hide();
     if (scHid) { scHid.visible = scWasVisible; scHid = null; }

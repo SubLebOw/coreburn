@@ -78,6 +78,14 @@ export const meta = {
     this.save();
     return true;
   },
+  // Phase 3B gear (progress.js COSMETICS with a cost): pay once, owned forever, never below 0 scrap
+  buyCosmetic(item) {
+    if (!item || !item.gear || !(item.cost > 0) || item.earn || this.owns(item.id) || this.data.scrap < item.cost) return false;
+    this.data.scrap -= item.cost;
+    this.data.owned.push(item.id);
+    this.save();
+    return true;
+  },
   grant(id) { if (!this.owns(id)) { this.data.owned.push(id); this.save(); return true; } return false; },
   equip(kind, id) {
     if (id && !this.owns(id)) return;

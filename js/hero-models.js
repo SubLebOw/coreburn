@@ -163,7 +163,7 @@ export function buildSarrow(t) {
   const bg = d.extra.blade || d.keep('blade', bladeGeo(0.07, 0.03, 0.02));
   const { blades, halos } = addBlades(m, bg, mats.blade, 0x8afff4, [[-0.06, 0.04], [0.06, 0.04]], -1.13);
   return { ...m, core, flashMats: [mats.coat, mats.coatDark, mats.pants, mats.leather, mats.orange, mats.metal, mats.red], blade: mats.blade, blades, halos, bladeBase: -0.77, bladeLen: 0.72,
-    anchors: { headTop: 0.32, back: -0.22, shoulder: 0.46, scale: 1 }, style: 'duelist' };
+    anchors: { headTop: 0.32, back: -0.22, shoulder: 0.46, scale: 1, headW: 0.25, faceZ: 0.24 }, style: 'duelist' };
 }
 
 // ZALEKS: the juggernaut. Wide stacked pauldrons, a reactor backpack with glowing exhausts, a heavy
@@ -222,7 +222,7 @@ export function buildZaleks(t) {
   const bg = d.extra.blade || d.keep('blade', bladeGeo(0.11, 0.07));
   const { blades, halos } = addBlades(m, bg, mats.blade, 0xffc060, [[-0.12, 0.05], [0, 0.05], [0.12, 0.05]], -1.1);
   return { ...m, core, flashMats: [mats.plate, mats.plateDark, mats.cloth, mats.accent, mats.metal], blade: mats.blade, blades, halos, bladeBase: -0.85, bladeLen: 0.5,
-    anchors: { headTop: 0.32, back: -0.56, shoulder: 0.7, scale: 1.3 }, style: 'heavy' };
+    anchors: { headTop: 0.32, back: -0.56, shoulder: 0.7, scale: 1.3, headW: 0.28, faceZ: 0.27, shoulderLift: 0.17, shoulderOut: 0.08 }, style: 'heavy' };
 }
 
 // ISKRA: compact agile ranged skirmisher. Slim tactical suit, a chest rig, a needle launcher on the right
@@ -271,7 +271,7 @@ export function buildIskra(t) {
   const bg = d.extra.blade || d.keep('blade', bladeGeo(0.035, 0.03));
   const { blades, halos } = addBlades(m, bg, mats.blade, 0xeeaaff, [[0, 0.04]], -1.2);
   return { ...m, core, flashMats: [mats.cloth, mats.clothDark, mats.accent, mats.metal], blade: mats.blade, blades, halos, bladeBase: -0.75, bladeLen: 0.9,
-    anchors: { headTop: 0.26, back: -0.2, shoulder: 0.32, scale: 0.88 }, style: 'agile' };
+    anchors: { headTop: 0.26, back: -0.2, shoulder: 0.32, scale: 0.88, headW: 0.18, faceZ: 0.2 }, style: 'agile' };
 }
 
 // ORIN: gravity controller. A layered robe over iron, a bell mask, a gravity halo + organ pipes on the
@@ -324,7 +324,7 @@ export function buildOrin(t) {
   const mg = d.extra.mote || d.keep('mote', oct(0.06));
   for (let i = 0; i < 3; i++) { const o = new THREE.Mesh(mg, mats.eye); const a = i / 3 * Math.PI * 2; o.position.set(Math.cos(a) * 0.62, Math.sin(a * 2) * 0.1, Math.sin(a) * 0.62); orbit.add(o); }
   return { ...m, core, flashMats: [mats.plate, mats.plateDark, mats.cloth, mats.accent, mats.metal, mats.mask], blade: mats.blade, blades, halos, bladeBase: -0.8, bladeLen: 0.62,
-    anchors: { headTop: 0.3, back: -0.34, shoulder: 0.4, scale: 1.1 }, style: 'control', orbit,
+    anchors: { headTop: 0.3, back: -0.34, shoulder: 0.4, scale: 1.1, headW: 0.26, faceZ: 0.24 }, style: 'control', orbit,
     idle(t, mv = 0) { orbit.rotation.y = t * (1.1 + mv * 1.4); orbit.rotation.z = Math.sin(t * 0.5) * 0.12; orbit.position.y = 1.45 + Math.sin(t * 1.6) * 0.06;
       for (const [i, o] of orbit.children.entries()) { o.rotation.x = t * 2 + i; o.rotation.y = t * 3 + i; } } };
 }
@@ -384,7 +384,7 @@ export function buildNinja(t) {
     const h = new THREE.Mesh(UNIT, G(0xd0c8ff, { transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })); h.rotation.z = Math.PI / 4; h.position.copy(b.position); h.visible = false; arm.add(h); halos.push(h);
   }
   return { ...m, core, flashMats: [mats.cloth, mats.clothDark, mats.accent, mats.metal, mats.mask, mats.steel], blade: mats.blade, blades, halos, bladeBase: -0.84, bladeLen: 0.2,
-    anchors: { headTop: 0.26, back: -0.22, shoulder: 0.36, scale: 0.92 }, style: 'ninja' };
+    anchors: { headTop: 0.26, back: -0.22, shoulder: 0.36, scale: 0.92, headW: 0.2, faceZ: 0.21 }, style: 'ninja' };
 }
 
 // AXIOM: robotic swarm commander. Not human: a sensor head sunk between servo shoulders, a tapered armoured
@@ -447,7 +447,7 @@ export function buildAxiom(t) {
     const h = new THREE.Mesh(UNIT, G(0xff6a6a, { transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })); h.position.copy(b.position); h.visible = false; arm.add(h); halos.push(h);
   }
   return { ...m, core, flashMats: [mats.plate, mats.dark, mats.metal, mats.accent], blade: mats.blade, blades, halos, bladeBase: -0.84, bladeLen: 0.16, plateL, plateR,
-    anchors: { headTop: 0.26, back: -0.36, shoulder: 0.46, scale: 1.05 }, style: 'machine',
+    anchors: { headTop: 0.26, back: -0.36, shoulder: 0.46, scale: 1.05, headW: 0.19, faceZ: 0.2 }, style: 'machine',
     idle(t, mv = 0) { // stepped servo head scan (snaps between angles)
       const step = Math.floor(t * 0.8) % 4, target = [0.35, 0, -0.35, 0][step] * (1 - mv);
       m.head.rotation.y += (target - m.head.rotation.y) * 0.18;

@@ -2,19 +2,17 @@
 // The COSMETICS screen (title menu and hero select): pick a hero, equip/remove the hats, masks,
 // capes, auras, talon trails and banners you've unlocked by levelling up, and see that hero's five
 // ARENA SKINS (with a spinning 3D preview). Arena skins: AUTO (CoreBurnZ only) / ALWAYS / OFF.
-import * as THREE from 'three';
-import { COSMETICS, ARENA_SKINS, SLOTS, SLOT_LABEL, HERO_IDS, xpNeeded, SKIN_VARIANTS, TITLES, PLATES, ACCOUNT_MAX } from './progress.js?v=1.31.1';
+import { COSMETICS, ARENA_SKINS, SLOTS, SLOT_LABEL, HERO_IDS, xpNeeded, SKIN_VARIANTS, TITLES, PLATES, ACCOUNT_MAX, RARITY } from './progress.js?v=1.31.1';
 import { CHARACTERS } from './characters.js?v=1.31.1';
-import { Wardrobe } from './cosmetics.js?v=1.31.1';
-import { disposeModel } from './hero-models.js?v=1.31.1';
 
 const $ = (id) => document.getElementById(id);
 const hex = (c) => '#' + c.toString(16).padStart(6, '0');
-const SLOT_ICON = { hat: '🎩', mask: '🎭', cape: '🧣', aura: '◎', trail: '✧', banner: '⚑' };
+export const SLOT_ICON = { hat: '⛑', mask: '🎭', cape: '🧣', aura: '◎', trail: '✧', banner: '⚑', shoulder: '◭', weapon: '⚔' };
+const CATS = [['all', 'ALL'], ['hat', 'HELMETS'], ['mask', 'MASKS'], ['shoulder', 'SHOULDERS'], ['cape', 'BACK'], ['weapon', 'WEAPONS'], ['aura', 'AURAS'], ['trail', 'TRAILS'], ['banner', 'BANNERS']];
 
 export class CosmeticsUI {
-  constructor(progress, { onClose, onChange } = {}) {
-    this.p = progress; this.onClose = onClose; this.onChange = onChange;
+  constructor(progress, { onClose, onChange, preview } = {}) {
+    this.p = progress; this.onClose = onClose; this.onChange = onChange; this.pv = preview; this.cat = 'all'; this.trying = null;
     this.panel = $('cos-panel');
     this.hero = 'sarrow';
     this.previewSkin = null;
@@ -44,7 +42,7 @@ export class CosmeticsUI {
     this.startPreview();
   }
   close() {
-    this.isOpen = false;
+    this.isOpen = false; this.trying = null; this.pv.unmount(this); // unbought / locked try-ons never stick
     this.panel.classList.add('hidden');
     this.refreshBadge();
     this.onClose?.();
@@ -59,23 +57,36 @@ export class CosmeticsUI {
       const b = document.createElement('button');
       b.className = 'sp-tab' + (h === this.hero ? ' on' : '');
       b.textContent = CHARACTERS[h].name;
-      b.addEventListener('click', (e) => { e.stopPropagation(); this.hero = h; this.previewSkin = null; this.render(); this.buildPreview(); });
+      b.addEventListener('click', (e) => { e.stopPropagation(); this.hero = h; this.previewSkin = null; this.trying = null; this.render(); this.buildPreview(); });
       tabs.appendChild(b);
     }
     const list = $('cos-items'); list.innerHTML = '';
     if (!this.canvasWrap) { this.canvasWrap = document.createElement('div'); this.canvasWrap.id = 'cos-preview'; }
-    list.appendChild(this.canvasWrap);
     const eq = p.equipped(this.hero);
-    for (const item of p.itemsFor(this.hero)) {
-      const own = p.owns(item), on = eq[item.slot] === item.id;
+    // category chips (slot filter); owned items equip instantly, locked ones can be TRIED ON (preview only)
+    const cats = document.createElement('div'); cats.className = 'cos-cats';
+    const have = new Set(p.itemsFor(this.hero).map((i) => i.slot));
+    for (const [id, label] of CATS) {
+      if (id !== 'all' && !have.has(id)) continue;
+      const c = document.createElement('button'); c.className = 'cos-cat' + (this.cat === id ? ' on' : ''); c.textContent = label;
+      c.addEventListener('click', (e) => { e.stopPropagation(); this.cat = id; this.render(); });
+      cats.appendChild(c);
+    }
+    list.appendChild(cats);
+    list.appendChild(this.canvasWrap);
+    const items = p.itemsFor(this.hero).filter((i) => this.cat === 'all' || i.slot === this.cat)
+      .sort((a, b) => (p.owns(b) - p.owns(a)) || SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot));
+    for (const item of items) {
+      const own = p.owns(item), on = eq[item.slot] === item.id, trying = this.trying?.id === item.id;
       const b = document.createElement('button');
-      b.className = 'sp-item cos-item' + (own ? ' owned' : ' locked') + (on ? ' on' : '');
-      b.style.setProperty('--c', hex(item.color));
-      b.innerHTML = `<div class="sw">${SLOT_ICON[item.slot]}</div><div class="nm"></div><div class="ds">${SLOT_LABEL[item.slot]}</div><div class="st">${on ? 'EQUIPPED · tap to remove' : own ? 'TAP TO EQUIP' : item.heroLevel ? `🔒 HERO LV ${item.heroLevel}` : `🔒 LEVEL ${item.level}`}</div>`;
+      b.className = itemClass(item, own, on, trying) + ' cos-item';
+      b.style.setProperty('--c', hex(item.gear ? item.glow : item.color));
+      b.innerHTML = itemHTML(item, `${SLOT_LABEL[item.slot]}`, trying ? (own ? 'PREVIEWING · tap to equip' : `PREVIEWING · 🔒 ${p.lockText(item)}`) : on ? 'EQUIPPED · tap to remove' : own ? 'TAP TO EQUIP' : `🔒 ${p.lockText(item)}`);
       b.querySelector('.nm').textContent = item.name;
       b.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (!own) { b.classList.remove('nope'); void b.offsetWidth; b.classList.add('nope'); return; }
+        if (!own) { this.trying = trying ? null : item; this.render(); this.buildPreview(); return; } // try it on
+        this.trying = null;
         p.equip(this.hero, item.slot, on ? null : item.id);
         this.render(); this.buildPreview(); this.onChange?.();
       });
@@ -121,39 +132,16 @@ export class CosmeticsUI {
     for (const pl of PLATES) chip(pb, pl.name.toUpperCase(), p.owns(pl), p.plate?.id === pl.id, `LV ${pl.level}`, null, () => { p.setPlate(pl.id); this.render(); this.refreshBadge(); });
   }
 
-  // ---- a small spinning 3D preview of the hero wearing their stuff ----
-  startPreview() {
-    if (!this.renderer) {
-      this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-      this.renderer.setSize(200, 220);
-      this.scene = new THREE.Scene();
-      this.scene.add(new THREE.HemisphereLight(0xdfefff, 0x4a3426, 2.2));
-      const sun = new THREE.DirectionalLight(0xffe0c0, 2.2); sun.position.set(3, 5, 4); this.scene.add(sun);
-      this.cam = new THREE.PerspectiveCamera(30, 200 / 220, 0.1, 50);
-      this.cam.position.set(0, 2.2, 7.2); this.cam.lookAt(0, 1.25, 0);
-      this.wardrobe = new Wardrobe(this.scene, this.p);
-      for (const s of this.wardrobe.trail) this.scene.remove(s.m);
-    }
-    this.canvasWrap.appendChild(this.renderer.domElement);
-    this.buildPreview();
-    const loop = () => {
-      if (!this.isOpen) return;
-      requestAnimationFrame(loop);
-      if (this.model) this.model.root.rotation.y += 0.015;
-      this.wardrobe.update(1 / 60);
-      this.renderer.render(this.scene, this.cam);
-    };
-    loop();
-  }
-  buildPreview() {
-    if (!this.scene) return;
-    if (this.model) disposeModel(this.model);
-    const c = CHARACTERS[this.hero];
-    const s = this.previewSkin || this.p.variantOf(this.hero);
-    this.model = c.build(s ? s.tint : null);
-    if (s && this.model.core) this.model.core.material.color.setHex(s.glow);
-    this.scene.add(this.model.root);
-    this.wardrobe.dress({ model: this.model, char: c, position: this.model.root.position, state: 'normal' });
-  }
+  // ---- the shared 3D hero preview (hero-preview.js, same one as the Shop) ----
+  startPreview() { this.pv.mount(this.canvasWrap, this); this.buildPreview(); }
+  buildPreview() { if (this.isOpen) this.pv.set(this.hero, { tryOn: this.trying, skin: this.previewSkin }); }
+}
+
+// card helpers shared with the Shop: rarity frame + states (previewing / owned / equipped / locked)
+export function itemClass(item, own, on, trying) {
+  return 'sp-item' + (own ? ' owned' : ' locked') + (on ? ' on' : '') + (trying ? ' trying' : '') + (item.rarity ? ` r-${item.rarity}` : item.mastery ? ' r-earned' : '');
+}
+export function itemHTML(item, desc, status) {
+  const r = item.rarity ? RARITY[item.rarity] : item.mastery ? RARITY.earned : null;
+  return `<div class="sw">${SLOT_ICON[item.slot] || ''}</div>${r ? `<div class="rar" style="--r:${hex(r.c)}">${r.label}</div>` : ''}<div class="nm"></div><div class="ds">${desc}</div><div class="st">${status}</div>`;
 }

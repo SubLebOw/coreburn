@@ -12,8 +12,10 @@
 const KEY = 'coreburn-progress';
 const BASE_HEROES = ['sarrow', 'zaleks', 'iskra', 'orin'];
 export const HERO_IDS = [...BASE_HEROES, 'ninja', 'axiom'];
-export const SLOTS = ['hat', 'mask', 'cape', 'aura', 'trail', 'banner'];
-export const SLOT_LABEL = { hat: 'HAT', mask: 'MASK', cape: 'CAPE', aura: 'AURA', trail: 'TALON TRAIL', banner: 'BANNER' };
+const BASE_SLOTS = ['hat', 'mask', 'cape', 'aura', 'trail', 'banner']; // the level-up sets (order = unlock order: never change)
+// Phase 3B: two geometry slots on top (shoulder armour, weapon shape). Saved per hero in equipped[hero][slot].
+export const SLOTS = [...BASE_SLOTS, 'shoulder', 'weapon'];
+export const SLOT_LABEL = { hat: 'HELMET / HAT', mask: 'MASK', cape: 'BACK', aura: 'AURA', trail: 'TALON TRAIL', banner: 'BANNER', shoulder: 'SHOULDERS', weapon: 'WEAPON' };
 
 const NAMES = {
   sarrow: { hat: "Drifter's Brim", mask: 'Ash Veil', cape: 'Ember Mantle', aura: 'Cinder Halo', trail: 'Talon Wake', banner: "Duelist's Pennant" },
@@ -27,18 +29,48 @@ const COLORS = { sarrow: [0xe0702a, 0x3ff6e0], zaleks: [0xffa030, 0xd8cfb8], isk
 
 // level 2 unlocks the first item, then one per level: every hero's hat, then every hero's mask...
 export const COSMETICS = [];
-SLOTS.forEach((slot, si) => BASE_HEROES.forEach((hero, hi) => COSMETICS.push({
+BASE_SLOTS.forEach((slot, si) => BASE_HEROES.forEach((hero, hi) => COSMETICS.push({
   id: `${hero}-${slot}`, hero, slot, name: NAMES[hero][slot], level: 2 + si * 4 + hi,
   color: COLORS[hero][si % 2], glow: COLORS[hero][(si + 1) % 2],
 })));
 export const MAX_COSMETIC_LEVEL = 25;
 // KAGERO's set: account levels 27, 30, 33, 36, 39, 42
-SLOTS.forEach((slot, si) => COSMETICS.push({ id: `ninja-${slot}`, hero: 'ninja', slot, name: NAMES.ninja[slot], level: 27 + si * 3, color: COLORS.ninja[si % 2], glow: COLORS.ninja[(si + 1) % 2] }));
+BASE_SLOTS.forEach((slot, si) => COSMETICS.push({ id: `ninja-${slot}`, hero: 'ninja', slot, name: NAMES.ninja[slot], level: 27 + si * 3, color: COLORS.ninja[si % 2], glow: COLORS.ninja[(si + 1) % 2] }));
 // AXIOM's set: account levels 45..60
-SLOTS.forEach((slot, si) => COSMETICS.push({ id: `axiom-${slot}`, hero: 'axiom', slot, name: NAMES.axiom[slot], level: 45 + si * 3, color: COLORS.axiom[si % 2], glow: COLORS.axiom[(si + 1) % 2] }));
+BASE_SLOTS.forEach((slot, si) => COSMETICS.push({ id: `axiom-${slot}`, hero: 'axiom', slot, name: NAMES.axiom[slot], level: 45 + si * 3, color: COLORS.axiom[si % 2], glow: COLORS.axiom[(si + 1) % 2] }));
 // MASTERY cosmetics (hero level): gold versions of the hero's own shapes
 const MASTERY = [['aura', 7, 'Mastery Halo'], ['banner', 13, 'Mastery Standard'], ['cape', 18, 'Veteran Mantle'], ['hat', 24, 'Grand Crown']];
 for (const h of HERO_IDS) for (const [slot, hl, name] of MASTERY) COSMETICS.push({ id: `${h}-m-${slot}`, hero: h, slot, name, heroLevel: hl, color: 0xd8a83a, glow: 0xfff0a0, mastery: true });
+
+
+// ---- Phase 3B GEAR: geometry-changing cosmetics built on each hero's anchor points (cosmetics.js GEAR) ----
+// Bought with scrap in the Shop (cost; owned ids live in the scrap save's `owned` list, like shop skins)
+// or EARNED from real progress (earn). Prices sit next to the old shop (100-300) and a wave-20 run (~150-200
+// scrap): commons ~1-2 runs, rares ~3, epics ~4-5. No new save fields: equipping uses equipped[hero][slot].
+export const RARITY = { common: { label: 'COMMON', c: 0x9aa6b0 }, rare: { label: 'RARE', c: 0x3ab0ff }, epic: { label: 'EPIC', c: 0xb05aff }, legendary: { label: 'LEGENDARY', c: 0xffb02a }, earned: { label: 'EARNED', c: 0xffe27a } };
+const GEAR = {
+  sarrow: [['shoulder', 'pauldron', 'Riveted Pauldrons', 'common', 250, 0x6a737d, 0xe0702a], ['hat', 'warhelm', 'Duelist Warhelm', 'rare', 450, 0x4d5a66, 0x3ff6e0], ['weapon', 'serrated', 'Serrated Talons', 'rare', 400, 0, 0x7affe8], ['cape', 'wings', 'Exhaust Wings', 'epic', 700, 0x2a3038, 0x3ff6e0]],
+  zaleks: [['mask', 'respirator', 'Siege Respirator', 'common', 250, 0x3a3c40, 0xffa030], ['shoulder', 'spiked', 'Bastion Spikes', 'rare', 400, 0x5a5e63, 0xffa030], ['weapon', 'serrated', 'Breaker Teeth', 'rare', 400, 0, 0xffc060], ['cape', 'stacks', 'Reactor Stacks', 'epic', 650, 0x2c2e31, 0xff7a20]],
+  iskra:  [['shoulder', 'pads', 'Strike Pads', 'common', 250, 0x9aa0aa, 0xe060ff], ['hat', 'visorhelm', 'Recon Visor', 'rare', 400, 0xc9c4bc, 0xe060ff], ['weapon', 'prism', 'Prism Needles', 'rare', 450, 0, 0xffb0ff], ['cape', 'quiver', 'Needle Quiver', 'epic', 600, 0x433d58, 0xe060ff]],
+  orin:   [['shoulder', 'coil', 'Tether Coils', 'common', 300, 0xb08a4a, 0x3ff6e0], ['hat', 'crown', 'Gravity Crown', 'rare', 500, 0xb08a4a, 0x3ff6e0], ['weapon', 'serrated', 'Hooked Sickles', 'rare', 400, 0, 0xff9080], ['cape', 'ring', 'Graviton Ring', 'epic', 700, 0x8a8580, 0xff4a5a]],
+  ninja:  [['shoulder', 'sode', 'Lacquer Sode', 'common', 300, 0x7a1a22, 0xa08cff], ['mask', 'kitsune', 'Kitsune Mask', 'rare', 400, 0xe8e4dc, 0xff3a4a], ['weapon', 'tristar', 'Tri-Star', 'rare', 400, 0, 0xd0c8ff], ['cape', 'katanas', 'Twin Katana Rig', 'epic', 650, 0x14141b, 0xa08cff]],
+  axiom:  [['shoulder', 'pylon', 'Drone Pylons', 'common', 350, 0x2c2e37, 0xff2a3a], ['hat', 'sensor', 'Sensor Array', 'rare', 450, 0x5e6270, 0xff2a3a], ['weapon', 'prism', 'Prism Emitters', 'rare', 450, 0, 0xff6a6a], ['cape', 'wings', 'Uplink Wings', 'epic', 750, 0x15161b, 0xff2a3a]],
+};
+const WEAPON_SHAPE = { sarrow: 'serrated', zaleks: 'serrated', iskra: 'prism', orin: 'serrated', ninja: 'tristar', axiom: 'prism' };
+for (const h of HERO_IDS) {
+  for (const [slot, shape, name, rarity, cost, color, glow] of GEAR[h]) COSMETICS.push({ id: `${h}-g-${shape}`, hero: h, slot, shape, name, rarity, cost, color: color || glow, glow, gear: true });
+  // EARNED (never sold): this hero's best CoreBurnZ wave, every boss beaten, hero mastery level
+  COSMETICS.push({ id: `${h}-e-crown`, hero: h, slot: 'hat', shape: 'crown', name: 'Ascendant Crown', rarity: 'earned', color: 0xd8a83a, glow: 0xfff0a0, gear: true, earn: { kind: 'heroWave', n: 40 } });
+  COSMETICS.push({ id: `${h}-e-plates`, hero: h, slot: 'shoulder', shape: 'spiked', name: 'Bossbreaker Plates', rarity: 'earned', color: 0xd8a83a, glow: 0xff5a2a, gear: true, earn: { kind: 'bosses', n: 7 } });
+  COSMETICS.push({ id: `${h}-e-edge`, hero: h, slot: 'weapon', shape: WEAPON_SHAPE[h], name: 'Masterwork Edge', rarity: 'earned', color: 0xffe27a, glow: 0xffe27a, gear: true, earn: { kind: 'heroLevel', n: 20 } });
+}
+// prestige pieces for the hard-unlock heroes
+COSMETICS.push({ id: 'ninja-e-wings', hero: 'ninja', slot: 'cape', shape: 'wings', name: 'Shadow Lord Wings', rarity: 'earned', color: 0x0c0a14, glow: 0xa08cff, gear: true, earn: { kind: 'heroWave', n: 50 } });
+COSMETICS.push({ id: 'axiom-e-halo', hero: 'axiom', slot: 'cape', shape: 'ring', name: 'Overmind Halo', rarity: 'earned', color: 0x5e6270, glow: 0xff2a3a, gear: true, earn: { kind: 'heroWave', n: 60 } });
+const EARN_LABEL = { heroWave: (n, h) => `Reach wave ${n} with this hero (CoreBurnZ)`, bosses: (n) => `Beat all ${n} bosses`, heroLevel: (n) => `Hero level ${n}` };
+
+// Hooks the game fills in (main.js): scrap-shop ownership + lifetime stats, so this file stays save-only
+export const progressHooks = { shopOwns: () => false, stats: () => ({}) };
 
 export const ACCOUNT_MAX = 100, HERO_MAX = 30;
 // TITLES: account titles (shown on the menu, game over and your co-op tag) + per-hero titles
@@ -122,7 +154,22 @@ export class Progress {
   get xp() { return this.data.xp; }
   heroLevel(h) { return this.data.heroLevel[h] || 1; }
   heroInfo(h) { const lv = this.heroLevel(h); return { level: lv, xp: this.data.heroXp[h] || 0, need: lv >= HERO_MAX ? 0 : heroXpNeeded(lv), max: lv >= HERO_MAX }; }
-  owns(item) { return item.heroLevel ? this.heroLevel(item.hero) >= item.heroLevel : this.data.level >= item.level; }
+  owns(item) {
+    if (item.cost) return !!progressHooks.shopOwns(item.id);
+    if (item.earn) { const [c, t] = this.earnProgress(item); return c >= t; }
+    return item.heroLevel ? this.heroLevel(item.hero) >= item.heroLevel : this.data.level >= item.level;
+  }
+  // [current, target, text] for an EARNED item, read from the real stats (never stored)
+  earnProgress(item) {
+    const e = item.earn, s = progressHooks.stats() || {};
+    const cur = e.kind === 'heroWave' ? ((s.heroBest || {})[item.hero] || 0) : e.kind === 'bosses' ? (Array.isArray(s.bosses) ? s.bosses.length : 0) : this.heroLevel(item.hero);
+    return [Math.min(cur, e.n), e.n, EARN_LABEL[e.kind](e.n, item.hero)];
+  }
+  lockText(item) {
+    if (item.cost) return `${item.cost.toLocaleString()} SCRAP · SHOP`;
+    if (item.earn) { const [c, t] = this.earnProgress(item); return `${c}/${t} · ${EARN_LABEL[item.earn.kind](t)}`; }
+    return item.heroLevel ? `HERO LV ${item.heroLevel}` : `LEVEL ${item.level}`;
+  }
   itemsFor(hero) { return COSMETICS.filter((c) => c.hero === hero); }
   equipped(hero) { return this.data.equipped[hero] || {}; }
   equip(hero, slot, id) { // id null = take it off

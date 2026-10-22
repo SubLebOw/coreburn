@@ -1079,3 +1079,149 @@ body:has(#coop-panel:not(.hidden)) #title-panel, body:has(#tw-panel:not(.hidden)
 @media (max-height: 520px) and (orientation: landscape) {
   #rk-list { min-height: 0; } .rk-row { padding: 5px 10px; } .rk-empty, .rk-note { padding: 6px 0; } .rk-name { margin: 4px 0 0; }
 }
+
+/* =====================================================================
+   v1.31 pass 2: cinematic menu atmosphere, premium logo + profile badge,
+   hero select showcase (roster on top, 3D hero left, info right)
+   ===================================================================== */
+
+/* ---------- Atmosphere: only behind the title and hero select, never in a run ---------- */
+#menu-atmo { position: fixed; inset: 0; z-index: 15; pointer-events: none; display: none;
+  background:
+    radial-gradient(ellipse 70% 45% at 50% -8%, rgba(63,246,224,.16), transparent 70%),
+    radial-gradient(ellipse 40% 60% at -5% 40%, rgba(63,246,224,.10), transparent 70%),
+    radial-gradient(ellipse 40% 60% at 105% 40%, rgba(63,246,224,.08), transparent 70%),
+    radial-gradient(ellipse 85% 50% at 50% 112%, rgba(255,96,24,.30), rgba(255,70,20,.08) 50%, transparent 72%),
+    radial-gradient(ellipse 75% 70% at 50% 45%, transparent 35%, rgba(2,3,5,.78) 100%),
+    linear-gradient(180deg, rgba(4,8,10,.35), rgba(10,6,4,.25)); }
+#menu-atmo::after { content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse 65% 34% at 50% 104%, rgba(255,120,30,.45), transparent 70%);
+  animation: lavaPulse 5.5s ease-in-out infinite alternate; }
+@keyframes lavaPulse { from { opacity: .45; } to { opacity: 1; } }
+body:has(#overlay:not(.hidden) #title-panel:not(.hidden)) #menu-atmo,
+body:has(#upgrade-overlay.select:not(.hidden)) #menu-atmo { display: block; }
+#overlay:has(#title-panel:not(.hidden)) { background: none; }
+#upgrade-overlay.select { background: none; }
+
+/* ---------- Logo + subtitle ---------- */
+#title-panel .m-brand h1, body.zmode #title-panel .m-brand h1 {
+  background-image: linear-gradient(180deg, #fff6d6 0%, #ffd27a 38%, #ffab2e 62%, #e0602a 100%);
+  filter: drop-shadow(0 2px 0 #5a2206) drop-shadow(0 0 16px rgba(255,150,40,.45)); letter-spacing: 5px; }
+body.zmode #title-panel h1::after { background: linear-gradient(180deg, #ffffff, #ffe08a 45%, #ff8a2a); -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent; text-shadow: none; }
+#title-panel .m-brand h2 { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 8px;
+  font-size: 10px; letter-spacing: 6px; text-transform: uppercase; color: #e3cfa2; }
+#title-panel .m-brand h2::before, #title-panel .m-brand h2::after { content: ''; width: 34px; height: 1px; background: linear-gradient(90deg, transparent, #ffc23a); }
+#title-panel .m-brand h2::after { transform: scaleX(-1); }
+
+/* ---------- PLAY: gold, with a soft breathing glow (opacity only) ---------- */
+#title-panel .m-play, body.zmode #title-panel .m-play { position: relative; color: #1c1204; background: linear-gradient(180deg, #ffdc78, #ffb424);
+  border: 1px solid rgba(255,240,200,.65); box-shadow: 0 8px 26px rgba(255,170,40,.32), inset 0 1px 0 rgba(255,255,255,.55); }
+#title-panel .m-play::after { content: ''; position: absolute; inset: -3px; border-radius: inherit; pointer-events: none;
+  box-shadow: 0 0 22px 4px rgba(255,190,60,.55); opacity: .35; animation: playGlow 2.8s ease-in-out infinite alternate; }
+@keyframes playGlow { to { opacity: 1; } }
+
+/* ---------- Profile badge (name · level · XP · scrap) ---------- */
+#m-profile { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 12px;
+  border: 1px solid rgba(255,194,58,.22); background: linear-gradient(90deg, rgba(63,246,224,.07), rgba(0,0,0,.25) 45%, rgba(255,194,58,.07)); }
+.mp-hex { flex: none; width: 34px; height: 34px; color: var(--ui-teal); filter: drop-shadow(0 0 6px rgba(63,246,224,.55)); }
+.mp-hex svg { width: 100%; height: 100%; display: block; }
+body.zmode .mp-hex { color: var(--ui-gold); filter: drop-shadow(0 0 6px rgba(255,194,58,.5)); }
+.mp-main { flex: 1; min-width: 0; text-align: left; }
+#mp-name { display: block; font-size: 13px; letter-spacing: 2px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#title-panel #m-profile #lvl-bar { margin: 3px 0 0; padding: 0; border: none; background: none; box-shadow: none; font-size: 9px; gap: 6px; justify-content: flex-start; }
+#m-profile #lvl-bar i { height: 5px; }
+#m-profile #lvl-title { font-size: 9px; }
+.mp-scrap { flex: none; display: flex; align-items: baseline; gap: 4px; padding: 5px 10px; border-radius: 999px; color: var(--ui-gold);
+  border: 1px solid rgba(255,194,58,.4); background: rgba(255,194,58,.08); font-weight: 900; }
+.mp-scrap span { font-size: 11px; } .mp-scrap b { font-size: 14px; letter-spacing: .5px; } .mp-scrap small { font-size: 8px; letter-spacing: 2px; opacity: .8; }
+@media (orientation: landscape) and (max-height: 520px) {
+  #title-panel #m-profile { grid-column: 2; grid-row: 1; padding: 5px 8px; }
+  #title-panel .m-brand { grid-row: 1 / span 2; }
+  .mp-hex { width: 28px; height: 28px; }
+}
+
+/* ---------- Hero select: roster tiles on top ---------- */
+#upgrade-overlay.select #upgrade-box { max-width: 1120px; }
+#upgrade-overlay.select #upgrade-title { font-size: clamp(16px, 2.6vw, 22px); letter-spacing: 6px; }
+#upgrade-overlay.select #upgrade-cards { flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: stretch; gap: 8px; margin-top: 14px; }
+#upgrade-cards .ucard.hero { flex: 0 1 132px; max-width: 132px; min-height: 0; padding: 10px 6px 8px; gap: 5px; align-items: center; }
+#upgrade-cards .ucard.hero .ubody { display: none; }
+#upgrade-cards .ucard.hero .icon { width: 40px; height: 40px; font-size: 22px; }
+#upgrade-cards .ucard.hero .key { position: absolute; top: 5px; left: 6px; }
+.ucard.hero .tname { font-size: 12px; font-weight: 900; letter-spacing: 2px; color: var(--c); text-shadow: 0 0 10px color-mix(in srgb, var(--c) 40%, transparent); }
+.ucard.hero.locked .tname { color: #8a5a60; }
+#upgrade-cards .ucard.hero.locked .ubody { display: block; }
+#upgrade-cards .ucard.hero.locked .ubody > :not(.effect) { display: none; }
+#upgrade-cards .ucard.hero.locked .effect { font-size: 9px !important; line-height: 1.2; }
+#upgrade-cards .ucard.hero .save-badge { top: auto; bottom: -8px; right: 50%; transform: translateX(50%); white-space: nowrap; }
+
+/* ---------- Showcase: 3D stage + info panel ---------- */
+#upgrade-overlay.select #sc-wrap { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 18px; margin-top: 16px; height: min(58vh, 500px); text-align: left; }
+#sc-stage { position: relative; min-height: 0; }
+#sc-side { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+#sc-info { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px; border-radius: var(--ui-r-lg); background: var(--ui-panel);
+  border: 1px solid color-mix(in srgb, var(--c, #3ff6e0) 35%, transparent); box-shadow: var(--ui-shadow), inset 3px 0 0 var(--c, #3ff6e0); }
+#sc-info .ubody { display: flex; flex-direction: column; gap: 6px; animation: uiIn .2s var(--ui-ease) both; }
+#sc-info .group { font-size: 10px; font-weight: 900; letter-spacing: 2px; color: var(--ui-dim); }
+#sc-info .uname { font-size: clamp(24px, 3.4vw, 36px); font-weight: 900; letter-spacing: 5px; line-height: 1; color: var(--c); text-shadow: 0 0 20px color-mix(in srgb, var(--c) 45%, transparent); }
+#sc-info .effect { display: block !important; font-size: 13px; line-height: 1.4; color: #d7e0e5; }
+#sc-info .kit { display: flex; flex-direction: column; gap: 5px; }
+#sc-info .kslot { font-size: 12px; padding: 6px 9px; border-left: 2px solid var(--c); border-radius: 6px; background: rgba(255,255,255,.04); }
+#sc-info .kslot b { font-size: 13px; color: var(--c); }
+#sc-info .kslot i { display: block !important; margin: 2px 0 0; font-size: 11.5px; }
+#sc-info .stats { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: var(--ui-r); background: rgba(0,0,0,.25); border: 1px solid var(--ui-line); }
+#sc-info .sbar span { width: 58px; }
+#sc-info .sbar i { height: 5px; }
+#sc-info .hlvl { font-size: 11px; letter-spacing: 1px; color: #d8d0ff; }
+#sc-info .hlvl b { color: #fff; }
+#sc-info .hlvl i { display: block; height: 4px; margin: 3px 0; border-radius: 999px; background: rgba(255,255,255,.1); overflow: hidden; }
+#sc-info .hlvl i b { display: block; height: 100%; background: linear-gradient(90deg, #8a7aff, #ffc23a); }
+#sc-info .hlvl small { display: block; font-size: 10px; opacity: .75; }
+#sc-info .mbtn { margin-top: 6px; width: auto; padding: 6px 14px; font: 900 11px var(--ui-font); letter-spacing: 2px; color: #ffe39a; cursor: pointer;
+  background: rgba(255,194,58,.1); border: 1px solid rgba(255,194,58,.5); border-radius: var(--ui-r-sm); }
+#sc-info .mbtn em { font-style: normal; color: #fff; opacity: .8; margin-left: 4px; }
+#sc-info .mbtn:hover { background: rgba(255,194,58,.2); }
+#sc-go { align-self: flex-end; margin: 0; min-width: 180px; padding: 11px 26px; color: #061012;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c, #3ff6e0) 75%, #fff), var(--c, #3ff6e0)); box-shadow: 0 6px 22px color-mix(in srgb, var(--c, #3ff6e0) 35%, transparent); }
+#sc-side:has(#sc-info) #sc-go { --c: inherit; }
+#upgrade-overlay.select #upgrade-hint { margin-top: 10px; }
+
+/* phones, landscape: tight roster strip, smaller stage, scrolling info */
+@media (max-height: 520px) and (orientation: landscape) {
+  #upgrade-overlay.select #upgrade-title { display: none; }
+  #upgrade-overlay.select #upgrade-hint { display: none; }
+  #upgrade-overlay.select #upgrade-cards { margin: 2px 0 0 96px; margin-right: 52px; gap: 5px; flex-wrap: nowrap; }
+  #upgrade-cards .ucard.hero { flex: 1 1 0; max-width: 112px; padding: 5px 4px; gap: 2px; }
+  #upgrade-cards .ucard.hero .icon { width: 26px; height: 26px; font-size: 15px; }
+  #upgrade-cards .ucard.hero .key { display: none; }
+  .ucard.hero .tname { font-size: 10px; letter-spacing: 1px; }
+  #upgrade-cards .ucard.hero.locked .effect { display: none !important; }
+  .ucard.hero.sel::before { top: -7px; font-size: 7px; padding: 0 5px; }
+  #upgrade-overlay.select #sc-wrap { grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 10px; margin-top: 8px; height: calc(100vh - 92px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); height: calc(100dvh - 92px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  #sc-info { padding: 8px 12px; }
+  #sc-info .ubody { gap: 4px; }
+  #sc-info .uname { font-size: 22px; letter-spacing: 3px; }
+  #sc-info .effect { font-size: 11px; }
+  #sc-info .kslot { font-size: 10.5px; padding: 4px 7px; } #sc-info .kslot b { font-size: 11px; } #sc-info .kslot i { font-size: 10px; }
+  #sc-side { gap: 6px; }
+  #sc-go { min-height: 40px; padding: 8px 20px; min-width: 150px; font-size: 14px; }
+  #upgrade-overlay.select #sel-cos-btn { margin-top: 4px; }
+}
+/* phones, portrait: roster wraps, stage above the info */
+@media (max-width: 600px) and (orientation: portrait) {
+  #upgrade-cards .ucard.hero { flex: 0 1 30%; }
+  #upgrade-overlay.select #sc-wrap { grid-template-columns: 1fr; grid-template-rows: 200px auto; height: auto; }
+  #sc-info { max-height: 46vh; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #menu-atmo::after, #title-panel .m-play::after { animation: none; }
+  #sc-info .ubody { animation: none; }
+}
+body:has(#upgrade-overlay.select:not(.hidden)) #touch-controls { opacity: 0; pointer-events: none; }
+#menu-atmo { box-shadow: inset 0 0 160px 40px rgba(0,0,0,.55); }
+@media (max-height: 520px) and (orientation: landscape) {
+  #upgrade-overlay.select #upgrade-cards { margin-top: 8px; }
+  #upgrade-overlay.select #sc-wrap { margin-right: 52px; height: calc(100vh - 118px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); height: calc(100dvh - 118px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+}
+@media (max-height: 520px) and (orientation: landscape) { #upgrade-overlay.select #upgrade-box { padding-top: 6px; } }

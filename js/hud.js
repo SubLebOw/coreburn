@@ -185,13 +185,14 @@ export class Hud {
     $('upgrade-hint').textContent = `Press 1-${chars.length} · ← → and Enter · or click a hero`;
     const box = $('upgrade-cards');
     box.innerHTML = '';
+    const info = $('sc-info'); info.innerHTML = ''; // showcase info panel: the selected hero's details live here
     let sel = Math.max(0, chars.findIndex((c) => c.id === current));
     const bar = (label, v) => `<div class="sbar"><span>${label}</span><i><b style="width:${Math.round(Math.min(1, v) * 100)}%"></b></i></div>`;
     const els = chars.map((c, i) => {
       const b = document.createElement('button');
       if (c.locked) { // the secret hero: a dark silhouette until it's unlocked
         b.className = 'ucard hero locked';
-        b.innerHTML = `<span class="key">${i + 1}</span><div class="icon sil">${SILHOUETTE}</div><div class="ubody"><div class="group">SECRET HERO</div><div class="uname">???</div><div class="effect">🔒 ${c.unlockHint}</div></div>`;
+        b.innerHTML = `<span class="key">${i + 1}</span><div class="icon sil">${SILHOUETTE}</div><div class="tname">???</div><div class="ubody"><div class="group">SECRET HERO</div><div class="uname">???</div><div class="effect">🔒 ${c.unlockHint}</div></div>`;
         b.addEventListener('pointerdown', (e) => e.stopPropagation());
         b.addEventListener('click', (e) => { e.stopPropagation(); b.classList.remove('nope'); void b.offsetWidth; b.classList.add('nope'); });
         box.appendChild(b);
@@ -202,7 +203,7 @@ export class Hud {
       const range = { sarrow: 0.3, zaleks: 0.25, iskra: 1, orin: 0.6, ninja: 0.85, axiom: 0.9 }[c.id] ?? 0.5;
       const kit = c.abilities ? ['attack', 'mobility', 'ultimate'].map((k, j) =>
         `<div class="kslot"><b>${zab(c.abilities[k]).icon} ${zab(c.abilities[k]).name}</b> <span>${['J', 'K', 'L'][j]}</span><i>${(RULES.z && c.abilities[k].zdesc) || zab(c.abilities[k]).desc}</i></div>`).join('') : '';
-      b.innerHTML = `<span class="key">${i + 1}</span><div class="icon">⬢</div><div class="ubody"><div class="group"></div><div class="uname"></div><div class="effect"></div>` +
+      b.innerHTML = `<span class="key">${i + 1}</span><div class="icon">⬢</div><div class="tname">${c.name}</div><div class="ubody"><div class="group"></div><div class="uname"></div><div class="effect"></div>` +
         `<div class="kit">${kit}</div><div class="stats">${bar('HEALTH', c.hp / 200)}${bar('SPEED', c.speed / 8.3)}${bar('RANGE', range)}</div></div>`;
       b.querySelector('.group').innerHTML = `<span class="ptag">${c.tag}</span> ${c.title.toUpperCase()}`;
       b.querySelector('.uname').textContent = c.name;
@@ -224,11 +225,22 @@ export class Hud {
         b.querySelector('.ubody').insertBefore(d, b.querySelector('.kit'));
       }
       b.addEventListener('pointerdown', (e) => e.stopPropagation());
-      b.addEventListener('click', (e) => { e.stopPropagation(); pick(i); });
+      b.addEventListener('click', (e) => { e.stopPropagation(); if (i === sel) pick(i); else { sel = i; mark(); } }); // tap = preview, tap again (or SELECT) = go
       box.appendChild(b);
       return b;
     });
-    const mark = () => els.forEach((b, i) => b.classList.toggle('sel', i === sel));
+    const bodies = els.map((b) => b.querySelector('.ubody'));
+    const mark = () => {
+      els.forEach((b, i) => b.classList.toggle('sel', i === sel));
+      bodies.forEach((u, i) => { if (i !== sel && u.parentNode !== els[i]) els[i].appendChild(u); });
+      if (chars[sel] && !chars[sel].locked) {
+        info.style.setProperty('--c', hex(chars[sel].color));
+        info.appendChild(bodies[sel]);
+        this.onSelectHero?.(chars[sel]);
+      }
+    };
+    $('sc-go').onpointerdown = (e) => e.stopPropagation();
+    $('sc-go').onclick = (e) => { e.stopPropagation(); pick(sel); };
     mark();
     let done = false;
     const pick = (i) => {

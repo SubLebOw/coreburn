@@ -45,6 +45,7 @@ import { CosmeticsUI } from './cosmetics-ui.js?v=1.30.1';
 import { Shrine } from './shrine.js?v=1.30.1';
 import { getMastery } from './mastery.js?v=1.30.1';
 import { readSave, writeSave, deleteSave } from './saves.js?v=1.30.1';
+import { Showcase } from './showcase.js?v=1.30.1';
 
 const IS_TOUCH = isTouchDevice();
 if (IS_TOUCH) document.body.classList.add('touch'); // shows the touch controls (see style.css)
@@ -80,6 +81,15 @@ scene.add(sun, sun.target);
 const input = new Input(renderer.domElement);
 setupTouchControls(input);
 const hud = new Hud();
+// HERO SHOWCASE on hero select: same renderer, its own tiny scene, drawn only while hero select is open
+const showcase = new Showcase(renderer);
+let scHid = null, scWasVisible = true;
+const scStage = document.getElementById('sc-stage'), selOverlay = document.getElementById('upgrade-overlay');
+hud.onSelectHero = (c) => showcase.setHero(c.id, c.color, () => {
+  const v = progress.variantOf(c.id), m = c.build(v ? v.tint : null);
+  if (v && m.core) m.core.material.color.setHex(v.glow);
+  return m;
+});
 const effects = new Effects(scene);
 const projectiles = new Projectiles(scene);
 const env = { hemi, sun, baseHemi: 1.2 };
@@ -537,6 +547,7 @@ function showTitle() {
   state = 'title';
   if (!coop.mode) { setRules(localStorage.getItem('coreburn-rules') === 'z'); onRulesChanged(); } // back to your own pick after co-op
   cosmeticsUI.refreshBadge();
+  refreshProfileName();
   hud.showTitle(best);
   document.getElementById('restart-btn').classList.remove('hidden');
   document.getElementById('restart-hint').innerHTML = RESTART_HINT;
@@ -928,6 +939,9 @@ document.getElementById('start-btn').addEventListener('click', showCharacterSele
   mb.addEventListener('pointerdown', (e) => e.stopPropagation()); mm.addEventListener('pointerdown', (e) => e.stopPropagation());
   mb.addEventListener('click', (e) => { e.stopPropagation(); const open = mm.classList.toggle('hidden') === false; mb.setAttribute('aria-expanded', String(open)); mb.classList.toggle('on', open); }); }
 document.getElementById('restart-btn').addEventListener('click', tryRestart);
+// main menu profile badge: the leaderboard name (or PLAYER until one is set)
+function refreshProfileName() { document.getElementById('mp-name').textContent = (leaderboard.name || 'PLAYER').toUpperCase(); }
+refreshProfileName();
 setRules(localStorage.getItem('coreburn-rules') === 'z');
 onRulesChanged();
 hud.showTitle(best);
@@ -1085,6 +1099,13 @@ function frame() {
   coop.updateTags(camera);
   input.endFrame();
   renderer.render(scene, camera);
+  if (state === 'select' && selOverlay.classList.contains('select') && !selOverlay.classList.contains('hidden')) {
+    if (!scHid && player.model) { scHid = player.model.root; scWasVisible = scHid.visible; scHid.visible = false; } // the arena hero would stand behind the showcase
+    showcase.render(dt, scStage);
+  } else if (showcase.model || scHid) { // left hero select: drop the showcase model, give the arena hero back
+    showcase.hide();
+    if (scHid) { scHid.visible = scWasVisible; scHid = null; }
+  }
 }
 frame();
 

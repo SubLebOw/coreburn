@@ -12,21 +12,21 @@
 // Rules: enemies get more numerous and tougher per player, bosses switch targets every few seconds,
 // a downed hero is revived by a teammate standing next to them for 3 seconds, and the run ends when
 // everyone is down. Score and combo are shared; upgrade picks and power-ups are per player.
-import { applyAffixVisuals } from './affixes.js?v=1.31.0';
-import { cleanMastery } from './mastery.js?v=1.31.0';
-import { synergiesFor, showSynergyPopup } from './synergy.js?v=1.31.0';
+import { applyAffixVisuals } from './affixes.js?v=1.31.1';
+import { cleanMastery } from './mastery.js?v=1.31.1';
+import { synergiesFor, showSynergyPopup } from './synergy.js?v=1.31.1';
 import * as THREE from 'three';
-import { NetHost, NetClient, normalizeCode, MAX_PLAYERS } from './net.js?v=1.31.0';
-import { Player } from './player.js?v=1.31.0';
-import { Enemy } from './enemy.js?v=1.31.0';
-import { bossForNumber } from './bosses.js?v=1.31.0';
-import { RULES, setRules } from './rules.js?v=1.31.0';
-import { makeGolden } from './golden.js?v=1.31.0';
-import { meta } from './meta.js?v=1.31.0';
-import { waveStats } from './waves.js?v=1.31.0';
-import { CHARACTERS, ALL_HEROES, DUPLICATE_TINTS, displayName } from './characters.js?v=1.31.0';
-import { GAME_VERSION } from './version.js?v=1.31.0';
-import { cleanLook } from './progress.js?v=1.31.0';
+import { NetHost, NetClient, normalizeCode, MAX_PLAYERS } from './net.js?v=1.31.1';
+import { Player } from './player.js?v=1.31.1';
+import { Enemy } from './enemy.js?v=1.31.1';
+import { bossForNumber } from './bosses.js?v=1.31.1';
+import { RULES, setRules } from './rules.js?v=1.31.1';
+import { makeGolden } from './golden.js?v=1.31.1';
+import { meta } from './meta.js?v=1.31.1';
+import { waveStats } from './waves.js?v=1.31.1';
+import { CHARACTERS, ALL_HEROES, DUPLICATE_TINTS, displayName } from './characters.js?v=1.31.1';
+import { GAME_VERSION } from './version.js?v=1.31.1';
+import { cleanLook } from './progress.js?v=1.31.1';
 
 const SNAP_RATE = 15;   // host -> friends, per second
 const INPUT_RATE = 20;  // friend -> host, per second

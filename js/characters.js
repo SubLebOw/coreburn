@@ -12,7 +12,7 @@
 // numbers. They stay within ~10% of each other at every wave.
 import * as THREE from 'three';
 
-import { HERO_STATS, CHARACTER_ORDER, ALL_HEROES, heroOrder, characterBudget } from './hero-stats.js?v=1.30.3';
+import { HERO_STATS, CHARACTER_ORDER, ALL_HEROES, heroOrder, characterBudget } from './hero-stats.js?v=1.31.0';
 export { CHARACTER_ORDER, ALL_HEROES, heroOrder, characterBudget };
 const BUILDERS = { sarrow: (t) => buildSarrow(t), zaleks: (t) => buildZaleks(t), iskra: (t) => buildIskra(t), orin: (t) => buildOrin(t), ninja: (t) => buildNinja(t), axiom: (t) => buildAxiom(t) };
 export const CHARACTERS = Object.fromEntries(Object.entries(HERO_STATS).map(([id, c]) => [id, { ...c, build: BUILDERS[id] }]));

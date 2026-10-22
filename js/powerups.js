@@ -9,7 +9,7 @@
 //   MAGNET     10s   pulls pickups in from far away, and every kill drops a +5 heal orb
 //   ARC TALONS 10s   your slashes and blinks chain lightning to 3 nearby enemies
 import * as THREE from 'three';
-import { RULES, Z_TUNING } from './rules.js?v=1.30.3';
+import { RULES, Z_TUNING } from './rules.js?v=1.31.0';
 const Z_SHIELD_TIME = 1e6;
 
 export const POWERUPS = {

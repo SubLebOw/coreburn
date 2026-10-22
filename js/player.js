@@ -7,11 +7,11 @@
 //   ORIN    chaining arc tether/ Magnet Grapple (yank / pull) / Hymn Engine (vortex + drones)
 // Also: core recharge (regen), weapon tier + upgrade cards (upgrades.js), power-ups (powerups.js).
 import * as THREE from 'three';
-import { decorateSkin } from './cosmetics.js?v=1.30.3';
-import { RULES, zHero } from './rules.js?v=1.30.3';
-import { Loadout, tierColor } from './upgrades.js?v=1.30.3';
-import { CHARACTERS } from './characters.js?v=1.30.3';
-import { KIT } from './allies.js?v=1.30.3';
+import { decorateSkin } from './cosmetics.js?v=1.31.0';
+import { RULES, zHero } from './rules.js?v=1.31.0';
+import { Loadout, tierColor } from './upgrades.js?v=1.31.0';
+import { CHARACTERS } from './characters.js?v=1.31.0';
+import { KIT } from './allies.js?v=1.31.0';
 
 // The camera looks at the arena from the +X/+Z corner. These are the floor directions
 // that match "up the screen" and "right on the screen", so W always moves up the screen.

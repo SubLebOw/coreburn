@@ -3,7 +3,7 @@
 // acid-green visors. This file defines every regular enemy type, how they look,
 // and how they behave. (Bosses live in boss.js, waves in waves.js.)
 import * as THREE from 'three';
-import { affixDamage } from './affixes.js?v=1.30.3';
+import { affixDamage } from './affixes.js?v=1.31.0';
 
 const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1); // shared by every enemy body part
 const VISOR_MAT = new THREE.MeshBasicMaterial({ color: 0xc8ff3a });  // acid-green glow

@@ -13,12 +13,12 @@
 //   every 5th wave is a BOSS round instead (7 bosses take turns, see bosses.js;
 //   each time round the rotation they get faster and nastier)
 import * as THREE from 'three';
-import { Enemy } from './enemy.js?v=1.30.3';
-import { bossForNumber } from './bosses.js?v=1.30.3';
-import { RULES, Z_TUNING } from './rules.js?v=1.30.3';
-import { tickBossPhase } from './boss-phases.js?v=1.30.3';
-import { rollAffixes, applyAffixStats, tickAffixes, tickAffixVisuals, affixDeath, tickAffixJobs } from './affixes.js?v=1.30.3';
-import { makeGolden } from './golden.js?v=1.30.3';
+import { Enemy } from './enemy.js?v=1.31.0';
+import { bossForNumber } from './bosses.js?v=1.31.0';
+import { RULES, Z_TUNING } from './rules.js?v=1.31.0';
+import { tickBossPhase } from './boss-phases.js?v=1.31.0';
+import { rollAffixes, applyAffixStats, tickAffixes, tickAffixVisuals, affixDeath, tickAffixJobs } from './affixes.js?v=1.31.0';
+import { makeGolden } from './golden.js?v=1.31.0';
 
 const SCREEN_CAP = 14;        // regular enemies alive at once (not counting mites/summons)
 const HARD_CAP = 24;          // (co-op: 30)          // absolute limit including splitter mites and boss summons

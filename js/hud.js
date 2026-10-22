@@ -192,7 +192,7 @@ export class Hud {
       const b = document.createElement('button');
       if (c.locked) { // the secret hero: a dark silhouette until it's unlocked
         b.className = 'ucard hero locked';
-        b.innerHTML = `<span class="key">${i + 1}</span><div class="icon sil">${SILHOUETTE}</div><div class="tname">???</div><div class="ubody"><div class="group">SECRET HERO</div><div class="uname">???</div><div class="effect">🔒 ${c.unlockHint}</div></div>`;
+        b.innerHTML = `<span class="key">${i + 1}</span><div class="icon sil">${SILHOUETTE}</div><div class="tname">${c.secret ? '???' : c.name}</div><div class="ubody"><div class="group">${c.secret ? 'SECRET HERO' : 'LOCKED HERO'}</div><div class="uname">${c.secret ? '???' : c.name}</div><div class="effect">🔒 ${c.unlockHint}</div></div>`;
         b.addEventListener('pointerdown', (e) => e.stopPropagation());
         b.addEventListener('click', (e) => { e.stopPropagation(); b.classList.remove('nope'); void b.offsetWidth; b.classList.add('nope'); });
         box.appendChild(b);

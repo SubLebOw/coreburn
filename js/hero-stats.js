@@ -62,7 +62,7 @@ export const HERO_STATS = {
   orin: {
     id: 'orin', name: 'ORIN', title: 'Rogue choir-unit', tag: 'CONTROL', color: 0xff4a5a, blade: 0xff9a8a, secret: true,
     blurb: 'Controls the fight: a chaining arc beam, a magnet grapple, and drones that fight for him.',
-    unlockHint: 'Reach wave 50 to unlock',
+    unlockHint: 'Reach wave 50',
     hp: 165, speed: 6.6, dmg: 1.08, atkSpeed: 1, armor: 0,
     abilities: {
       attack: { name: 'Arc Tether', short: 'TETHER', icon: 'ϟ', desc: 'Short beam that pins an enemy in place and chains to 2 more' },

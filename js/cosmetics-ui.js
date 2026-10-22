@@ -19,6 +19,7 @@ export class CosmeticsUI {
     this.previewSkin = null;
     this.panel.addEventListener('pointerdown', (e) => e.stopPropagation());
     $('cos-close').addEventListener('click', (e) => { e.stopPropagation(); this.close(); });
+    $('cos-back').addEventListener('click', (e) => { e.stopPropagation(); $('cos-close').click(); }); // top-left BACK = same as DONE
     window.addEventListener('keydown', (e) => { if (this.isOpen && e.code === 'Escape') { e.stopImmediatePropagation(); this.close(); } }, true);
     this.refreshBadge();
   }

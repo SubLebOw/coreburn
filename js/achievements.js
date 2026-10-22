@@ -5,6 +5,7 @@
 //
 // stats used (meta.data.stats): kills, bestWave, bestCombo, bosses[] (boss ids beaten), goldens,
 // closeCalls, mutators, heroWave10[] (heroes that reached wave 10), coopRuns, revives, dailies, rushes
+import { HERO_STATS } from './hero-stats.js?v=1.30.3';
 export const ACHIEVEMENTS = [
   { id: 'kills100', name: 'Scrapper', desc: 'Defeat 100 enemies (total)', goal: (s) => [s.kills, 100], reward: { scrap: 50 } },
   { id: 'kills2500', name: 'Choir Breaker', desc: 'Defeat 2,500 enemies (total)', goal: (s) => [s.kills, 2500], reward: { scrap: 250 } },
@@ -27,7 +28,7 @@ export const ACHIEVEMENTS = [
 ];
 
 export function defaultStats() {
-  return { runs: 0, kills: 0, bestWave: 0, bestCombo: 0, bosses: [], goldens: 0, closeCalls: 0, mutators: 0, heroWave10: [], coopRuns: 0, revives: 0, dailies: 0, rushes: 0, rushClears: 0 };
+  return { zBosses: [], heroBest: {}, runs: 0, kills: 0, bestWave: 0, bestCombo: 0, bosses: [], goldens: 0, closeCalls: 0, mutators: 0, heroWave10: [], coopRuns: 0, revives: 0, dailies: 0, rushes: 0, rushClears: 0 };
 }
 
 // Returns the milestones that were just completed (and pays their rewards)
@@ -51,7 +52,7 @@ export function checkAchievements(meta, live = {}) {
 export function rewardText(a, meta) {
   const r = a.reward;
   if (r.scrap) return `+${r.scrap} scrap`;
-  if (r.hero) return 'SECRET HERO UNLOCKED: ORIN';
+  if (r.hero) return `${r.hero === 'orin' ? 'SECRET ' : ''}HERO UNLOCKED: ${HERO_STATS[r.hero]?.name || r.hero}`;
   const it = meta.item(r.item[0], r.item[1]);
   return `${it ? it.name : r.item[1]} ${r.item[0] === 'skin' ? 'skin' : 'talons'} unlocked`;
 }

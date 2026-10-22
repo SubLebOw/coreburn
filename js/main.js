@@ -32,6 +32,7 @@ import { GOLD_TIME } from './golden.js?v=1.30.3';
 import { ShopUI } from './shop-ui.js?v=1.30.3';
 import { Twitch } from './twitch.js?v=1.30.3';
 import { checkAchievements, rewardText } from './achievements.js?v=1.30.3';
+import { isLocked, lockHint, migrateUnlocks, onWaveReached, onBossDefeated } from './unlocks.js?v=1.30.3';
 import { rngFor, dailyKey, weekKey, rushOrder, RUSH_BOSSES, rushTierBefore, rushScore, rushLabel, formatTime, dailyStartCard } from './modes.js?v=1.30.3';
 import { BOSS_ROTATION } from './bosses.js?v=1.30.3';
 import { Leaderboard } from './leaderboard.js?v=1.30.3';
@@ -144,6 +145,7 @@ const world = {
   onEnemyKilled(e) {
     kills++;
     meta.data.stats.kills++;
+    if (goldRush && ++goldRush.got >= goldRush.goal) goldRushEnd(true); else if (goldRush) hud.setMutator({ name: `GOLD RUSH ${goldRush.got}/${goldRush.goal}`, color: '#ffc23a' });
     sound.play('enemyDeath');
     combo.add(1);
     score += Math.round(e.points * combo.mult * (enemies.mutator?.score || 1) * player.stats.scoreMult);
@@ -175,6 +177,7 @@ const world = {
     }
   },
   onWaveStart(n) {
+    heroUnlocks(onWaveReached(n, player.char.id, RULES.z, mode === 'endless'));
     const mut = enemies.mutator;
     if (RULES.z && mode === 'endless' && shrine.onWaveStart(n, !mut && !isBossWave(n))) { // CoreBurnZ: a RISK SHRINE rises
       setTimeout(() => { if (shrine.visible) { hud.showToast('RISK SHRINE', 'Stand on the red altar: curse 3 waves, win a boss relic', '#ff3a4a'); if (coop.mode === 'host') coop.net.broadcast({ t: 'toast', text: 'RISK SHRINE', sub: 'Stand on the red altar: curse 3 waves, win a boss relic', color: '#ff3a4a' }); } }, 1800);
@@ -187,6 +190,7 @@ const world = {
       return;
     }
     hud.setMutator(null);
+    if (!transition && goldRushStart(n)) { sound.play('waveStart'); sound.setIntensity(1); return; }
     if (transition) { sound.play('waveStart'); sound.setIntensity(1); return; } // the arena banner shows instead
     const msgs = { 1: 'The Grindchoir is coming', 2: 'Ripper hounds: they lunge!', 3: 'Slag spitters: dodge the bolts', 4: 'Bulwarks: only heavy hits stagger them', 6: 'Hive splitters burst into mites', 7: 'Elites (amber crowns) incoming' };
     hud.showBanner(`WAVE ${n}`, msgs[n] || '');
@@ -205,6 +209,7 @@ const world = {
     run.bosses++;
     const st = meta.data.stats;
     if (!st.bosses.includes(enemies.bossDef.name)) st.bosses.push(enemies.bossDef.name);
+    heroUnlocks(onBossDefeated(enemies.bossDef, RULES.z)); // Kagero: unique CoreBurnZ bosses (counted once each)
     milestones();
     if (enemies.golden) goldenReward(boss);
     world.player.heal(60);
@@ -229,6 +234,7 @@ const world = {
     hud.showToast(def.name + '!', def.hint, '#' + def.color.toString(16).padStart(6, '0'));
   },
   onWaveCleared(n) {
+    if (goldRush) goldRushEnd(false); // the wave ended before the objective
     if (mode === 'rush') { // BOSS RUSH: a pick after every boss; after the 7th, you've won
       if (n / 5 >= RUSH_BOSSES) { world.runOver = true; rushWon = true; deathTimer = 0; setTimeout(() => { if (state === 'playing') gameOver(); }, 1600); }
       else { upgradeTimer = Math.max(upgradeTimer, 1.3); normalPick = true; }
@@ -240,7 +246,7 @@ const world = {
     const bonus = 25 * n * combo.mult;
     score += bonus;
     if (!isBossWave(n)) {
-      const wh = RULES.z ? Z_TUNING.waveHeal : 25;
+      const wh = RULES.z ? Math.min(25, Math.max(Z_TUNING.waveHeal, Math.round(0.05 * world.player.maxHp))) : 25; // v1.31: max(12, 5% max HP), capped at 25
       world.player.heal(wh);
       hud.showBanner(`WAVE ${n} CLEARED`, `+${bonus} pts · +${wh} health`);
     }
@@ -395,12 +401,13 @@ function updateTransition(dt) {
 
 // ---------- Starting / ending a run ----------
 // Character select comes before EVERY run (the last pick is highlighted)
-let heroId = CHARACTERS[localStorage.getItem('coreburn-hero')] && (!CHARACTERS[localStorage.getItem('coreburn-hero')].secret || meta.data.unlocked[localStorage.getItem('coreburn-hero')]) ? localStorage.getItem('coreburn-hero') : 'sarrow';
+migrateUnlocks(progress.data.level || 1); // v1.31: one-time, add-only (grandfathers existing profiles)
+let heroId = CHARACTERS[localStorage.getItem('coreburn-hero')] && !isLocked(localStorage.getItem('coreburn-hero')) ? localStorage.getItem('coreburn-hero') : 'sarrow';
 function showCharacterSelect() {
   state = 'select';
   hud.hideOverlay();
   const canSave = mode === 'endless' && !coop.mode;
-  const chars = heroOrder(RULES.z).map((id) => ({ ...CHARACTERS[id], locked: CHARACTERS[id].secret && !meta.data.unlocked[id], hlv: RULES.z ? progress.heroInfo(id) : null, save: canSave ? getSave(id) : null }));
+  const chars = heroOrder(RULES.z).map((id) => ({ ...CHARACTERS[id], locked: isLocked(id), unlockHint: lockHint(id) || CHARACTERS[id].unlockHint, hlv: RULES.z ? progress.heroInfo(id) : null, save: canSave ? getSave(id) : null }));
   if (!chars.find((c) => c.id === heroId) || chars.find((c) => c.id === heroId)?.locked) heroId = 'sarrow';
   hud.showSelect(chars, heroId, (id) => {
     heroId = id;
@@ -421,7 +428,7 @@ function snapshot(n) {
     levels: { ...L.levels }, tier: L.tier, patches: L.patches, rerolls: L.rerolls, mythicAt: L.mythicAt, comboBest: combo.best,
     curse: shrine.curse ? { ...shrine.curse } : null, shrineLast: shrine.lastWave, mutator: enemies.mutator?.id || null,
     drones: player.char.id === 'axiom' && ax ? ax.perm(player) : null, uploadUsed: !!player.uploadUsed, revived: revivedThisRun,
-    run: { bosses: run.bosses, mutators: run.mutators, jackpot: run.jackpot } };
+    run: { bosses: run.bosses, mutators: run.mutators, jackpot: run.jackpot, rushes: run.rushes || 0 } };
 }
 function autosave(n) {
   if (!savable() || restoring) return;
@@ -488,7 +495,7 @@ function startGame(id = heroId, sv = null) {
   state = 'playing';
   revivedThisRun = false;
   hostPicking = false;
-  run = { bosses: 0, mutators: 0, jackpot: 0, awarded: 0, drops: [] };
+  run = { bosses: 0, mutators: 0, jackpot: 0, awarded: 0, drops: [] }; goldRush = null;
   closeCall = 0; closeCallCd = 0; bursts.length = 0;
   document.body.classList.remove('closecall');
   hud.setMutator(null);
@@ -535,7 +542,7 @@ function startClientGame(char, tint, name = char) {
   deathTimer = 0;
   player.talonBase = null;
   player.startCard = null;
-  run = { bosses: 0, mutators: 0, jackpot: 0, awarded: 0, drops: [] };
+  run = { bosses: 0, mutators: 0, jackpot: 0, awarded: 0, drops: [] }; goldRush = null;
   player.setCharacter(char, null);
   player.setIdColor(tint); // co-op duplicates: coloured ring + name tag instead of a body recolour
   hud.setHeroName(name.toUpperCase(), tint || player.char.color);
@@ -577,6 +584,28 @@ world.coop = coop;
 
 let lastRun = { wave: 1, score: 0, killer: null, place: null, tier: 0 }; // what the share buttons talk about
 
+// GOLD RUSH (v1.31, CoreBurnZ survival): now and then an ordinary wave (8+, never boss/mutator/shrine waves)
+// asks for N kills in 25 s. Success adds bonus SCRAP (the game's currency) to the run jackpot, paid with the
+// normal run scrap (once). Failure just ends the event. Max 2 per run, 12% per eligible wave; solo and co-op host
+// only (a co-op client never rolls it, so nothing pays twice).
+let goldRush = null;
+function goldRushStart(n) {
+  goldRush = null;
+  if (!RULES.z || mode !== 'endless' || coop.mode === 'client' || n < 8 || isBossWave(n) || enemies.mutator || shrine.visible || (run.rushes || 0) >= 2) return false;
+  if (!(world.forceGoldRush || Math.random() < 0.12)) return false;
+  run.rushes = (run.rushes || 0) + 1;
+  goldRush = { n, goal: 10 + Math.min(15, Math.floor(n / 3)), got: 0, t: 25 };
+  hud.showBanner('GOLD RUSH!', `Wave ${n} · defeat ${goldRush.goal} enemies in 25 s for bonus scrap`, '#ffc23a');
+  hud.setMutator({ name: `GOLD RUSH 0/${goldRush.goal}`, color: '#ffc23a' });
+  return true;
+}
+function goldRushEnd(won) {
+  const g = goldRush; goldRush = null; hud.setMutator(null);
+  if (!g || world.runOver) return;
+  if (won) { const bonus = Math.min(120, 20 + 2 * g.n); run.jackpot += bonus; hud.showToast('GOLD RUSH COMPLETE', `+${bonus} scrap (paid at the end of the run)`, '#ffc23a'); sound.play('powerup'); }
+  else hud.showToast('GOLD RUSH OVER', `${g.got}/${g.goal} - no bonus this time`, '#93a4ae');
+}
+
 // GOLDEN boss: scrap jackpot and a 40% chance at a rare cosmetic you don't own yet
 function goldenReward(boss) {
   const jackpot = 150 + 50 * Math.min(10, boss.bossNumber || 1);
@@ -596,6 +625,10 @@ function goldenReward(boss) {
 
 // MILESTONES: check progress now (stats are updated as things happen); pop a toast for each new one
 const milestoneQueue = [];
+function heroUnlocks(ids) { // a non-blocking milestone toast, once per hero (the unlock flag is permanent)
+  for (const id of ids) milestoneQueue.push({ name: 'NEW HERO', reward: { hero: id } });
+  if (milestoneQueue.length && !milestoneQueue.showing) showNextMilestone();
+}
 function milestones() {
   meta.data.stats.bestCombo = Math.max(meta.data.stats.bestCombo, combo.best);
   const live = { cursed: player.loadout.picked.filter((p) => p.group === 'cursed').length };
@@ -1063,6 +1096,7 @@ function frame() {
       if (!coop.mode && !world.runOver) runTime += dt;
       if (coop.mode === 'host') coop.hostSim(dt);
       combo.update(worldDt);
+      if (goldRush && (goldRush.t -= worldDt) <= 0) goldRushEnd(false);
       if (upgradeTimer > 0) {
         upgradeTimer -= dt;
         if (upgradeTimer <= 0 && (!player.dead || coop.mode === 'host')) openUpgradePicker();

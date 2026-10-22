@@ -14,7 +14,10 @@ import * as THREE from 'three';
 
 import { HERO_STATS, CHARACTER_ORDER, ALL_HEROES, heroOrder, characterBudget } from './hero-stats.js?v=1.31.1';
 export { CHARACTER_ORDER, ALL_HEROES, heroOrder, characterBudget };
-const BUILDERS = { sarrow: (t) => buildSarrow(t), zaleks: (t) => buildZaleks(t), iskra: (t) => buildIskra(t), orin: (t) => buildOrin(t), ninja: (t) => buildNinja(t), axiom: (t) => buildAxiom(t) };
+import { buildSarrow as hmSarrow, buildZaleks as hmZaleks, buildIskra as hmIskra, buildOrin as hmOrin, buildNinja as hmNinja, buildAxiom as hmAxiom } from './hero-models.js?v=1.31.1';
+// Phase 3B: the layered procedural models in hero-models.js (the old box builders below are kept for reference)
+const BUILDERS = { sarrow: hmSarrow, zaleks: hmZaleks, iskra: hmIskra, orin: hmOrin, ninja: hmNinja, axiom: hmAxiom };
+const LEGACY_BUILDERS = { sarrow: (t) => buildSarrow(t), zaleks: (t) => buildZaleks(t), iskra: (t) => buildIskra(t), orin: (t) => buildOrin(t), ninja: (t) => buildNinja(t), axiom: (t) => buildAxiom(t) };
 export const CHARACTERS = Object.fromEntries(Object.entries(HERO_STATS).map(([id, c]) => [id, { ...c, build: BUILDERS[id] }]));
 
 // Co-op duplicates get a colour tint so you can tell them apart

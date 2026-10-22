@@ -1225,3 +1225,6 @@ body:has(#upgrade-overlay.select:not(.hidden)) #touch-controls { opacity: 0; poi
   #upgrade-overlay.select #sc-wrap { margin-right: 52px; height: calc(100vh - 118px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); height: calc(100dvh - 118px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
 }
 @media (max-height: 520px) and (orientation: landscape) { #upgrade-overlay.select #upgrade-box { padding-top: 6px; } }
+#m-profile #lvl-bar span { white-space: nowrap; } #m-profile #lvl-title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; } #m-profile #lvl-bar i { flex: 1 0 40px; }
+#m-profile, #m-profile .mp-main { min-width: 0; } #m-profile #lvl-bar i { flex: 1 1 24px; min-width: 24px; } @media (orientation: landscape) and (max-height: 520px) { #title-panel { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+@media (orientation: landscape) and (max-height: 520px) { #title-panel .m-brand h1, body.zmode #title-panel .m-brand h1 { font-size: clamp(28px, 4.6vw, 40px); letter-spacing: 3px; } #title-panel .m-brand h2 { white-space: nowrap; letter-spacing: 4px; gap: 8px; } #title-panel .m-brand h2::before, #title-panel .m-brand h2::after { width: 20px; } }

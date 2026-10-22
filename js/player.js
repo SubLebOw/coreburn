@@ -132,6 +132,13 @@ export class Player {
       this.model.root.add(this.idRing);
     } else if (this.idRing) this.idRing.parent?.remove(this.idRing);
   }
+  // co-op: a remote hero leaves for good -> free its model, its own arcs/rings and pooled trail patches
+  disposeAll() {
+    disposeModel(this.model);
+    for (const o of [this.slashArc, this.spinRing, this.marker, this.bubble, this.guard, this.idRing]) if (o) { o.parent?.remove(o); o.geometry.dispose(); o.material.dispose(); }
+    for (const t of this.trail) this.scene.remove(t.mesh);
+    this.trail[0]?.mesh.geometry.dispose(); this.trailMat?.dispose();
+  }
   setIdColor(c) { this.idColor = c || null; this.attachExtras(); }
 
   // Switch hero (character select). tint = co-op duplicate colour, or null.

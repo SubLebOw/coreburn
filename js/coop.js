@@ -308,8 +308,7 @@ export class Coop {
   heroBySlot(slot) { return (this.heroes || []).find((h) => h.slot === slot); }
 
   removeHero(h) {
-    h.wardrobe?.dispose(); disposeModel(h.model);
-    for (const t of h.trail) this.ctx.scene.remove(t.mesh);
+    h.wardrobe?.dispose(); if (h.disposeAll) h.disposeAll(); else disposeModel(h.model);
     h.wardrobe?.dispose();
     this.heroes = this.heroes.filter((x) => x !== h);
     this.dropTag(h);

@@ -5,7 +5,7 @@
 //
 // stats used (meta.data.stats): kills, bestWave, bestCombo, bosses[] (boss ids beaten), goldens,
 // closeCalls, mutators, heroWave10[] (heroes that reached wave 10), coopRuns, revives, dailies, rushes
-import { HERO_STATS } from './hero-stats.js?v=1.31.1';
+import { HERO_STATS } from './hero-stats.js?v=1.32.0';
 export const ACHIEVEMENTS = [
   { id: 'kills100', name: 'Scrapper', desc: 'Defeat 100 enemies (total)', goal: (s) => [s.kills, 100], reward: { scrap: 50 } },
   { id: 'kills2500', name: 'Choir Breaker', desc: 'Defeat 2,500 enemies (total)', goal: (s) => [s.kills, 2500], reward: { scrap: 250 } },

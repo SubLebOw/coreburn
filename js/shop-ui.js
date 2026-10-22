@@ -3,10 +3,10 @@
 // (if you have the scrap) or to equip / unequip it. Rare items can't be bought: golden bosses drop them.
 const $ = (id) => document.getElementById(id);
 const hex = (c) => '#' + c.toString(16).padStart(6, '0');
-import { ACHIEVEMENTS, rewardText } from './achievements.js?v=1.31.1';
-import { COSMETICS, HERO_IDS, SLOT_LABEL, RARITY } from './progress.js?v=1.31.1';
-import { CHARACTERS } from './characters.js?v=1.31.1';
-import { itemClass, itemHTML } from './cosmetics-ui.js?v=1.31.1';
+import { ACHIEVEMENTS, rewardText } from './achievements.js?v=1.32.0';
+import { COSMETICS, HERO_IDS, SLOT_LABEL, RARITY } from './progress.js?v=1.32.0';
+import { CHARACTERS } from './characters.js?v=1.32.0';
+import { itemClass, itemHTML } from './cosmetics-ui.js?v=1.32.0';
 const TABS = [['gear', 'GEAR'], ['skin', 'SKINS'], ['talon', 'TALONS'], ['perk', 'PERKS'], ['ach', 'MILESTONES']];
 const NOTES = {
   gear: 'Armour, helmets, back pieces and weapon shapes for each hero. Tap to try it on, tap again to buy or equip. Gold EARNED pieces come from real milestones and are never sold. Drag the hero to turn.',

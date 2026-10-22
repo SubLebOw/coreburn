@@ -1235,3 +1235,15 @@ body:has(#upgrade-overlay.select:not(.hidden)) #touch-controls { opacity: 0; poi
   background: rgba(14,18,22,.85); border: 1px solid var(--ui-line-2); border-radius: var(--ui-r); box-shadow: 0 6px 16px rgba(0,0,0,.4); touch-action: manipulation; transition: background .15s, border-color .15s; }
 .panel-back:hover { background: rgba(30,38,44,.95); border-color: var(--ui-gold); color: var(--ui-gold); }
 @media (max-height: 520px) and (orientation: landscape) { .panel-back { min-height: 36px; padding: 6px 12px; font-size: 12px; top: calc(6px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left)); } }
+
+/* v1.31.1: Axiom EXPERT unlock: progress bars on the locked card, gold prestige popup */
+.ucard.hero.locked .xtag { display: block; font-size: 9px; letter-spacing: 2px; color: var(--ui-gold); margin-bottom: 3px; }
+.ucard.hero.locked .lockbars { display: grid; gap: 3px; width: 100%; }
+.ucard.hero.locked .lockbars .sbar { display: grid; gap: 2px; font-size: 9px; letter-spacing: 0; font-weight: 700; color: #ffe0a0; }
+.ucard.hero.locked .lockbars .sbar span { width: auto; white-space: normal; line-height: 1.15; opacity: .9; }
+.ucard.hero.locked .lockbars .sbar i { display: block; height: 3px; width: 100%; }
+.ucard.hero.locked .lockbars .sbar b { background: linear-gradient(90deg, var(--ui-ember), var(--ui-gold)); }
+#milestone.expert { border-color: var(--ui-gold); background: linear-gradient(165deg, rgba(48,36,12,.96), rgba(16,12,6,.97)); box-shadow: 0 0 34px rgba(255,194,58,.55); }
+#milestone.expert b { background: linear-gradient(180deg, #fff3c4, var(--ui-gold) 55%, var(--ui-ember)); -webkit-background-clip: text; background-clip: text; color: transparent; letter-spacing: 4px; font-size: 22px; }
+#milestone.expert.show { animation-duration: 4s; }
+#milestone.expert span { color: #ffe08a; font-size: 14px; letter-spacing: 1px; }

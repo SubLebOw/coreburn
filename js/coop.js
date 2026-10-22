@@ -12,6 +12,7 @@
 // Rules: enemies get more numerous and tougher per player, bosses switch targets every few seconds,
 // a downed hero is revived by a teammate standing next to them for 3 seconds, and the run ends when
 // everyone is down. Score and combo are shared; upgrade picks and power-ups are per player.
+import { disposeModel } from './hero-models.js?v=1.31.1';
 import { applyAffixVisuals } from './affixes.js?v=1.31.1';
 import { cleanMastery } from './mastery.js?v=1.31.1';
 import { synergiesFor, showSynergyPopup } from './synergy.js?v=1.31.1';
@@ -307,7 +308,7 @@ export class Coop {
   heroBySlot(slot) { return (this.heroes || []).find((h) => h.slot === slot); }
 
   removeHero(h) {
-    this.ctx.scene.remove(h.model.root);
+    h.wardrobe?.dispose(); disposeModel(h.model);
     for (const t of h.trail) this.ctx.scene.remove(t.mesh);
     h.wardrobe?.dispose();
     this.heroes = this.heroes.filter((x) => x !== h);

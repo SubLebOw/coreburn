@@ -5,7 +5,8 @@
 import * as THREE from 'three';
 import { COSMETICS } from './progress.js?v=1.31.1';
 
-const BOX = new THREE.BoxGeometry(1, 1, 1);
+import { disposeModel } from './hero-models.js?v=1.31.1';
+const BOX = new THREE.BoxGeometry(1, 1, 1); BOX.userData.cached = true;
 const lam = (c) => new THREE.MeshLambertMaterial({ color: c });
 const glowMat = (c, o = 1) => new THREE.MeshBasicMaterial({ color: c, transparent: o < 1, opacity: o, depthWrite: o >= 1 });
 function box(parent, mat, w, h, d, x, y, z, rx = 0, rz = 0) {
@@ -91,7 +92,7 @@ export class Wardrobe {
   // eq = { slot: id } from a co-op friend (already cleaned); omit for your own equipped + owned items
   dress(player, eq = null) {
     this.player = player; this.remote = !!eq;
-    for (const p of this.parts) p.parent?.remove(p);
+    for (const p of this.parts) disposeModel(p);
     this.parts = []; this.cape = this.aura = this.banner = null; this.trailColor = null;
     const mine = !eq;
     eq = eq || this.progress.equipped(player.char.id);
@@ -129,7 +130,7 @@ export class Wardrobe {
     for (const s of this.trail) if (s.life > 0) { s.life -= dt; s.m.material.opacity = Math.max(0, s.life / 0.45) * 0.7; s.m.scale.setScalar(0.06 + 0.2 * s.life); if (s.life <= 0) s.m.visible = false; }
     this.last = (this.last || new THREE.Vector3()).copy(p.position);
   }
-  dispose() { this.clearTrail(); for (const s of this.trail) this.scene.remove(s.m); for (const p of this.parts) p.parent?.remove(p); this.parts = []; this.player = null; }
+  dispose() { this.clearTrail(); for (const s of this.trail) this.scene.remove(s.m); for (const p of this.parts) disposeModel(p); this.parts = []; this.player = null; }
   clearTrail() { for (const s of this.trail) { s.life = 0; s.m.visible = false; } }
 }
 

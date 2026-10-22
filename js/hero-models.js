@@ -48,8 +48,8 @@ class Design {
   constructor() { this.parts = {}; this.extra = {}; }
   add(group, mat, geo, ...t) { ((this.parts[group] ||= {})[mat] ||= []).push(bake(geo, ...t)); return this; }
   // a standalone geometry (animated part), cached with the design
-  keep(name, geo) { this.extra[name] = geo; return geo; }
-  done() { for (const g of Object.values(this.parts)) for (const k of Object.keys(g)) g[k] = merge(g[k]); return this; }
+  keep(name, geo) { this.extra[name] = geo; geo.userData.cached = true; return geo; }
+  done() { for (const g of Object.values(this.parts)) for (const k of Object.keys(g)) { g[k] = merge(g[k]); g[k].userData.cached = true; } for (const g of Object.values(this.extra)) g.userData.cached = true; return this; }
 }
 const CACHE = {};
 function design(id, fn) { return CACHE[id] || (CACHE[id] = (() => { const d = new Design(); fn(d); return d.done(); })()); }
@@ -88,6 +88,24 @@ function addBlades(m, geo, mat, haloColor, list, base) {
 }
 const sym = (fn) => { fn(1); fn(-1); };
 const UNIT = new THREE.BoxGeometry(1, 1, 1); // talon halos: Player sizes them absolutely (as before)
+UNIT.userData.cached = true;
+
+// Free a dropped hero model (hero/skin/showcase/preview switch): per-instance materials and any
+// uncached geometry (cosmetics, skin attachments) are disposed; cached hero geometry and anything
+// tagged userData.keep (the Player's arcs/rings/bubbles, pooled FX) are left alone.
+export function disposeModel(model) {
+  const root = model && (model.root || model); if (!root) return;
+  root.parent?.remove(root);
+  const mats = new Set(), geos = new Set();
+  (function walk(o) {
+    if (o.userData.keep) { o.parent?.remove(o); return; }
+    if (o.geometry && !o.geometry.userData.cached && !o.geometry.userData.shared) geos.add(o.geometry);
+    if (o.material) for (const m of [].concat(o.material)) if (!m.userData.shared) mats.add(m);
+    for (const c of [...o.children]) walk(c);
+  })(root);
+  for (const g of geos) g.dispose();
+  for (const m of mats) { m.map?.dispose?.(); m.dispose(); }
+}
 
 // =====================================================================================================
 // SARROW: lean blade duelist. Peaked hood, one heavy asymmetric pauldron (left), split coat tails, a
@@ -307,7 +325,8 @@ export function buildOrin(t) {
   for (let i = 0; i < 3; i++) { const o = new THREE.Mesh(mg, mats.eye); const a = i / 3 * Math.PI * 2; o.position.set(Math.cos(a) * 0.62, Math.sin(a * 2) * 0.1, Math.sin(a) * 0.62); orbit.add(o); }
   return { ...m, core, flashMats: [mats.plate, mats.plateDark, mats.cloth, mats.accent, mats.metal, mats.mask], blade: mats.blade, blades, halos, bladeBase: -0.8, bladeLen: 0.62,
     anchors: { headTop: 0.3, back: -0.34, shoulder: 0.4, scale: 1.1 }, style: 'control', orbit,
-    idle(t) { orbit.rotation.y = t * 1.1; orbit.position.y = 1.45 + Math.sin(t * 1.6) * 0.06; } };
+    idle(t, mv = 0) { orbit.rotation.y = t * (1.1 + mv * 1.4); orbit.rotation.z = Math.sin(t * 0.5) * 0.12; orbit.position.y = 1.45 + Math.sin(t * 1.6) * 0.06;
+      for (const [i, o] of orbit.children.entries()) { o.rotation.x = t * 2 + i; o.rotation.y = t * 3 + i; } } };
 }
 
 // KAGERO: shadow ninja. Unmistakable at a distance: a hachigane forehead plate and long headband tails,
@@ -429,7 +448,10 @@ export function buildAxiom(t) {
   }
   return { ...m, core, flashMats: [mats.plate, mats.dark, mats.metal, mats.accent], blade: mats.blade, blades, halos, bladeBase: -0.84, bladeLen: 0.16, plateL, plateR,
     anchors: { headTop: 0.26, back: -0.36, shoulder: 0.46, scale: 1.05 }, style: 'machine',
-    idle(t) { m.head.rotation.y = Math.sin(t * 0.7) * 0.25 + (Math.sin(t * 2.3) > 0.97 ? 0.15 : 0); } };
+    idle(t, mv = 0) { // stepped servo head scan (snaps between angles)
+      const step = Math.floor(t * 0.8) % 4, target = [0.35, 0, -0.35, 0][step] * (1 - mv);
+      m.head.rotation.y += (target - m.head.rotation.y) * 0.18;
+      } };
 }
 
 // geometry/material counts (for the leak checks in the dev harness)

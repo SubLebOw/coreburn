@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { COSMETICS, ARENA_SKINS, SLOTS, SLOT_LABEL, HERO_IDS, xpNeeded, SKIN_VARIANTS, TITLES, PLATES, ACCOUNT_MAX } from './progress.js?v=1.31.1';
 import { CHARACTERS } from './characters.js?v=1.31.1';
 import { Wardrobe } from './cosmetics.js?v=1.31.1';
+import { disposeModel } from './hero-models.js?v=1.31.1';
 
 const $ = (id) => document.getElementById(id);
 const hex = (c) => '#' + c.toString(16).padStart(6, '0');
@@ -147,7 +148,7 @@ export class CosmeticsUI {
   }
   buildPreview() {
     if (!this.scene) return;
-    if (this.model) this.scene.remove(this.model.root);
+    if (this.model) disposeModel(this.model);
     const c = CHARACTERS[this.hero];
     const s = this.previewSkin || this.p.variantOf(this.hero);
     this.model = c.build(s ? s.tint : null);

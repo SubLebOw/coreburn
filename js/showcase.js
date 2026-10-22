@@ -3,6 +3,7 @@
 // as a second pass over the arena. Its tiny scene has no shadow-casting lights.
 // Nothing here runs or stays in memory-heavy form outside hero select: hide() drops the model.
 import * as THREE from 'three';
+import { disposeModel } from './hero-models.js?v=1.31.1';
 
 function glowTexture() {
   const c = document.createElement('canvas'); c.width = c.height = 128;
@@ -38,7 +39,7 @@ export class Showcase {
   // build(id) -> a model ({ root }) from the game's existing hero builders
   setHero(id, color, build) {
     if (id === this.heroId && this.model) return;
-    if (this.model) this.scene.remove(this.model.root);
+    if (this.model) disposeModel(this.model);
     this.heroId = id;
     this.model = build();
     this.model.root.position.set(0, 0, 0);
@@ -49,7 +50,7 @@ export class Showcase {
     this.rim.color.setHex(color); this.under.color.setHex(color);
   }
   hide() {
-    if (this.model) this.scene.remove(this.model.root);
+    if (this.model) disposeModel(this.model);
     this.model = null; this.heroId = null; this.el = null;
   }
   // called once per frame after the main render, only while hero select is open

@@ -1152,7 +1152,7 @@ frame();
 const LOCAL_DEV = !IS_NATIVE && ['localhost', '127.0.0.1'].includes(location.hostname);
 if (LOCAL_DEV) {
   import('./dev.local.js?v=1.31.1')
-    .then((m) => m.install({ player, enemies, world, progress, allies, arena, powerups, projectiles, effects, hud, sound, ads, startGame, snapCamera: () => updateCamera(0, true), getScore: () => score, combo, meta, twitch, input, getState: () => state, getLastRun: () => lastRun, getMode: () => mode, bursts, openPicker: () => { normalPick = true; openUpgradePicker(); } }))
+    .then((m) => m.install({ renderer, scene, showcase, player, enemies, world, progress, allies, arena, powerups, projectiles, effects, hud, sound, ads, startGame, snapCamera: () => updateCamera(0, true), getScore: () => score, combo, meta, twitch, input, getState: () => state, getLastRun: () => lastRun, getMode: () => mode, bursts, openPicker: () => { normalPick = true; openUpgradePicker(); } }))
     .catch(() => {}); // no dev file = no helpers, that's fine
 }
 window.__cbReady = true; // boot failsafe in index.html checks this

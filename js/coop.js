@@ -105,7 +105,7 @@ export class Coop {
       b.style.setProperty('--c', '#' + c.color.toString(16).padStart(6, '0'));
       b.innerHTML = `<b>⬢</b><span>${c.name}</span><small>${c.title}</small>`;
       b.addEventListener('click', () => this.chooseHero(id));
-      if (c.secret) b.classList.add('secret-hero');
+      if (c.secret || id === 'iskra' || id === 'ninja') b.classList.add('secret-hero'); // locked heroes: shown once unlocked (unlocks.js)
       heroes.appendChild(b);
     }
   }

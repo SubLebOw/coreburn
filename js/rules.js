@@ -20,7 +20,7 @@ export const Z_TUNING = {
 export const Z_HERO = { // v1.29: everyone starts weaker (was sarrow 1.25/1.25, zaleks 1.4/1.6, iskra 1.2/1.1, orin 1.1/0.97, ninja 1/1, axiom 1/1)
   sarrow: { hp: 1.1, dmg: 1.1 },
   zaleks: { hp: 1.25, dmg: 1.4, speed: 1.15 },
-  iskra: { hp: 0.95, dmg: 0.85 },
+  iskra: { hp: 1.1357143, dmg: 0.85 }, // v1.31: base max HP 66.5 -> 79.5 (+13)
   orin: { hp: 0.85, dmg: 0.75 },
   ninja: { hp: 0.85, dmg: 0.82 },
   axiom: { hp: 1.15, dmg: 1.1 }, // the only buff: he was already the weakest in bot play

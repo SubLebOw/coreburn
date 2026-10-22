@@ -54,6 +54,7 @@ function load() {
     stats: { ...defaultStats(), ...(s.stats || {}) },
     ach: s.ach || {},
     unlocked: s.unlocked || {},
+    unlockV: s.unlockV || 0, grandfathered: !!s.grandfathered, // v1.31 hero-unlock migration (unlocks.js)
   };
 }
 

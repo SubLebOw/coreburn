@@ -252,7 +252,7 @@ export class Player {
     this.guard.visible = this.shieldHp > 0 || !!this.netShield;
 
     // ----- Core recharge: slow regen, faster if you avoid getting hit for 3 seconds -----
-    const regen = (this.timeSinceHit > 3 ? 5 : 1.5) * this.stats.regen;
+    const regen = (this.timeSinceHit > 3 ? 5 : 1.5) * this.stats.regen * (RULES.z ? Math.min(1.4, Math.max(1, Math.sqrt(this.maxHp / 180))) : 1); // v1.31: CoreBurnZ regen scales gently with max HP (x1 at <=180, max x1.4)
     this.hp = Math.min(this.maxHp, this.hp + regen * dt);
 
     // ----- Turn joystick/keys into a direction on the floor -----

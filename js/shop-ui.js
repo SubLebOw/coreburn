@@ -19,6 +19,7 @@ export class ShopUI {
     this.isOpen = false;
     this.panel = $('shop-panel');
     $('sp-close').addEventListener('click', (e) => { e.stopPropagation(); this.close(); });
+    $('sp-back').addEventListener('click', (e) => { e.stopPropagation(); $('sp-close').click(); }); // top-left BACK = same as DONE
     for (const el of [this.panel]) el.addEventListener('pointerdown', (e) => e.stopPropagation());
     window.addEventListener('keydown', (e) => { if (this.isOpen && e.code === 'Escape') this.close(); });
     this.refreshTitle();

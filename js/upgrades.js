@@ -47,12 +47,12 @@ export const UPGRADES = {
   crit:     { name: 'Crit Spark', group: 'attack', icon: '✸', color: 0xfff27a, max: 8, desc: () => '+3.5% chance for 1.8x critical hits' },
   twin:     { name: 'Twin Strike', group: 'attack', icon: '⫽', color: 0x9ab8ff, max: 6, desc: () => '+4% chance an attack hits twice' },
   storm:    { name: 'Storm Core', group: 'attack', icon: 'ϟ', color: 0x8ab4ff, max: 6, desc: () => '+7.5% chance attacks chain lightning to 2 foes' },
-  leech:    { name: 'Core Leech', group: 'attack', icon: '♥', color: 0x6aff7a, max: 6, desc: () => 'Heal +0.25 per attack hit (max 6/s)' },
+  leech:    { name: 'Core Leech', group: 'attack', icon: '♥', color: 0x6aff7a, max: 6, desc: () => `Heal +0.25 per attack hit (max ${RULES.z ? 7 : 6}/s)` },
   odDamage: { name: 'Ultimate Fury', group: 'ultimate', icon: '✺', color: 0xff5a2a, max: 6, desc: () => '+12.5% ultimate damage' },
   odCool:   { name: 'Ultimate Coolant', group: 'ultimate', icon: '❄', color: 0x9ae4ff, max: 6, desc: () => `-${RULES.z ? 10 : 5}% ultimate cooldown` },
   bkCool:   { name: 'Quick Recovery', group: 'mobility', icon: '⟳', color: 0x7affc8, max: 6, desc: () => '-6% mobility cooldown' },
   speed:    { name: 'Swift Step', group: 'core', icon: '»', color: 0xd0ff6a, max: 6, desc: () => '+3% move speed' },
-  maxHp:    { name: 'Reinforced Core', group: 'core', icon: '⬢', color: 0x6aff9a, max: 8, desc: () => '+7.5% max health' },
+  maxHp:    { name: 'Reinforced Core', group: 'core', icon: '⬢', color: 0x6aff9a, max: 8, desc: () => `+${RULES.z ? 8.5 : 7.5}% max health` },
   regen:    { name: 'Core Recharge', group: 'core', icon: '✚', color: 0x3ff6a0, max: 6, desc: () => '+17.5% health regen' },
   // ---- SARROW ----
   arc:      { name: 'Wide Arc', heroes: S, group: 'attack', icon: '◠', color: 0x7ffff2, max: 6, desc: () => '+6% slash reach and +5% slash damage, wider swing' },
@@ -125,7 +125,7 @@ export const BOSS_CARDS = {
   bCrown:  { name: 'Cinder Crown', icon: '♛', max: 2, desc: () => '+12% damage (everything)' },
   bFang:   { name: 'Bossfang', icon: '⚔', max: 2, desc: () => '+25% damage to bosses' },
   bEcho:   { name: 'Echo Engine', icon: '✺', max: 2, desc: () => '-12% ultimate cooldown, +15% ultimate damage' },
-  bAegis:  { name: 'Grind Aegis', icon: '⛉', max: 2, desc: () => 'Take 10% less damage' },
+  bAegis:  { name: 'Grind Aegis', icon: '⛉', max: 2, desc: () => 'Take 11% less damage' },
   bTempest:{ name: 'Tempest Heart', icon: 'ϟ', max: 2, desc: () => '+12% chance attacks chain lightning' },
   bSoles:  { name: 'Choirless Soles', icon: '»', max: 2, desc: () => '+6% move speed, -15% mobility cooldown' },
   bTithe:  { name: "Deacon's Tithe", icon: '♥', max: 2, desc: () => 'Heal +0.5 per attack hit, +40% core recharge' },
@@ -141,7 +141,7 @@ export const EVOLUTIONS = {
   eUndying:EV({ name: 'Undying Core', icon: '✚', needs: ['leech', 'regen'], text: '+50% health regen and lifesteal can heal twice as fast' }),
   eThunder:EV({ name: 'Thunder Twins', icon: 'ϟ', needs: ['twin', 'storm'], text: '+15% Twin Strike and +15% Storm chain chance' }),
   eApex:   EV({ name: 'Apex Ultimate', icon: '✺', needs: ['odDamage', 'odCool'], text: 'Ultimate +30% damage and -20% cooldown' }),
-  eJugg:   EV({ name: 'Juggernaut Core', icon: '⬢', needs: ['maxHp', 'speed'], text: '+25% max health and take 10% less damage' }),
+  eJugg:   EV({ name: 'Juggernaut Core', icon: '⬢', needs: ['maxHp', 'speed'], text: '+25% max health and take 11% less damage' }),
   eComet:  EV({ name: 'Comet Blink', icon: '☄', heroes: S, needs: ['bkDamage', 'bkTrail'], text: 'Blink +60% damage and its trail burns twice as hard' }),
   eWorld:  EV({ name: 'Worldbreaker', icon: '⚒', heroes: Z, needs: ['zHammer', 'zQuake'], text: 'Slam +50% damage and +30% radius, hammer +25% damage' }),
   eTempest:EV({ name: 'Endless Tempest', icon: '⁂', heroes: I, needs: ['iStorm', 'iVolley'], text: 'Needle storm +3 needles per volley and lasts 2s longer' }),
@@ -298,7 +298,7 @@ export class Loadout {
       dashCd: 1 - 0.06 * L('bkCool'),
       trail: L('bkTrail') * 0.6,                  // trail tick = (4 + 3 x this) x damage
       speed: 1 + 0.03 * L('speed'),
-      maxHpPct: 0.075 * L('maxHp'),
+      maxHpPct: (RULES.z ? 0.085 : 0.075) * L('maxHp'), // v1.31: CoreBurnZ 8.5%/level
       maxHpFlat: 3 * this.patches,
       regen: (1 + 0.175 * L('regen')) * (L('overclock') ? 0 : 1),
       scoreMult: L('greed') ? 1.5 : 1,
@@ -329,16 +329,18 @@ export class Loadout {
     if (L('bHeart')) s.maxHpPct += 0.2 * L('bHeart');
     if (L('bCrown')) s.dmg *= 1 + 0.12 * L('bCrown');
     if (L('bEcho')) { s.spinCd *= 1 - 0.12 * L('bEcho'); s.spinDmg *= 1 + 0.15 * L('bEcho'); }
-    if (L('bAegis')) s.hurtMult *= 1 - 0.1 * L('bAegis');
+    let dr = 1; // v1.31: generic damage reduction (Aegis + Juggernaut), capped at 30%
+    if (L('bAegis')) dr *= 1 - 0.11 * L('bAegis');
     s.storm += 0.12 * L('bTempest');
     if (L('bSoles')) { s.speed *= 1 + 0.06 * L('bSoles'); s.dashCd *= 1 - 0.15 * L('bSoles'); }
     s.leech += 0.5 * L('bTithe'); s.regen += 0.4 * L('bTithe');
     // CoreBurnZ evolutions
     s.critMult = L('eNova') ? 2.6 : 1.8; if (L('eNova')) s.crit += 0.1;
-    s.leechCap = L('eUndying') ? 12 : 6; if (L('eUndying')) s.regen *= 1.5;
+    s.leechCap = RULES.z ? (L('eUndying') ? 13 : 7) : (L('eUndying') ? 12 : 6); // v1.31: CoreBurnZ caps 6 -> 7 (Undying 12 -> 13) if (L('eUndying')) s.regen *= 1.5;
     if (L('eThunder')) { s.twin += 0.15; s.storm += 0.15; }
     if (L('eApex')) { s.spinDmg *= 1.3; s.spinCd *= 0.8; }
-    if (L('eJugg')) { s.maxHpPct += 0.25; s.hurtMult *= 0.9; }
+    if (L('eJugg')) { s.maxHpPct += 0.25; dr *= 0.89; }
+    s.hurtMult *= Math.max(0.7, dr); // generic DR ceiling 30% (hero masteries like Zaleks' plating stay separate)
     if (L('eComet')) { s.dashDmg *= 1.6; s.trail *= 2; }
     if (L('eWorld')) { s.slamDmg *= 1.5; s.slamRadius *= 1.3; s.bashDmg *= 1.25; }
     if (L('eTempest')) { s.stormCount += 3; s.stormTime += 2; }
@@ -362,7 +364,7 @@ export class Loadout {
     if (M('sLong')) s.dashTime *= 1.2;
     if (M('sKeen') || M('iSharp') || M('oOver') || M('nSharp') || M('aBolt')) s.dmg *= 1.06;
     if (M('sDouble') || M('zDouble') || M('iExtra') || M('nDouble')) s.dashCharges += 1;
-    if (M('zPlate')) s.hurtMult *= 0.94;
+    if (M('zPlate')) s.hurtMult *= Math.max(0.94, 0.68 / Math.max(0.7, dr)); // all card/relic/mastery DR together never above 32%
     if (M('zHeavy')) s.bashDmg *= 1.1;
     if (M('zBastion')) s.shield *= 1.4;
     if (M('zRampage')) { s.chargeDmg *= 1.3; s.chargeStun += 0.5; }

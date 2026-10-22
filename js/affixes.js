@@ -115,7 +115,7 @@ export function affixDeath(e, waves) {
     fx.spawnWarning(p, R, 0.9);
     waves.affixJobs.push({ t: 0.9, run() {
       fx.spawnRing(p, 0xff7a1a, R, 0.45); fx.spawnSparks(p.clone().setY(1), 0xffa040, 14, 7); waves.world.shake?.(0.3);
-      for (const h of (waves.world.heroes || [waves.world.player])) if (h && !h.dead && h.position.distanceTo(p) < R + (h.radius || 0.5)) h.takeDamage(dmg, e);
+      for (const h of (waves.world.heroes || [waves.world.player])) if (h && !h.dead && h.position.distanceTo(p) < R + (h.radius || 0.5)) h.takeDamage(dmg, e, { telegraphed: true });
     } });
   }
 }

@@ -30,6 +30,8 @@ const ZK = {
   dragMax: 6, dragSlam: 0.8, dragStun: 0.9,       // ZALEKS: charge carries up to 6 enemies, slams them at the end
 };
 
+const TELEGRAPHED = new Set(['lancer', 'grub', 'bomber']); // painted line / burrow warning / fuse: full damage, no hit protection
+
 export class Player {
   constructor(scene, world, charId = 'sarrow', tint = null) {
     this.world = world; // gives access to enemies, effects, the arena, etc.
@@ -175,6 +177,7 @@ export class Player {
     this.spinCooldown = 0;
     this.hurtTimer = 0;
     this.invulnTimer = 0;
+    this.guardT = 0; this.guardRaw = 0; // hit-protection window
     this.timeSinceHit = 99;
     this.walkPhase = 0;
     this.dead = false;
@@ -240,6 +243,7 @@ export class Player {
     this.attackBuffer -= dt;
     this.hurtTimer -= dt;
     this.invulnTimer -= dt;
+    this.guardT -= dt; // hit-protection window (see takeDamage)
     this.timeSinceHit += dt;
     this.fireCd -= dt;
     this.phaseTimer -= dt;
@@ -1255,12 +1259,23 @@ export class Player {
   // `source` = the enemy, boss or bolt owner that hit us (remembered so the game over
   // screen and the share text can say what killed Sarrow)
   // opts.hazard = lava / lightning (the SHIELD blocks those without using up a charge)
+  static ordinaryHit(source, opts) {
+    return !!source && source.isBoss === false && !opts.hazard && !opts.telegraphed && !TELEGRAPHED.has(source.typeName);
+  }
   takeDamage(amount, source = null, opts = {}) {
     if (this.dead) return false;
     if (this.state === 'dash' && (this.kit === 'sarrow' || this.kit === 'orin')) return false; // blinking / grappling = untouchable
     if (this.phaseTimer > 0) return false;               // ISKRA: just phased
     if (this.invulnTimer > 0) return false;              // just revived
     if (this.world.powerups && this.world.powerups.absorb(opts, this)) return false; // SHIELD
+    // HIT PROTECTION (v1.31): a full-damage ORDINARY enemy hit opens a 0.4 s window; later ordinary hits in it
+    // whose raw damage is <= the opener's take 50%. Never refreshed or extended. Bosses (incl. Klaxon), hazards and
+    // telegraphed attacks (lancer, grub, bomber, volatile bursts) always hit full and neither open nor use it.
+    // Runs on the raw amount after i-frames / pickup shield (blocked hits do nothing) and before armour/DR/slam shield.
+    if (Player.ordinaryHit(source, opts)) {
+      if (this.guardT > 0 && amount <= this.guardRaw) amount *= 0.5;
+      else if (!(this.guardT > 0)) { this.guardT = 0.4; this.guardRaw = amount; }
+    }
     const c = this.char;
     if (this.state === 'spin' && c.spinGuard) amount *= 1 - c.spinGuard; // overdrive = tougher
     amount *= 1 - (c.armor || 0);                         // ZALEKS' plating

@@ -18,8 +18,8 @@
 // Universal cards work for every hero; hero cards only show up for that hero (Loadout.hero).
 // This file has no Three.js in it, so tools (like the time-to-kill simulator) can import it too.
 
-import { RULES, Z_TUNING } from './rules.js?v=1.30.2';
-import { applySynergies } from './synergy.js?v=1.30.2';
+import { RULES, Z_TUNING } from './rules.js?v=1.30.3';
+import { applySynergies } from './synergy.js?v=1.30.3';
 
 export const WEAPON_TIER_STEP = 0.28; // = 0.14 enemy health per wave x 2 waves per pick
 export const PICK_EVERY = 2;          // waves between upgrade picks

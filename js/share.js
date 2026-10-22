@@ -9,7 +9,7 @@
 //   3. Everywhere else (desktop, or anything without a share sheet): open a ready-made
 //      post on X (twitter.com/intent/tweet). In the Android app this opens the X app or browser.
 // COPY puts the same text + link on the clipboard, for anywhere else (Discord, WhatsApp...).
-import { IS_NATIVE, getPlugin } from './native.js?v=1.30.2';
+import { IS_NATIVE, getPlugin } from './native.js?v=1.30.3';
 
 export const SHARE_URL = 'https://sublebow.github.io/coreburn/';
 

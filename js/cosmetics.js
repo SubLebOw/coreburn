@@ -3,7 +3,7 @@
 // them: hats + masks on the head, capes + banners on the back, an aura at the feet and a talon trail.
 // Also ARENA SKINS (a themed colour wash + core glow per arena), applied through Player.reskin().
 import * as THREE from 'three';
-import { COSMETICS } from './progress.js?v=1.30.2';
+import { COSMETICS } from './progress.js?v=1.30.3';
 
 const BOX = new THREE.BoxGeometry(1, 1, 1);
 const lam = (c) => new THREE.MeshLambertMaterial({ color: c });

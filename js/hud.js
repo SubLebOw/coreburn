@@ -192,9 +192,9 @@ export class Hud {
       const b = document.createElement('button');
       if (c.locked) { // the secret hero: a dark silhouette until it's unlocked
         b.className = 'ucard hero locked';
-        b.innerHTML = `<span class="key">${i + 1}</span><div class="icon sil">${SILHOUETTE}</div><div class="tname">${c.secret ? '???' : c.name}</div><div class="ubody"><div class="group">${c.secret ? 'SECRET HERO' : 'LOCKED HERO'}</div><div class="uname">${c.secret ? '???' : c.name}</div><div class="effect">🔒 ${c.unlockHint}</div></div>`;
+        b.innerHTML = `<span class="key">${i + 1}</span><div class="icon sil">${SILHOUETTE}</div><div class="tname">${c.secret ? '???' : c.name}</div><div class="ubody"><div class="group">${c.secret ? 'SECRET HERO' : c.lockBars ? 'EXPERT UNLOCK' : 'LOCKED HERO'}</div><div class="uname">${c.secret ? '???' : c.lockBars ? c.name + ' — EXPERT UNLOCK' : c.name}</div><div class="effect">${c.lockBars ? `<b class="xtag">EXPERT UNLOCK</b><div class="lockbars">${c.lockBars.map(([l, v]) => bar(l, v)).join('')}</div>` : `🔒 ${c.unlockHint}`}</div></div>`;
         b.addEventListener('pointerdown', (e) => e.stopPropagation());
-        b.addEventListener('click', (e) => { e.stopPropagation(); b.classList.remove('nope'); void b.offsetWidth; b.classList.add('nope'); });
+        b.addEventListener('click', (e) => { e.stopPropagation(); b.classList.remove('nope'); void b.offsetWidth; b.classList.add('nope'); this.showToast(c.secret ? 'SECRET HERO' : c.lockBars ? `${c.name} — EXPERT UNLOCK` : `${c.name} LOCKED`, c.unlockHint, c.lockBars ? '#ffc23a' : '#ff8a9a'); }); // tiles are tiny on phones: tap shows the challenge
         box.appendChild(b);
         return b;
       }
@@ -317,9 +317,10 @@ export class Hud {
   }
 
   // MILESTONE popup (bottom centre). big = the secret hero unlock
-  showMilestone(name, reward, big = false) {
+  showMilestone(name, reward, big = false, expert = false) {
     const el = $('milestone');
-    el.innerHTML = '<small>MILESTONE</small><b></b><span></span>';
+    el.innerHTML = `<small>${expert ? 'EXPERT UNLOCK' : 'MILESTONE'}</small><b></b><span></span>`;
+    el.classList.toggle('expert', expert);
     el.querySelector('b').textContent = name;
     el.querySelector('span').textContent = reward;
     el.classList.toggle('big', big);

@@ -3,6 +3,8 @@
 //   Iskra:  reach wave 15 with Sarrow or Zaleks (CoreBurnZ survival).
 //   Orin:   reach wave 50 (the existing 'wave50' milestone; unchanged).
 //   Kagero: defeat all 12 unique CoreBurnZ bosses, cumulative across runs (meta.data.stats.zBosses = boss names).
+//   Axiom (v1.31.1, EXPERT): 30,000 lifetime CoreBurnZ-survival kills (stats.zKills, counted from v1.31.1 on: the old
+//   stats.kills mixes every mode, so it is not backfilled) AND wave 70 in CoreBurnZ survival with a non-Axiom hero (stats.heroBest).
 // EXISTING PROFILES are grandfathered: before v1.31 Iskra and Kagero were free for everyone, so any profile that
 // has played (runs, kills, scrap, purchases, milestones, account level > 1 or a best score) keeps them.
 // The migration only ever ADDS unlock flags, runs once (meta.data.unlockV) and never resets anything.
@@ -12,13 +14,21 @@ import { HERO_STATS } from './hero-stats.js?v=1.31.0';
 
 export const Z_BOSS_NAMES = [...new Set(Z_ROTATION.map((e) => e.def.name))];
 export const zBossCount = () => Z_BOSS_NAMES.filter((n) => (meta.data.stats.zBosses || []).includes(n)).length;
-const GATED = ['iskra', 'orin', 'ninja'];
+const GATED = ['iskra', 'orin', 'ninja', 'axiom'];
+export const AX_KILLS = 30000, AX_WAVE = 70;
+export const axiomProgress = () => { const s = meta.data.stats, hb = s.heroBest || {}; return { kills: s.zKills || 0, wave: Math.max(0, ...Object.keys(hb).filter((h) => h !== 'axiom').map((h) => hb[h] || 0)) }; };
 export const isLocked = (id) => GATED.includes(id) && !meta.data.unlocked[id];
 export function lockHint(id) {
   if (id === 'iskra') return 'Reach wave 15 with Sarrow or Zaleks';
   if (id === 'orin') return 'Reach wave 50';
   if (id === 'ninja') return `Defeat all ${Z_BOSS_NAMES.length} unique bosses (${zBossCount()}/${Z_BOSS_NAMES.length})`;
+  if (id === 'axiom') { const p = axiomProgress(); return `Lifetime kills: ${p.kills.toLocaleString()} / 30,000 · Best wave (other hero): ${p.wave} / 70`; }
   return '';
+}
+export function lockBars(id) {
+  if (id !== 'axiom') return null;
+  const p = axiomProgress();
+  return [[`Lifetime kills: ${p.kills.toLocaleString()} / 30,000`, p.kills / AX_KILLS], [`Best wave (other hero): ${p.wave} / 70`, p.wave / AX_WAVE]];
 }
 
 export function migrateUnlocks(accountLevel = 1) {
@@ -33,13 +43,31 @@ export function migrateUnlocks(accountLevel = 1) {
   meta.save();
   return existing;
 }
+function profileExists(d, accountLevel) {
+  const s = d.stats; let hadBest = false;
+  try { hadBest = Object.keys(localStorage).some((k) => k.startsWith('coreburn-best') || k.startsWith('coreburn-run')); } catch { /* blocked storage */ }
+  return s.runs > 0 || s.kills > 0 || d.totalScrap > 0 || d.owned.length > 0 || Object.keys(d.ach).length > 0 || accountLevel > 1 || hadBest;
+}
+// v1.31.1: Axiom was free before, so every existing profile keeps him (same detection, run once, add-only)
+export function migrateAxiom(accountLevel = 1) {
+  const d = meta.data;
+  if (d.unlockV >= 2) return false;
+  const existing = profileExists(d, accountLevel);
+  if (existing) d.unlocked.axiom = true;
+  d.unlockV = 2; d.axiomGrandfathered = existing;
+  meta.save();
+  return existing;
+}
+function axiomCheck() { const p = axiomProgress(); return p.kills >= AX_KILLS && p.wave >= AX_WAVE ? unlock('axiom') : []; }
+export function onZKill(n = 1) { const s = meta.data.stats; s.zKills = (s.zKills || 0) + n; return s.zKills >= AX_KILLS && !meta.data.unlocked.axiom ? axiomCheck() : []; }
 
 // returns the hero ids that just unlocked (each only once: the flag is permanent)
 function unlock(id) { if (meta.data.unlocked[id]) return []; meta.data.unlocked[id] = true; meta.save(); return [id]; }
 export function onWaveReached(n, heroId, z, survival) {
   const s = meta.data.stats;
   if (z && survival) { s.heroBest = s.heroBest || {}; if (n > (s.heroBest[heroId] || 0)) s.heroBest[heroId] = n; } // reusable per-hero best wave
-  return z && survival && n >= 15 && (heroId === 'sarrow' || heroId === 'zaleks') ? unlock('iskra') : [];
+  const got = z && survival && n >= 15 && (heroId === 'sarrow' || heroId === 'zaleks') ? unlock('iskra') : [];
+  return z && survival && heroId !== 'axiom' && n >= AX_WAVE ? got.concat(axiomCheck()) : got;
 }
 export function onBossDefeated(def, z) {
   if (!z || !def || !Z_BOSS_NAMES.includes(def.name)) return [];

@@ -32,7 +32,7 @@ import { GOLD_TIME } from './golden.js?v=1.31.0';
 import { ShopUI } from './shop-ui.js?v=1.31.0';
 import { Twitch } from './twitch.js?v=1.31.0';
 import { checkAchievements, rewardText } from './achievements.js?v=1.31.0';
-import { isLocked, lockHint, migrateUnlocks, onWaveReached, onBossDefeated } from './unlocks.js?v=1.31.0';
+import { isLocked, lockHint, lockBars, migrateUnlocks, migrateAxiom, onZKill, onWaveReached, onBossDefeated } from './unlocks.js?v=1.31.0';
 import { rngFor, dailyKey, weekKey, rushOrder, RUSH_BOSSES, rushTierBefore, rushScore, rushLabel, formatTime, dailyStartCard } from './modes.js?v=1.31.0';
 import { BOSS_ROTATION } from './bosses.js?v=1.31.0';
 import { Leaderboard } from './leaderboard.js?v=1.31.0';
@@ -145,6 +145,7 @@ const world = {
   onEnemyKilled(e) {
     kills++;
     meta.data.stats.kills++;
+    if (RULES.z && mode === 'endless') heroUnlocks(onZKill()); // Axiom: CoreBurnZ survival kills (solo + co-op host; saved with the meta save)
     if (goldRush && ++goldRush.got >= goldRush.goal) goldRushEnd(true); else if (goldRush) hud.setMutator({ name: `GOLD RUSH ${goldRush.got}/${goldRush.goal}`, color: '#ffc23a' });
     sound.play('enemyDeath');
     combo.add(1);
@@ -401,13 +402,13 @@ function updateTransition(dt) {
 
 // ---------- Starting / ending a run ----------
 // Character select comes before EVERY run (the last pick is highlighted)
-migrateUnlocks(progress.data.level || 1); // v1.31: one-time, add-only (grandfathers existing profiles)
+migrateUnlocks(progress.data.level || 1); migrateAxiom(progress.data.level || 1); // v1.31: one-time, add-only (grandfathers existing profiles)
 let heroId = CHARACTERS[localStorage.getItem('coreburn-hero')] && !isLocked(localStorage.getItem('coreburn-hero')) ? localStorage.getItem('coreburn-hero') : 'sarrow';
 function showCharacterSelect() {
   state = 'select';
   hud.hideOverlay();
   const canSave = mode === 'endless' && !coop.mode;
-  const chars = heroOrder(RULES.z).map((id) => ({ ...CHARACTERS[id], locked: isLocked(id), unlockHint: lockHint(id) || CHARACTERS[id].unlockHint, hlv: RULES.z ? progress.heroInfo(id) : null, save: canSave ? getSave(id) : null }));
+  const chars = heroOrder(RULES.z).map((id) => ({ ...CHARACTERS[id], locked: isLocked(id), unlockHint: lockHint(id) || CHARACTERS[id].unlockHint, lockBars: lockBars(id), hlv: RULES.z ? progress.heroInfo(id) : null, save: canSave ? getSave(id) : null }));
   if (!chars.find((c) => c.id === heroId) || chars.find((c) => c.id === heroId)?.locked) heroId = 'sarrow';
   hud.showSelect(chars, heroId, (id) => {
     heroId = id;
@@ -639,10 +640,11 @@ function showNextMilestone() {
   const a = milestoneQueue.shift();
   if (!a) { milestoneQueue.showing = false; return; }
   milestoneQueue.showing = true;
-  hud.showMilestone(a.name, rewardText(a, meta), !!a.reward.hero);
+  const expert = a.reward.hero === 'axiom';
+  hud.showMilestone(expert ? 'AXIOM' : a.name, rewardText(a, meta), !!a.reward.hero, expert);
   sound.play('powerup');
   shop.refreshTitle();
-  setTimeout(showNextMilestone, 2600);
+  setTimeout(showNextMilestone, expert ? 4200 : 2600);
 }
 
 // ACCOUNT XP: every run in any mode; level-ups unlock cosmetics (shown on the game over screen)
@@ -688,6 +690,7 @@ function awardScrap(r) {
   run.awarded = total;
   meta.addScrap(gain);
   if (!run.counted) { meta.data.stats.runs++; if (coop.mode) meta.data.stats.coopRuns++; run.counted = true; }
+  if (coop.mode === 'client' && RULES.z && !run.zCounted) { run.zCounted = true; heroUnlocks(onZKill(r.kills || 0).concat(onWaveReached(r.wave || 0, player.char.id, true, true))); } // co-op guest: once per run
   if (coop.mode === 'client') { meta.data.stats.kills += r.kills || 0; meta.data.stats.bestWave = Math.max(meta.data.stats.bestWave, r.wave || 0); }
   milestones();
   meta.data.stats.bestWave = Math.max(meta.data.stats.bestWave, r.wave || 0);

@@ -3,6 +3,7 @@
 // as a second pass over the arena. Its tiny scene has no shadow-casting lights.
 // Nothing here runs or stays in memory-heavy form outside hero select: hide() drops the model.
 import * as THREE from 'three';
+import { disposeModel } from './hero-models.js?v=1.31.1';
 
 function glowTexture() {
   const c = document.createElement('canvas'); c.width = c.height = 128;
@@ -38,18 +39,18 @@ export class Showcase {
   // build(id) -> a model ({ root }) from the game's existing hero builders
   setHero(id, color, build) {
     if (id === this.heroId && this.model) return;
-    if (this.model) this.scene.remove(this.model.root);
+    if (this.model) disposeModel(this.model);
     this.heroId = id;
     this.model = build();
     this.model.root.position.set(0, 0, 0);
-    this.model.root.rotation.y = 0.5;
+    this.model.root.rotation.y = 0.6; this.drag = 0;
     this.model.root.traverse((o) => { o.castShadow = false; o.receiveShadow = false; });
     this.scene.add(this.model.root);
     for (const m of [this.ringMat, this.glowMat]) m.color.setHex(color);
     this.rim.color.setHex(color); this.under.color.setHex(color);
   }
   hide() {
-    if (this.model) this.scene.remove(this.model.root);
+    if (this.model) disposeModel(this.model);
     this.model = null; this.heroId = null; this.el = null;
   }
   // called once per frame after the main render, only while hero select is open
@@ -59,7 +60,9 @@ export class Showcase {
     if (rc.width < 20 || rc.height < 20) return;
     const reduce = Showcase.reduced;
     this.t += dt;
-    if (!reduce) this.model.root.rotation.y += dt * 0.45;
+    // a 3/4 view that sways gently (plus any drag), never a side-on profile
+    this.model.root.rotation.y = 0.6 + (this.drag || 0) + (reduce ? 0 : Math.sin(this.t * 0.6) * 0.3);
+    this.model.idle?.(this.t);
     this.ringMat.opacity = reduce ? .85 : .7 + .25 * Math.sin(this.t * 2);
     this.cam.aspect = rc.width / rc.height;
     // narrow stage (phones): pull back a bit so the whole hero fits

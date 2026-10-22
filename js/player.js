@@ -6,6 +6,7 @@
 //   ISKRA   auto-aimed needles / Phase Hop (2 charges, decoy) / Needle Storm (fan barrage)
 //   ORIN    chaining arc tether/ Magnet Grapple (yank / pull) / Hymn Engine (vortex + drones)
 // Also: core recharge (regen), weapon tier + upgrade cards (upgrades.js), power-ups (powerups.js).
+import { disposeModel } from './hero-models.js?v=1.31.1';
 import * as THREE from 'three';
 import { decorateSkin } from './cosmetics.js?v=1.31.1';
 import { RULES, zHero } from './rules.js?v=1.31.1';
@@ -31,6 +32,16 @@ const ZK = {
 };
 
 const TELEGRAPHED = new Set(['lancer', 'grub', 'bomber']); // painted line / burrow warning / fuse: full damage, no hit protection
+
+// Phase 3B: how each hero carries himself. Pure pose numbers used only by animate().
+const MOTION = {
+  duelist: { cadence: 1.12, stride: 0.75, bob: 0.07, lean: 0.12, crouch: 0.04, sway: 0.04, breath: 2.6, breathAmp: 0.015, guard: -0.7, armSwing: 0.45, armOut: 0.05, armIdle: 0.06, armAsym: -1 }, // Sarrow: quick, forward, blades high
+  heavy:   { cadence: 0.78, stride: 0.55, bob: 0.11, lean: 0.06, crouch: 0.02, sway: 0.07, breath: 1.4, breathAmp: 0.03, guard: -0.5, armSwing: 0.3, armOut: 0.12, armIdle: 0.04, armAsym: 1 },  // Zaleks: slow, weighty rolls
+  agile:   { cadence: 1.2, stride: 0.8, bob: 0.06, lean: 0.16, crouch: 0.05, sway: 0.02, breath: 3.2, breathAmp: 0.012, guard: -0.75, armSwing: 0.35, armOut: 0.0, armIdle: 0.08, armAsym: -1 }, // Iskra: springy, light
+  control: { cadence: 0.9, stride: 0.5, bob: 0.03, lean: 0.03, crouch: 0.0, sway: 0.0, breath: 1.2, breathAmp: 0.035, guard: -0.45, armSwing: 0.2, armOut: 0.18, armIdle: 0.1, armAsym: 1 },   // Orin: measured, floating calm
+  ninja:   { cadence: 1.15, stride: 0.85, bob: 0.04, lean: 0.2, crouch: 0.08, sway: 0.0, breath: 2.2, breathAmp: 0.01, guard: -0.95, armSwing: 0.25, armOut: -0.05, armIdle: 0.03, armAsym: 1 }, // Kagero: low, stealthy
+  machine: { cadence: 0.95, stride: 0.6, bob: 0.05, lean: 0.05, crouch: 0.0, sway: 0.0, breath: 0.9, breathAmp: 0.02, guard: -0.55, armSwing: 0.32, armOut: 0.08, armIdle: 0.0, armAsym: 1 },  // Axiom: steady servo gait
+};
 
 export class Player {
   constructor(scene, world, charId = 'sarrow', tint = null) {
@@ -87,6 +98,7 @@ export class Player {
     );
     this.guard.position.y = 1.1;
     this.guard.visible = false;
+    for (const o of [this.slashArc, this.spinRing, this.marker, this.bubble, this.guard]) o.userData.keep = true; // survive disposeModel()
     this.attachExtras();
 
     // Blink Trail upgrade: glowing patches left behind by a blink (pooled)
@@ -114,11 +126,18 @@ export class Player {
     if (this.idColor) {
       if (!this.idRing) {
         this.idRing = new THREE.Mesh(new THREE.RingGeometry(0.86, 1.02, 32), new THREE.MeshBasicMaterial({ color: this.idColor, transparent: true, opacity: 0.85, depthWrite: false }));
-        this.idRing.rotation.x = -Math.PI / 2; this.idRing.position.y = 0.035;
+        this.idRing.rotation.x = -Math.PI / 2; this.idRing.position.y = 0.035; this.idRing.userData.keep = true;
       }
       this.idRing.material.color.setHex(this.idColor);
       this.model.root.add(this.idRing);
     } else if (this.idRing) this.idRing.parent?.remove(this.idRing);
+  }
+  // co-op: a remote hero leaves for good -> free its model, its own arcs/rings and pooled trail patches
+  disposeAll() {
+    disposeModel(this.model);
+    for (const o of [this.slashArc, this.spinRing, this.marker, this.bubble, this.guard, this.idRing]) if (o) { o.parent?.remove(o); o.geometry.dispose(); o.material.dispose(); }
+    for (const t of this.trail) this.scene.remove(t.mesh);
+    this.trail[0]?.mesh.geometry.dispose(); this.trailMat?.dispose();
   }
   setIdColor(c) { this.idColor = c || null; this.attachExtras(); }
 
@@ -126,7 +145,7 @@ export class Player {
   setCharacter(id, tint = null) {
     const c = CHARACTERS[id] || CHARACTERS.sarrow;
     if (c === this.char && tint === this.tint) return;
-    this.scene.remove(this.model.root);
+    disposeModel(this.model); // frees the old model's materials + cosmetic geometry (cached hero geometry stays)
     this.char = c;
     this.tint = tint;
     this.skinGlow = null;
@@ -146,7 +165,7 @@ export class Player {
     if (tint === this.tint && glow === this.skinGlow && sid === (this.skinId ?? null)) return false;
     this.skinId = sid;
     const pos = this.model.root.position.clone(), rot = this.model.root.rotation.y;
-    this.scene.remove(this.model.root);
+    disposeModel(this.model);
     this.tint = tint; this.skinGlow = glow;
     this.model = this.char.build(tint);
     if (glow !== null && this.model.core) this.model.core.material.color.setHex(glow);
@@ -1400,18 +1419,26 @@ export class Player {
   animate(dt) {
     const m = this.model;
     const speedRatio = Math.min(1, this.velocity.length() / this.char.speed);
-    this.walkPhase += dt * 13 * speedRatio;
+    // Phase 3B: per-hero movement personality (visual only; no timing, hitbox or input change)
+    const P = MOTION[m.style] || MOTION.duelist;
+    this.walkPhase += dt * 13 * P.cadence * speedRatio;
     const swing = Math.sin(this.walkPhase);
+    const now = performance.now() / 1000, still = 1 - speedRatio;
+    const breathe = Math.sin(now * P.breath) * P.breathAmp * still;
 
     // legs + body bob
-    m.legL.rotation.x = swing * 0.7 * speedRatio;
-    m.legR.rotation.x = -swing * 0.7 * speedRatio;
-    m.body.position.y = Math.abs(swing) * 0.08 * speedRatio;
-    m.body.rotation.x = 0;
+    m.legL.rotation.x = swing * P.stride * speedRatio;
+    m.legR.rotation.x = -swing * P.stride * speedRatio;
+    m.body.position.y = Math.abs(swing) * P.bob * speedRatio + breathe;
+    m.body.rotation.x = P.lean * speedRatio + P.crouch;
+    m.body.rotation.z = P.sway * Math.sin(this.walkPhase) * speedRatio;
+    if (m.head) { m.head.rotation.x = -P.crouch * 0.8; m.head.rotation.z = -m.body.rotation.z; }
 
     // default "ready" arm pose: talons out in front
-    m.armL.rotation.set(-0.6 - swing * 0.4 * speedRatio, 0, 0.15);
-    m.armR.rotation.set(-0.6 + swing * 0.4 * speedRatio, 0, -0.15);
+    const idleArm = Math.sin(now * P.breath + 1) * P.armIdle * still;
+    m.armL.rotation.set(P.guard - swing * P.armSwing * speedRatio + idleArm, 0, 0.15 + P.armOut);
+    m.armR.rotation.set(P.guard + swing * P.armSwing * speedRatio - idleArm * P.armAsym, 0, -0.15 - P.armOut);
+    m.idle?.(now, speedRatio); // animated parts: Orin's motes, Axiom's head scan
     this.slashArc.material.opacity = Math.max(0, this.slashArc.material.opacity - dt * 6);
 
     const kit = this.kit;
@@ -1489,6 +1516,7 @@ export class Player {
         this.spinRing.rotation.z -= dt * 18;
       }
     }
+    if (this.hurtTimer > 0) m.body.rotation.x -= 0.14 * Math.min(1, this.hurtTimer * 6); // hit flinch (visual only)
     if (this.guard.visible) this.guard.material.opacity = 0.14 + 0.08 * Math.sin(performance.now() / 120);
 
     // flash red when hurt
@@ -1504,7 +1532,7 @@ export class Player {
     const t = Math.min(1, this.stateTime / 0.6);
     this.model.body.rotation.x = -t * Math.PI / 2 * 0.95; // fall on his back
     this.model.core.visible = false; // core goes dark
-    this.model.body.rotation.y = 0;
+    this.model.body.rotation.y = 0; this.model.body.rotation.z = 0;
     this.model.body.position.y = t * 0.25;
     this.setFlash(0x000000);
   }

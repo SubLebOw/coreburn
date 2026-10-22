@@ -176,7 +176,8 @@ export class Hud {
   }
 
   // Character select (before every run). Same overlay + card style as the upgrade picker.
-  showSelect(chars, current, onPick) {
+  // onBack (optional): the BACK button / Escape return to the main menu.
+  showSelect(chars, current, onPick, onBack) {
     const hex = (c) => '#' + c.toString(16).padStart(6, '0');
     $('upgrade-title').textContent = 'CHOOSE YOUR HERO';
     this.upgradeOverlay.classList.remove('boss');
@@ -218,7 +219,7 @@ export class Hud {
         const pts = masteryPoints(h.level), used = spentOn(c.id, getMastery(c.id, h.level));
         mb.innerHTML = `✦ MASTERY <em>${pts - used > 0 ? pts - used + ' pt' + (pts - used > 1 ? 's' : '') + ' free' : used + '/' + pts}</em>`;
         mb.addEventListener('pointerdown', (e) => e.stopPropagation());
-        mb.addEventListener('click', (e) => { e.stopPropagation(); openMasteryPanel(c.id, c.name, hex(c.color), h.level, () => this.showSelect(chars, chars[sel]?.id || current, onPick)); window.removeEventListener('keydown', onKey, true); });
+        mb.addEventListener('click', (e) => { e.stopPropagation(); openMasteryPanel(c.id, c.name, hex(c.color), h.level, () => this.showSelect(chars, chars[sel]?.id || current, onPick, onBack)); window.removeEventListener('keydown', onKey, true); });
         d.appendChild(mb);
         b.querySelector('.ubody').insertBefore(d, b.querySelector('.kit'));
       }
@@ -235,11 +236,26 @@ export class Hud {
       done = true;
       window.removeEventListener('keydown', onKey, true);
       this.upgradeOverlay.classList.add('hidden');
+      backBtn.onclick = null;
       onPick(chars[i].id);
     };
+    const backBtn = $('sel-back-btn');
+    backBtn.classList.toggle('on', !!onBack);
+    const back = () => {
+      if (done || !onBack) return;
+      done = true;
+      window.removeEventListener('keydown', onKey, true);
+      backBtn.onclick = null;
+      this.upgradeOverlay.classList.add('hidden');
+      this.upgradeOverlay.classList.remove('select');
+      onBack();
+    };
+    backBtn.onpointerdown = (e) => e.stopPropagation();
+    backBtn.onclick = (e) => { e.stopPropagation(); back(); };
     const onKey = (e) => {
       if (document.body.classList.contains('mastery-open')) return;
       if (e.repeat) return; // a key held down from the last run must not pick a hero
+      if (e.code === 'Escape' && onBack) { e.preventDefault(); e.stopPropagation(); back(); return; }
       const n = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4, Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3, Numpad5: 4 }[e.code];
       if (n !== undefined) { e.preventDefault(); e.stopPropagation(); pick(n); return; }
       const open = chars.map((c, i) => i).filter((i) => !chars[i].locked);

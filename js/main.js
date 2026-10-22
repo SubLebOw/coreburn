@@ -398,7 +398,7 @@ function showCharacterSelect() {
     const sv = canSave && getSave(id);
     if (!sv) { startGame(id); return; }
     hud.showContinue(CHARACTERS[id], sv, () => startGame(id, sv), () => { deleteSave(RULES.z, id); startGame(id); }, () => showCharacterSelect());
-  });
+  }, coop.mode ? null : () => { world.runOver = true; resetWorld(); showTitle(); }); // BACK / Escape: main menu
 }
 
 // ---------- SAVED RUNS (v1.30.0): one per hero per rule set, solo endless only ----------

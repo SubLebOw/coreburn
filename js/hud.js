@@ -225,10 +225,11 @@ export class Hud {
         b.querySelector('.ubody').insertBefore(d, b.querySelector('.kit'));
       }
       b.addEventListener('pointerdown', (e) => e.stopPropagation());
-      b.addEventListener('click', (e) => { e.stopPropagation(); if (i === sel) pick(i); else { sel = i; mark(); } }); // tap = preview, tap again (or SELECT) = go
+      b.addEventListener('click', (e) => { e.stopPropagation(); if (i === sel) { if (performance.now() - selAt > 450) pick(i); } else { sel = i; selAt = performance.now(); mark(); } }); // tap = preview, tap again (or SELECT) = go; a quick double-tap on a new hero only previews
       box.appendChild(b);
       return b;
     });
+    let selAt = 0;
     const bodies = els.map((b) => b.querySelector('.ubody'));
     const mark = () => {
       els.forEach((b, i) => b.classList.toggle('sel', i === sel));

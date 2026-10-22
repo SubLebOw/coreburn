@@ -86,7 +86,7 @@ const showcase = new Showcase(renderer);
 let scHid = null, scWasVisible = true;
 const scStage = document.getElementById('sc-stage'), selOverlay = document.getElementById('upgrade-overlay');
 hud.onSelectHero = (c) => showcase.setHero(c.id, c.color, () => {
-  const v = progress.variantOf(c.id), m = c.build(v ? v.tint : null);
+  const v = progress.variantOf(c.id), m = c.build(v ? v.tint : (coop.mode ? null : meta.skinColor)); // same look as the run: hero variant, else the shop skin
   if (v && m.core) m.core.material.color.setHex(v.glow);
   return m;
 });

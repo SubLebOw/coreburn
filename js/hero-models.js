@@ -76,7 +76,7 @@ function tint(mats, t) {
   return mats;
 }
 // glowing core + talons + their soft halos (the tier code scales blades on Y)
-function addCore(m, geo, mat, x, y, z, rz = 0) { const c = new THREE.Mesh(geo, mat); c.position.set(x, y, z); c.rotation.z = rz; m.body.add(c); return c; }
+function addCore(m, geo, mat, x, y, z, rz = 0) { const c = new THREE.Mesh(geo, mat); c.position.set(x, y, z); c.rotation.z = rz; c.scale.set(0.16, 0.16, 0.06); m.body.add(c); return c; }
 function addBlades(m, geo, mat, haloColor, list, base) {
   const blades = [], halos = [];
   for (const arm of [m.armL, m.armR]) for (const [x, z, rx = 0, rz = 0] of list) {
@@ -94,7 +94,7 @@ const UNIT = new THREE.BoxGeometry(1, 1, 1); // talon halos: Player sizes them a
 // bleed-red scarf tail, sharp forearm blade-guards and two long curved teal talon-blades per arm.
 export function buildSarrow(t) {
   const mats = tint({
-    coat: L(0x2e333a), coatDark: L(0x1b1e23), pants: L(0x3a3833), leather: L(0x5c3e2a), orange: L(0xe0702a),
+    coat: L(0x4d5a66), coatDark: L(0x2a3038), pants: L(0x5a5246), leather: L(0x8a5e3a), orange: L(0xe0702a),
     metal: L(0x7a8089), red: L(0x9a1e24), face: G(0x06080a), glow: G(0x3ff6e0), blade: G(0x8afff4, { transparent: true, opacity: 0.92 }),
   }, t);
   const d = design('sarrow', (d) => {
@@ -141,7 +141,7 @@ export function buildSarrow(t) {
     });
   });
   const m = assemble(d, mats, { legL: [0.17, 0.86, 0], legR: [-0.17, 0.86, 0], head: [0, 1.98, 0], armL: [0.42, 1.62, 0], armR: [-0.42, 1.62, 0] });
-  const core = addCore(m, d.extra.core || d.keep('core', oct(0.085)), mats.glow, 0, 1.42, 0.17);
+  const core = addCore(m, d.extra.core || d.keep('core', oct(0.5)), mats.glow, 0, 1.42, 0.17);
   const bg = d.extra.blade || d.keep('blade', bladeGeo(0.07, 0.03, 0.02));
   const { blades, halos } = addBlades(m, bg, mats.blade, 0x8afff4, [[-0.06, 0.04], [0.06, 0.04]], -1.13);
   return { ...m, core, flashMats: [mats.coat, mats.coatDark, mats.pants, mats.leather, mats.orange, mats.metal, mats.red], blade: mats.blade, blades, halos, bladeBase: -0.77, bladeLen: 0.72,
@@ -166,24 +166,24 @@ export function buildZaleks(t) {
     });
     d.add('body', 'cloth', box(0.8, 0.38, 0.5), 0, 1.0, 0);
     d.add('body', 'plate', box(1.0, 0.56, 0.6), 0, 1.42, 0);                  // chest
-    d.add('body', 'plate', box(0.84, 0.2, 0.5), 0, 1.76, -0.02, -0.2);        // upper chest slope
-    d.add('body', 'plateDark', box(0.62, 0.16, 0.52), 0, 1.88, -0.02);        // collar
+    d.add('body', 'plate', box(0.84, 0.18, 0.5), 0, 1.72, -0.02, -0.2);        // upper chest slope
+    d.add('body', 'plateDark', box(0.56, 0.12, 0.46), 0, 1.8, -0.04);        // collar
     for (const y of [1.18, 1.27]) d.add('body', 'accent', box(0.62, 0.05, 0.04), 0, y, 0.3);
     d.add('body', 'accent', box(1.02, 0.06, 0.62), 0, 1.15, 0);
     d.add('body', 'metal', tor(0.15, 0.04, 4, 4), 0, 1.45, 0.3, 0, 0, Math.PI / 4); // square core housing
     d.add('body', 'plateDark', box(0.66, 0.6, 0.26), 0, 1.46, -0.42);         // reactor pack
-    for (const x of [-0.2, 0.2]) { d.add('body', 'metal', cyl(0.07, 0.08, 0.44, 6), x, 1.86, -0.44); d.add('body', 'glow', cyl(0.05, 0.05, 0.04, 6), x, 2.09, -0.44); }
+    for (const x of [-0.24, 0.24]) { d.add('body', 'metal', cyl(0.07, 0.08, 0.3, 6), x, 1.8, -0.48); d.add('body', 'glow', cyl(0.05, 0.05, 0.04, 6), x, 1.96, -0.48); }
     d.add('body', 'glow', box(0.4, 0.06, 0.02), 0, 1.36, -0.56);              // pack vent glow
     sym((s) => { // stacked pauldrons with rivets
-      d.add('body', 'plate', box(0.5, 0.26, 0.68), s * 0.66, 1.84, 0, 0, 0, -s * 0.25);
-      d.add('body', 'plateDark', box(0.44, 0.16, 0.62), s * 0.73, 1.68, 0, 0, 0, -s * 0.38);
-      d.add('body', 'accent', box(0.52, 0.05, 0.7), s * 0.66, 1.72, 0, 0, 0, -s * 0.25);
-      for (const z of [-0.22, 0, 0.22]) d.add('body', 'metal', sph(0.04, 5, 3), s * 0.62, 1.99, z);
+      d.add('body', 'plate', box(0.46, 0.22, 0.64), s * 0.7, 1.74, 0, 0, 0, -s * 0.32);
+      d.add('body', 'plateDark', box(0.4, 0.14, 0.58), s * 0.78, 1.58, 0, 0, 0, -s * 0.45);
+      d.add('body', 'accent', box(0.48, 0.05, 0.66), s * 0.7, 1.63, 0, 0, 0, -s * 0.32);
+      for (const z of [-0.2, 0, 0.2]) d.add('body', 'metal', sph(0.04, 5, 3), s * 0.64, 1.86, z);
     });
     // HEAD: hunched, a heavy helm with a T-visor, cheek guards and a grille
     d.add('head', 'plateDark', box(0.46, 0.42, 0.48), 0, 0, 0);
     d.add('head', 'plate', box(0.52, 0.12, 0.52), 0, 0.2, 0.01);
-    d.add('head', 'plate', box(0.1, 0.18, 0.5), 0, 0.3, 0);                   // crest ridge
+    d.add('head', 'plate', box(0.1, 0.12, 0.46), 0, 0.27, 0);                   // crest ridge
     sym((s) => d.add('head', 'plate', box(0.08, 0.3, 0.3), s * 0.25, -0.04, 0.1));
     d.add('head', 'face', box(0.36, 0.07, 0.04), 0, 0.03, 0.245);
     d.add('head', 'glow', box(0.32, 0.035, 0.02), 0, 0.03, 0.27);
@@ -196,15 +196,15 @@ export function buildZaleks(t) {
       d.add(g, 'metal', box(0.46, 0.1, 0.22), 0, -0.88, 0.13);                // knuckle bar
       d.add(g, 'accent', box(0.45, 0.06, 0.45), 0, -0.52, 0);
       d.add(g, 'glow', box(0.03, 0.2, 0.02), s * 0.12, -0.68, 0.23);
-      if (s > 0) { d.add(g, 'plateDark', box(0.07, 0.56, 0.5), 0.26, -0.64, 0.02); d.add(g, 'glow', box(0.02, 0.44, 0.04), 0.3, -0.64, 0.02); } // integrated shield plate
+      if (s > 0) { d.add(g, 'plateDark', box(0.07, 0.42, 0.46), 0.26, -0.74, 0.02); d.add(g, 'glow', box(0.02, 0.32, 0.04), 0.3, -0.74, 0.02); } // integrated shield plate
     });
   });
-  const m = assemble(d, mats, { legL: [0.25, 0.8, 0], legR: [-0.25, 0.8, 0], head: [0, 1.96, 0.08], armL: [0.64, 1.62, 0], armR: [-0.64, 1.62, 0] });
-  const core = addCore(m, d.extra.core || d.keep('core', box(0.18, 0.18, 0.06)), mats.glow, 0, 1.45, 0.31);
+  const m = assemble(d, mats, { legL: [0.25, 0.8, 0], legR: [-0.25, 0.8, 0], head: [0, 2.08, 0.12], armL: [0.64, 1.62, 0], armR: [-0.64, 1.62, 0] });
+  const core = addCore(m, d.extra.core || d.keep('core', box(1, 1, 1)), mats.glow, 0, 1.45, 0.31);
   const bg = d.extra.blade || d.keep('blade', bladeGeo(0.11, 0.07));
   const { blades, halos } = addBlades(m, bg, mats.blade, 0xffc060, [[-0.12, 0.05], [0, 0.05], [0.12, 0.05]], -1.1);
   return { ...m, core, flashMats: [mats.plate, mats.plateDark, mats.cloth, mats.accent, mats.metal], blade: mats.blade, blades, halos, bladeBase: -0.85, bladeLen: 0.5,
-    anchors: { headTop: 0.38, back: -0.56, shoulder: 0.7, scale: 1.3 }, style: 'heavy' };
+    anchors: { headTop: 0.32, back: -0.56, shoulder: 0.7, scale: 1.3 }, style: 'heavy' };
 }
 
 // ISKRA: compact agile ranged skirmisher. Slim tactical suit, a chest rig, a needle launcher on the right
@@ -229,7 +229,7 @@ export function buildIskra(t) {
     sym((s) => { d.add('body', 'metal', cyl(0.055, 0.055, 0.1, 8), s * 0.21, 1.03, 0.08, Math.PI / 2); d.add('body', 'glow', box(0.03, 0.03, 0.02), s * 0.21, 1.03, 0.14); }); // mine canisters
     d.add('body', 'metal', box(0.24, 0.3, 0.06), 0, 1.42, -0.15);              // back ammo rack
     for (const x of [-0.07, 0, 0.07]) d.add('body', 'glow', cyl(0.025, 0.025, 0.22, 6), x, 1.44, -0.19);
-    for (const sx of [-0.08, 0.08]) d.add('body', 'accent', box(0.1, 0.035, 0.82), sx, 1.72, -0.46, 0.4); // split scarf
+    for (const sx of [-0.08, 0.08]) d.add('body', 'accent', box(0.1, 0.035, 0.7), sx, 1.5, -0.3, -1.05); // split scarf
     d.add('body', 'accent', box(0.36, 0.1, 0.3), 0, 1.72, 0);
     d.add('body', 'metal', box(0.18, 0.06, 0.2), -0.29, 1.73, 0, 0, 0, 0.35);    // small right shoulder pad
     d.add('body', 'metal', tor(0.08, 0.02, 4, 10), 0, 1.47, 0.16);
@@ -249,7 +249,7 @@ export function buildIskra(t) {
     });
   });
   const m = assemble(d, mats, { legL: [0.12, 0.92, 0], legR: [-0.12, 0.92, 0], head: [0, 2.02, 0], armL: [0.31, 1.63, 0], armR: [-0.31, 1.63, 0] });
-  const core = addCore(m, d.extra.core || d.keep('core', oct(0.06)), mats.glow, 0, 1.47, 0.18);
+  const core = addCore(m, d.extra.core || d.keep('core', oct(0.45)), mats.glow, 0, 1.47, 0.18);
   const bg = d.extra.blade || d.keep('blade', bladeGeo(0.035, 0.03));
   const { blades, halos } = addBlades(m, bg, mats.blade, 0xeeaaff, [[0, 0.04]], -1.2);
   return { ...m, core, flashMats: [mats.cloth, mats.clothDark, mats.accent, mats.metal], blade: mats.blade, blades, halos, bladeBase: -0.75, bladeLen: 0.9,
@@ -265,12 +265,15 @@ export function buildOrin(t) {
   }, t);
   const d = design('orin', (d) => {
     sym((s) => { const g = s > 0 ? 'legL' : 'legR';
-      d.add(g, 'cloth', cyl(0.11, 0.1, 0.44, 6), 0, -0.22, 0);
-      d.add(g, 'plate', cyl(0.12, 0.15, 0.34, 6), 0, -0.68, 0.02);            // iron greave-boot
-      d.add(g, 'accent', cyl(0.13, 0.13, 0.04, 6), 0, -0.52, 0.02);
-      d.add(g, 'plateDark', box(0.24, 0.08, 0.32), 0, -0.86, 0.05);
+      d.add(g, 'cloth', cyl(0.14, 0.13, 0.44, 6), 0, -0.22, 0);
+      d.add(g, 'plate', cyl(0.16, 0.2, 0.36, 7), 0, -0.64, 0.02);             // heavy iron greave-boot
+      d.add(g, 'accent', cyl(0.17, 0.17, 0.05, 7), 0, -0.47, 0.02);
+      d.add(g, 'metal', box(0.2, 0.12, 0.08), 0, -0.56, 0.17, 0.2);           // shin plate
+      d.add(g, 'plateDark', box(0.3, 0.11, 0.4), 0, -0.86, 0.06);
     });
-    d.add('body', 'cloth', cyl(0.3, 0.4, 0.5, 8), 0, 0.88, 0);                 // robe skirt (stops above the knee)
+    d.add('body', 'cloth', cyl(0.3, 0.46, 0.68, 8), 0, 0.8, 0);                 // long robe skirt (to the shins)
+    d.add('body', 'accent', cyl(0.465, 0.465, 0.04, 8), 0, 0.48, 0);            // brass hem
+    d.add('body', 'plateDark', box(0.2, 0.6, 0.04), 0, 0.82, 0.3, 0.2);           // front tabard
     d.add('body', 'plateDark', cyl(0.26, 0.3, 0.12, 8), 0, 1.1, 0);
     d.add('body', 'plate', cyl(0.3, 0.25, 0.56, 6), 0, 1.4, 0, 0, Math.PI / 6, 0, 1, 1, 0.7);
     d.add('body', 'accent', tor(0.16, 0.025, 4, 16), 0, 1.42, 0.17);           // gravity ring
@@ -295,7 +298,7 @@ export function buildOrin(t) {
     });
   });
   const m = assemble(d, mats, { legL: [0.15, 0.92, 0], legR: [-0.15, 0.92, 0], head: [0, 2.06, 0], armL: [0.44, 1.64, 0], armR: [-0.44, 1.64, 0] });
-  const core = addCore(m, d.extra.core || d.keep('core', oct(0.07)), mats.glow, 0, 1.42, 0.2);
+  const core = addCore(m, d.extra.core || d.keep('core', oct(0.5)), mats.glow, 0, 1.42, 0.2);
   const bg = d.extra.blade || d.keep('blade', bladeGeo(0.06, 0.03, 0.05));
   const { blades, halos } = addBlades(m, bg, mats.blade, 0xffa090, [[0, -0.06, 0.12], [0, 0.1, -0.18]], -1.08);
   // three gravity motes orbiting the body (animated in Player.animate via model.idle)
@@ -335,7 +338,7 @@ export function buildNinja(t) {
     d.add('body', 'metal', box(0.06, 0.74, 0.3), 0, 1.38, 0.01, 0, 0, 0.7);     // bandolier
     for (const k of [-1, 0, 1]) d.add('body', 'metal', star(0.07, 0.02), k * 0.16, 1.38 + k * 0.14, 0.17, 0, 0, 0.4);
     d.add('body', 'accent', box(0.4, 0.11, 0.32), 0, 1.72, 0);
-    for (const sx of [-0.07, 0.08]) d.add('body', 'accent', box(0.09, 0.035, 1.0), sx, 1.7, -0.56, 0.32); // long scarf
+    for (const sx of [-0.07, 0.08]) d.add('body', 'accent', box(0.09, 0.035, 0.9), sx, 1.4, -0.36, -1.15); // long scarf
     // HEAD: hood, face mask, slit, hachigane plate + headband tails, small hood point (ninja silhouette)
     d.add('head', 'cloth', box(0.36, 0.38, 0.38), 0, 0, 0);
     d.add('head', 'mask', box(0.38, 0.2, 0.08), 0, -0.08, 0.17);
@@ -343,7 +346,7 @@ export function buildNinja(t) {
     d.add('head', 'glow', box(0.26, 0.025, 0.02), 0, 0.06, 0.205);
     d.add('head', 'accent', box(0.39, 0.06, 0.4), 0, 0.13, 0);
     d.add('head', 'metal', box(0.2, 0.07, 0.03), 0, 0.13, 0.205);              // hachigane
-    for (const s2 of [-1, 1]) d.add('head', 'accent', box(0.045, 0.035, 0.55), s2 * 0.07, 0.1, -0.42, 0.45, s2 * 0.15);
+    for (const s2 of [-1, 1]) d.add('head', 'accent', box(0.045, 0.035, 0.5), s2 * 0.08, -0.02, -0.38, -0.75, s2 * 0.25);
     d.add('head', 'cloth', box(0.2, 0.06, 0.2), 0, 0.21, -0.02);
     sym((s) => { const g = s > 0 ? 'armL' : 'armR';
       d.add(g, 'clothDark', cyl(0.075, 0.065, 0.42, 6), 0, -0.21, 0);
@@ -353,7 +356,7 @@ export function buildNinja(t) {
     });
   });
   const m = assemble(dz, mats, { legL: [0.14, 0.88, 0], legR: [-0.14, 0.88, 0], head: [0, 2.0, 0.03], armL: [0.33, 1.63, 0], armR: [-0.33, 1.63, 0] });
-  const core = addCore(m, dz.extra.core || dz.keep('core', oct(0.055)), mats.glow, 0, 1.53, 0.16);
+  const core = addCore(m, dz.extra.core || dz.keep('core', oct(0.42)), mats.glow, 0, 1.53, 0.16);
   // the "blade" is a shuriken in each hand (normalized to unit height for the tier code)
   const bg = dz.extra.blade || dz.keep('blade', star(0.5, 0.05));
   const blades = [], halos = [];
@@ -414,7 +417,7 @@ export function buildAxiom(t) {
     });
   });
   const m = assemble(d, mats, { legL: [0.16, 0.94, 0], legR: [-0.16, 0.94, 0], head: [0, 1.98, 0.04], armL: [0.46, 1.68, 0], armR: [-0.46, 1.68, 0] });
-  const core = addCore(m, d.extra.core || d.keep('core', box(0.14, 0.18, 0.06)), mats.glow, 0, 1.44, 0.17);
+  const core = addCore(m, d.extra.core || d.keep('core', box(0.9, 1.1, 1)), mats.glow, 0, 1.44, 0.17);
   const pg = d.extra.door || d.keep('door', box(0.15, 0.3, 0.05));
   const plateL = new THREE.Mesh(pg, mats.metal); plateL.position.set(0.1, 1.44, 0.2); m.body.add(plateL);
   const plateR = new THREE.Mesh(pg, mats.metal); plateR.position.set(-0.1, 1.44, 0.2); m.body.add(plateR);

@@ -42,7 +42,7 @@ export class Showcase {
     this.heroId = id;
     this.model = build();
     this.model.root.position.set(0, 0, 0);
-    this.model.root.rotation.y = 0.5;
+    this.model.root.rotation.y = 0.6; this.drag = 0;
     this.model.root.traverse((o) => { o.castShadow = false; o.receiveShadow = false; });
     this.scene.add(this.model.root);
     for (const m of [this.ringMat, this.glowMat]) m.color.setHex(color);
@@ -59,7 +59,9 @@ export class Showcase {
     if (rc.width < 20 || rc.height < 20) return;
     const reduce = Showcase.reduced;
     this.t += dt;
-    if (!reduce) this.model.root.rotation.y += dt * 0.45;
+    // a 3/4 view that sways gently (plus any drag), never a side-on profile
+    this.model.root.rotation.y = 0.6 + (this.drag || 0) + (reduce ? 0 : Math.sin(this.t * 0.6) * 0.3);
+    this.model.idle?.(this.t);
     this.ringMat.opacity = reduce ? .85 : .7 + .25 * Math.sin(this.t * 2);
     this.cam.aspect = rc.width / rc.height;
     // narrow stage (phones): pull back a bit so the whole hero fits

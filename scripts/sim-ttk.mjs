@@ -22,8 +22,10 @@ const ZMODE = process.argv.includes('--z');
 if (ZMODE) RULES.z = true;
 const CHARACTER_ORDER = ZMODE ? ALL_HEROES : BASE_ORDER;
 
-const hpMult = (n) => 1 + 0.14 * (n - 1);
-const dmgMult = (n) => 1 + 0.07 * (n - 1);
+// v1.31 sim: --z uses the live CoreBurnZ wave formulas (js/waves.js startWave + Z_TUNING.waves)
+const ZW = Z_TUNING.waves;
+const hpMult = (n) => ZMODE ? (1 + ZW.hpStep * (n - 1)) * (1 + ZW.lateHp * Math.max(0, n - ZW.lateFrom)) : 1 + 0.14 * (n - 1);
+const dmgMult = (n) => (1 + 0.07 * (n - 1)) * (ZMODE ? ZW.dmg : 1);
 const WAVES = [10, 30, 60, 100];
 const picksBefore = (n) => Math.floor((n - 1) / PICK_EVERY);
 
@@ -34,6 +36,7 @@ const HERO_CARDS = {
   zaleks: ['zStun', 'zShield', 'zGuard', 'zQuake', 'zHammer', 'zTaunt', 'zCharge'],
   iskra: ['iPierce', 'iHop', 'iSplit', 'iStorm', 'iDecoy', 'iVolley', 'iHopRange'],
   ninja: ['nEdge', 'nPierce', 'nMirror', 'nFan', 'nShade', 'nTwin'],
+  axiom: ['axCap', 'axServo', 'axPayload', 'axPlating', 'axFactory', 'axFeedback'],
   orin: ['oDrone', 'oShell', 'oChain', 'oDroneDmg', 'oGrapple', 'oVortex', 'oShell', 'oReach', 'oDroneTime'],
 };
 function build(hero, picks) {
@@ -122,6 +125,14 @@ function kit(id, l, scen) {
       exposure = 0.85;
       ehpMult = 1 / (1 - s.shell * Math.min(1, (c.droneTime + s.droneTime) / ultCd));
       avoid = (scen === 'boss' ? 0.05 : 0.1 + 0.03 * s.grapple + 0.56 * Math.min(0.5, c.beam.lock) * (0.4 + 0.6 * crowd)) + 0.06; // pinned (tether) / yanked enemies, grapple escapes
+      break;
+    }
+    case 'axiom': { // v1.31 sim: ROUGH. Drones, Overclock and Ascension Protocol are NOT modelled (bolt only, x1.5 for drones)
+      const nd = c.needle;
+      st = nd.damage / nd.rate * 1.5; clear = st * 1.3; ult = 0; ultClear = 0; mob = 0;
+      uptime = 0.9; exposure = 0.85;
+      ehpMult = 1 / (1 - c.barrierCut * Math.min(1, c.barrier / c.dashCd)); // Reforge barrier uptime
+      avoid = 0.06;
       break;
     }
     case 'ninja': {

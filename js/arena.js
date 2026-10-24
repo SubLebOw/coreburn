@@ -276,6 +276,27 @@ export function createArena(scene, env) {
     isClear,
     inCrack,
 
+    // v1.33 obstacle avoidance: bend a unit chase direction `dir` (in place) round the first obstacle on the way.
+    // `m` is per-enemy memory: a sticky side (so clustered barrels don't make it flip-flop) that the caller
+    // flips when it stops making progress. Cheap: one pass over a dozen circles.
+    steer(pos, dir, radius, dist, m) {
+      let best = null, bt = Math.min(dist, 3.2);
+      for (const o of obstacles) {
+        const ox = o.x - pos.x, oz = o.z - pos.z, t = ox * dir.x + oz * dir.z;
+        if (t < -0.2 || t > bt + o.r) continue;
+        const perp = ox * dir.z - oz * dir.x, need = o.r + radius + 0.15;
+        if (Math.abs(perp) < need && t - o.r < bt) { best = o; bt = Math.max(0, t - o.r); best.perp = perp; }
+      }
+      if (!best) { if (m.t > 0) m.t -= 0.016; else m.side = 0; return dir; }
+      if (!m.side) m.side = best.perp > 0 ? -1 : 1; // pass on the side away from the centre
+      m.t = 0.6;
+      const w = Math.min(1, 1.3 - bt / 3.2); // turn harder the closer it gets
+      const tx = dir.z * m.side, tz = -dir.x * m.side; // perpendicular (left/right)
+      dir.x = dir.x * (1 - w) + tx * w; dir.z = dir.z * (1 - w) + tz * w;
+      const l = Math.hypot(dir.x, dir.z) || 1; dir.x /= l; dir.z /= l;
+      return dir;
+    },
+
     // The nearest spot to `pos` where something of size `radius` fits (spirals outwards)
     findClearSpot(pos, radius) {
       const p = pos.clone().setY(0);

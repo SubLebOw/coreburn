@@ -273,6 +273,15 @@ export class Enemy {
       this.facing += diff * Math.min(1, dt * (this.state === 'windup' ? 3 : 10));
     }
 
+    // v1.33: walk round barrels/rocks instead of grinding into them (facing above still uses the true direction)
+    const nav = this.nav || (this.nav = { side: 0, t: 0, ck: 0, lx: this.position.x, lz: this.position.z });
+    if (dist > 1.6 && !this.isBoss && this.state !== 'lunge') {
+      this.world.arena.steer(this.position, toPlayer, this.radius, dist, nav);
+      if ((nav.ck += dt) > 0.7) { // no progress for 0.7 s while steering: try the other side
+        if (nav.side && Math.hypot(this.position.x - nav.lx, this.position.z - nav.lz) < 0.35 * this.speed) nav.side = -nav.side;
+        nav.ck = 0; nav.lx = this.position.x; nav.lz = this.position.z;
+      }
+    }
     let moving = false;
     const ai = this.type.ai;
     if (Z_AI.has(ai)) moving = this.zUpdate(dt, player, dist, toPlayer);

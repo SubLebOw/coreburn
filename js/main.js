@@ -47,6 +47,7 @@ import { Wardrobe } from './cosmetics.js?v=1.32.0';
 import { HeroPreview } from './hero-preview.js?v=1.32.0';
 import { CosmeticsUI } from './cosmetics-ui.js?v=1.32.0';
 import { Shrine } from './shrine.js?v=1.32.0';
+import { EventDirector } from './events.js?v=1.32.0';
 import { getMastery } from './mastery.js?v=1.32.0';
 import { readSave, writeSave, deleteSave } from './saves.js?v=1.32.0';
 import { Showcase } from './showcase.js?v=1.32.0';
@@ -151,6 +152,7 @@ const world = {
     kills++;
     meta.data.stats.kills++;
     if (RULES.z && mode === 'endless') heroUnlocks(onZKill()); // Axiom: CoreBurnZ survival kills (solo + co-op host; saved with the meta save)
+    events.onKill(e);
     if (goldRush && ++goldRush.got >= goldRush.goal) goldRushEnd(true); else if (goldRush) hud.setMutator({ name: `GOLD RUSH ${goldRush.got}/${goldRush.goal}`, color: '#ffc23a' });
     sound.play('enemyDeath');
     combo.add(1);
@@ -197,6 +199,7 @@ const world = {
     }
     hud.setMutator(null);
     if (!transition && goldRushStart(n)) { sound.play('waveStart'); sound.setIntensity(1); return; }
+    if (!transition && events.roll(n, run, RULES.z && mode === 'endless' && coop.mode !== 'client' && !isBossWave(n) && !enemies.mutator && !shrine.visible && !goldRush, arena.current.id)) { sound.setIntensity(1); return; }
     if (transition) { sound.play('waveStart'); sound.setIntensity(1); return; } // the arena banner shows instead
     const msgs = { 1: 'The Grindchoir is coming', 2: 'Ripper hounds: they lunge!', 3: 'Slag spitters: dodge the bolts', 4: 'Bulwarks: only heavy hits stagger them', 6: 'Hive splitters burst into mites', 7: 'Elites (amber crowns) incoming' };
     hud.showBanner(`WAVE ${n}`, msgs[n] || '');
@@ -241,6 +244,7 @@ const world = {
   },
   onWaveCleared(n) {
     if (goldRush) goldRushEnd(false); // the wave ended before the objective
+    events.onWaveCleared();
     if (mode === 'rush') { // BOSS RUSH: a pick after every boss; after the 7th, you've won
       if (n / 5 >= RUSH_BOSSES) { world.runOver = true; rushWon = true; deathTimer = 0; setTimeout(() => { if (state === 'playing') gameOver(); }, 1600); }
       else { upgradeTimer = Math.max(upgradeTimer, 1.3); normalPick = true; }
@@ -317,6 +321,18 @@ const powerups = new PowerUps(scene, world);
 world.player = player;
 world.enemies = enemies;
 const shrine = new Shrine(scene, world); // CoreBurnZ risk shrines
+// PHASE 4 special events (Blackout / High-Value Target / Containment Shift): see events.js
+const tellFriends = (text, sub, color) => { if (coop.mode === 'host') coop.net.broadcast({ t: 'toast', text, sub, color }); };
+const events = new EventDirector(scene, world, {
+  banner: (t, s, c) => { hud.showBanner(t, s, c); tellFriends(t, s, c); },
+  toast: (t, s, c) => { hud.showToast(t, s, c); tellFriends(t, s, c); },
+  tag: (txt, c) => { hud.setMutator(txt ? { name: txt, color: c } : null); document.getElementById('mutator-tag')?.classList.toggle('ev', !!txt); },
+  award: (b) => { run.jackpot += b; run.evDone = (run.evDone || 0) + 1; }, // the normal end-of-run scrap payout (like Gold Rush)
+  sfx: (n) => sound.play(n),
+  enemies,
+  byNid: (nid) => coop.enemyMap?.get(nid),
+});
+world.events = events;
 world.shrine = shrine;
 world.powerups = powerups;
 const allies = new Allies(scene, world); // ISKRA's needles + decoys, ORIN's drones + vortex
@@ -434,7 +450,7 @@ function snapshot(n) {
     levels: { ...L.levels }, tier: L.tier, patches: L.patches, rerolls: L.rerolls, mythicAt: L.mythicAt, comboBest: combo.best,
     curse: shrine.curse ? { ...shrine.curse } : null, shrineLast: shrine.lastWave, mutator: enemies.mutator?.id || null,
     drones: player.char.id === 'axiom' && ax ? ax.perm(player) : null, uploadUsed: !!player.uploadUsed, revived: revivedThisRun,
-    run: { bosses: run.bosses, mutators: run.mutators, jackpot: run.jackpot, rushes: run.rushes || 0 } };
+    run: { bosses: run.bosses, mutators: run.mutators, jackpot: run.jackpot, rushes: run.rushes || 0, ev: run.ev ? { ...run.ev } : undefined, evDone: run.evDone || 0 } };
 }
 function autosave(n) {
   if (!savable() || restoring) return;
@@ -501,7 +517,7 @@ function startGame(id = heroId, sv = null) {
   state = 'playing';
   revivedThisRun = false;
   hostPicking = false;
-  run = { bosses: 0, mutators: 0, jackpot: 0, awarded: 0, drops: [] }; goldRush = null;
+  run = { bosses: 0, mutators: 0, jackpot: 0, awarded: 0, drops: [] }; goldRush = null; events.reset();
   closeCall = 0; closeCallCd = 0; bursts.length = 0;
   document.body.classList.remove('closecall');
   hud.setMutator(null);
@@ -520,6 +536,7 @@ function startGame(id = heroId, sv = null) {
 
 // ---------- Co-op hooks (see coop.js) ----------
 function resetWorld() {
+  events.reset();
   effects.reset();
   projectiles.reset();
   allies.reset();
@@ -548,7 +565,7 @@ function startClientGame(char, tint, name = char) {
   deathTimer = 0;
   player.talonBase = null;
   player.startCard = null;
-  run = { bosses: 0, mutators: 0, jackpot: 0, awarded: 0, drops: [] }; goldRush = null;
+  run = { bosses: 0, mutators: 0, jackpot: 0, awarded: 0, drops: [] }; goldRush = null; events.reset();
   player.setCharacter(char, null);
   player.setIdColor(tint); // co-op duplicates: coloured ring + name tag instead of a body recolour
   hud.setHeroName(name.toUpperCase(), tint || player.char.color);
@@ -558,6 +575,7 @@ function startClientGame(char, tint, name = char) {
 const RESTART_HINT = document.getElementById('restart-hint').innerHTML;
 function showTitle() {
   state = 'title';
+  events.reset();
   if (!coop.mode) { setRules(localStorage.getItem('coreburn-rules') === 'z'); onRulesChanged(); } // back to your own pick after co-op
   cosmeticsUI.refreshBadge();
   refreshProfileName();
@@ -708,6 +726,7 @@ function awardScrap(r) {
 function gameOver() {
   if (!coop.mode && mode === 'endless') { deleteSave(RULES.z, player.char.id); waveSnap = null; } // death ends the saved run
   state = 'gameover';
+  events.reset(); // death mid-event: lights/barriers/markers back to normal
   gameOverTime = performance.now();
   const newBest = mode === 'endless' && score > best.score; // ranked modes have their own boards
   if (newBest) {
@@ -1106,6 +1125,7 @@ function frame() {
       if (coop.mode === 'host') coop.hostSim(dt);
       combo.update(worldDt);
       if (goldRush && (goldRush.t -= worldDt) <= 0) goldRushEnd(false);
+      events.update(worldDt, world.heroes || [player]);
       if (upgradeTimer > 0) {
         upgradeTimer -= dt;
         if (upgradeTimer <= 0 && (!player.dead || coop.mode === 'host')) openUpgradePicker();

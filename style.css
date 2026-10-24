@@ -406,6 +406,10 @@ body.touch .ucard .key { display: none; }
 #mutator-tag { margin-top: 6px; display: inline-block; font-size: 11px; font-weight: 900; letter-spacing: 2px; padding: 2px 8px; border-radius: 4px; color: #000; background: var(--c, #ffb020); box-shadow: 0 0 12px var(--c, #ffb020); }
 #mutator-tag::before { content: 'MUTATOR · '; opacity: .7; }
 #mutator-tag.hidden { display: none; }
+#mutator-tag.ev::before { content: 'EVENT · '; }
+/* PHASE 4 BLACKOUT: a red emergency vignette at the edges only (the lit world dims in events.js; the centre stays clear) */
+body.blackout #slowmo-tint { opacity: 1; background: radial-gradient(ellipse at center, transparent 55%, #ff3a1a2e 85%, #2a0400aa 100%); animation: bo-pulse 1.6s ease-in-out infinite; }
+@keyframes bo-pulse { 50% { filter: brightness(1.5); } }
 #gameover-scrap { margin: 4px 0 10px; font-size: 15px; color: #ddd; }
 #gameover-scrap b { color: #ffc23a; font-size: 20px; letter-spacing: 1px; }
 #gameover-scrap i { color: #7aff9a; font-style: normal; font-weight: 900; }

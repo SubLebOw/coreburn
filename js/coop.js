@@ -481,10 +481,11 @@ export class Coop {
       h: this.heroes.map((h) => [h.slot, r2(h.position.x), r2(h.position.z), r2(h.facing), h.state, h.comboStep, Math.ceil(h.hp), h.maxHp, h.dead ? 1 : 0, r2(h.reviveProgress || 0), h.loadout.tier,
         powerups.listFor(h).map((p) => [p.type, r2(p.left), p.seconds, p.hits]), (h.shieldHp > 0 ? 1 : 0) | (h.tauntTimer > 0 ? 2 : 0), Math.round(h.rage || 0), h.flow || 0]),
       sh: this.ctx.world.shrine?.snapshot(), // CoreBurnZ risk shrine
+      ev: this.ctx.world.events?.snapshot() || 0, // Phase 4 special event (tiny; 0 when none)
       a: this.ctx.allies.serialize(), // needles, decoys, drones, vortexes
       e: enemies.list.filter((e) => e.nid).map((e) => e.isBoss
         ? [e.nid, 'B', r2(e.position.x), r2(e.position.z), r2(e.facing), e.state, (e.flashTimer > 0 ? 2 : 0) | (e.dead ? 4 : 0) | (e.golden ? 8 : 0), e.bossNumber, e.part, r2(e.stateTime), e.attack || '', e.hidden ? 1 : 0, r2(e.telegraphTime || 1), r2(e.rootY || 0)]
-        : [e.nid, e.typeName, r2(e.position.x), r2(e.position.z), r2(e.facing), e.state, (e.elite ? 1 : 0) | (e.flashTimer > 0 ? 2 : 0) | (e.dead ? 4 : 0) | (e.stun > 0 ? 8 : 0), r2(e.stateTime), e.affixMask || 0]),
+        : [e.nid, e.typeName, r2(e.position.x), r2(e.position.z), r2(e.facing), e.state, (e.elite ? 1 : 0) | (e.flashTimer > 0 ? 2 : 0) | (e.dead ? 4 : 0) | (e.stun > 0 ? 8 : 0) | (e.hvt ? 16 : 0), r2(e.stateTime), e.affixMask || 0]),
       p: projectiles.list.filter((p) => p.life > 0).map((p) => [r2(p.mesh.position.x), r2(p.mesh.position.z), p.mesh.material.color.getHex(), p.size]),
       pu: powerups.pickups.map((p) => [p.id, p.type, r2(p.obj.position.x), r2(p.obj.position.z)]),
       o: powerups.orbs.map((o) => [r2(o.obj.position.x), r2(o.obj.position.z)]),
@@ -807,6 +808,7 @@ export class Coop {
       } else {
         if (es[5] !== e.state) { e.state = es[5]; e.stateTime = es[7]; }
         e.stun = flags & 8 ? 0.1 : 0;
+        e.hvt = !!(flags & 16);
       }
       if (flags & 4 && !e.dead) { e.dead = true; e.state = 'dead'; e.stateTime = 0; }
     }
@@ -830,6 +832,7 @@ export class Coop {
     });
     this.ctx.allies.applySnapshot(m.a);
     this.ctx.world.shrine?.applySnapshot(m.sh);
+    this.ctx.world.events?.applySnapshot(m.ev);
     // pickups + heal orbs
     const pseen = new Set();
     for (const [id, type, x, z] of m.pu) {
@@ -896,6 +899,7 @@ export class Coop {
 
   // ---------- Client: every frame ----------
   clientFrame(dt, state) {
+    this.ctx.world.events?.animateClient(dt);
     const { player, input, arena, world, powerups } = this.ctx;
     this.net.checkTimeout();
     if (!this.inGame) { arena.update(dt, player, world, false); return; }

@@ -282,6 +282,12 @@ export class Enemy {
         nav.ck = 0; nav.lx = this.position.x; nav.lz = this.position.z;
       }
     }
+    // PHASE 4 HIGH-VALUE TARGET: keeps its distance (runs when you close in), with short sprints to reposition
+    if (this.hvt && !player.dead) {
+      this.hvtT = (this.hvtT || 0) + dt;
+      const burst = this.hvtT % 4 < 0.8; // a sprint every 4 s
+      if (dist < 6.5 || burst) { toPlayer.negate(); if (burst) this.position.addScaledVector(toPlayer, this.speed * 0.6 * dt); }
+    }
     let moving = false;
     const ai = this.type.ai;
     if (Z_AI.has(ai)) moving = this.zUpdate(dt, player, dist, toPlayer);
@@ -515,7 +521,8 @@ export class Enemy {
     if (this.type.ai === 'mender' && this.state === 'windup') { this.armL.rotation.x = this.armR.rotation.x = -2.6; }
 
     // white flash when hit, red glow while winding up an attack
-    let emissive = this.elite ? 0x2a1500 : 0x000000;
+    let emissive = this.hvt ? (Math.sin(this.stateTime * 8) > 0 ? 0x664400 : 0x332200) : this.elite ? 0x2a1500 : this.world.blackout ? 0x3a0e04 : 0x000000; // blackout: enemies glow
+
     if (this.flashTimer > 0) emissive = 0xffffff;
     else if (this.state === 'windup') emissive = 0x661100;
     this.setEmissive(emissive);

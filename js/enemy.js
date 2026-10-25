@@ -273,6 +273,21 @@ export class Enemy {
       this.facing += diff * Math.min(1, dt * (this.state === 'windup' ? 3 : 10));
     }
 
+    // v1.33: walk round barrels/rocks instead of grinding into them (facing above still uses the true direction)
+    const nav = this.nav || (this.nav = { side: 0, t: 0, ck: 0, lx: this.position.x, lz: this.position.z });
+    if (dist > 1.6 && !this.isBoss && this.state !== 'lunge') {
+      this.world.arena.steer(this.position, toPlayer, this.radius, dist, nav);
+      if ((nav.ck += dt) > 0.7) { // no progress for 0.7 s while steering: try the other side
+        if (nav.side && Math.hypot(this.position.x - nav.lx, this.position.z - nav.lz) < 0.35 * this.speed) nav.side = -nav.side;
+        nav.ck = 0; nav.lx = this.position.x; nav.lz = this.position.z;
+      }
+    }
+    // PHASE 4 HIGH-VALUE TARGET: keeps its distance (runs when you close in), with short sprints to reposition
+    if (this.hvt && !player.dead) {
+      this.hvtT = (this.hvtT || 0) + dt;
+      const burst = this.hvtT % 4 < 0.8; // a sprint every 4 s
+      if (dist < 6.5 || burst) { toPlayer.negate(); if (burst) this.position.addScaledVector(toPlayer, this.speed * 0.6 * dt); }
+    }
     let moving = false;
     const ai = this.type.ai;
     if (Z_AI.has(ai)) moving = this.zUpdate(dt, player, dist, toPlayer);
@@ -506,7 +521,8 @@ export class Enemy {
     if (this.type.ai === 'mender' && this.state === 'windup') { this.armL.rotation.x = this.armR.rotation.x = -2.6; }
 
     // white flash when hit, red glow while winding up an attack
-    let emissive = this.elite ? 0x2a1500 : 0x000000;
+    let emissive = this.hvt ? (Math.sin(this.stateTime * 8) > 0 ? 0x664400 : 0x332200) : this.elite ? 0x2a1500 : this.world.blackout ? 0x3a0e04 : 0x000000; // blackout: enemies glow
+
     if (this.flashTimer > 0) emissive = 0xffffff;
     else if (this.state === 'windup') emissive = 0x661100;
     this.setEmissive(emissive);

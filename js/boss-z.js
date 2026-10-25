@@ -10,7 +10,7 @@
 // Co-op: the host runs the attacks; friends see the same warnings (effects are mirrored), bolts come
 // through the snapshot, and the Abbot's inhale pulls each player on their own screen (pose()).
 import * as THREE from 'three';
-import { Boss } from './boss.js?v=1.32.0';
+import { Boss } from './boss.js?v=1.33.0';
 
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 const GLOW = (c) => new THREE.MeshBasicMaterial({ color: c });

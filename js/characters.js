@@ -12,9 +12,9 @@
 // numbers. They stay within ~10% of each other at every wave.
 import * as THREE from 'three';
 
-import { HERO_STATS, CHARACTER_ORDER, ALL_HEROES, heroOrder, characterBudget } from './hero-stats.js?v=1.32.0';
+import { HERO_STATS, CHARACTER_ORDER, ALL_HEROES, heroOrder, characterBudget } from './hero-stats.js?v=1.33.0';
 export { CHARACTER_ORDER, ALL_HEROES, heroOrder, characterBudget };
-import { buildSarrow as hmSarrow, buildZaleks as hmZaleks, buildIskra as hmIskra, buildOrin as hmOrin, buildNinja as hmNinja, buildAxiom as hmAxiom } from './hero-models.js?v=1.32.0';
+import { buildSarrow as hmSarrow, buildZaleks as hmZaleks, buildIskra as hmIskra, buildOrin as hmOrin, buildNinja as hmNinja, buildAxiom as hmAxiom } from './hero-models.js?v=1.33.0';
 // Phase 3B: the layered procedural models in hero-models.js (the old box builders below are kept for reference)
 const BUILDERS = { sarrow: hmSarrow, zaleks: hmZaleks, iskra: hmIskra, orin: hmOrin, ninja: hmNinja, axiom: hmAxiom };
 const LEGACY_BUILDERS = { sarrow: (t) => buildSarrow(t), zaleks: (t) => buildZaleks(t), iskra: (t) => buildIskra(t), orin: (t) => buildOrin(t), ninja: (t) => buildNinja(t), axiom: (t) => buildAxiom(t) };

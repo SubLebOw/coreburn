@@ -5,7 +5,7 @@
 //   * rare drops (golden bosses) and later achievements / unlocks
 // Nothing here is needed to play: the shop is purely optional extras.
 
-import { defaultStats } from './achievements.js?v=1.32.0';
+import { defaultStats } from './achievements.js?v=1.33.0';
 
 const KEY = 'coreburn-save';
 

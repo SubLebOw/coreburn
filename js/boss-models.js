@@ -8,6 +8,8 @@
 // Math.random on the boss build/update path, and only uses the unrecorded local effects + local sound.
 import * as THREE from 'three';
 import { sound } from './audio.js?v=1.33.0';
+import { rebuildBoss, tickRig, unrig } from './boss-rigs.js?v=1.33.0';
+import { DESIGNS } from './boss-designs.js?v=1.33.0';
 
 const PI = Math.PI;
 const UNIT = new THREE.BoxGeometry(1, 1, 1);
@@ -407,17 +409,19 @@ export function dressBoss(b) {
   b.mats.metal = new THREE.MeshLambertMaterial({ color: metal });
   b.mats.trim = new THREE.MeshLambertMaterial({ color: trim });
   b.dress = { spin: [], pulse: [], vents: [], weak: [], energy: BOSS_ENERGY[id] ?? 0xff7a1a, last: '', ventT: 0, deathStep: 0, t0: 0 };
+  if (DESIGNS[id]) { rebuildBoss(b, DESIGNS[id]); return; } // stage 3: brand-new body on the old handles
   try { DRESS[id]?.(new Kit(b), b); } catch (e) { console.warn('boss dress', id, e); }
   mergeStatic(b);
 }
 
-export function undressBoss(b) { for (const q of b.dress?.geos || []) q.dispose(); }
+export function undressBoss(b) { for (const q of b.dress?.geos || []) q.dispose(); unrig(b); }
 
 // ---------- animated components + presentation (every machine, from the boss's own state) ----------
 const _v = new THREE.Vector3();
 const DEATH_COLORS = [0x3a3634, 0x6a5a48, 0x2a2623];
 export function tickDress(b, dt, t) {
   const d = b.dress; if (!d) return;
+  tickRig(b, dt, t);
   const st = b.state, tele = st === 'telegraph', k = tele ? Math.min(1, b.stateTime / (b.telegraphTime || 1)) : 0;
   const busy = tele || st === 'charging' || st === 'beaming' || st === 'spiraling' || st === 'ledgering' || st === 'mirroring' || st === 'linking';
   const dead = st === 'dead';

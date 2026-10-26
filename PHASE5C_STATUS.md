@@ -21,6 +21,12 @@ No merge, version bump or deploy. PR #7 is not touched.
 - Timing fingerprint (`/workspace/pw/p5c-timing.mjs`, 22 sims) is identical to the baseline, so there are
   no stat, AI, timing or radius changes.
 
+- Variant E: 24/24 pass. Desktop and mobile smoke runs (wave 3) show 0 JS errors.
+- Perf (software render, 11 enemies, gallery scene, includes the shadow pass): draw calls 145 -> 236 and
+  triangles about 1.9k -> 7.1k. The geometry cache holds about 238 entries per type set; this is a one-time cost
+  that does not grow with enemy count.
+  **TODO:** cut draw calls (merge detail meshes into the main groups when LOD is lo, or bake static groups).
+
 ### Remaining
 - Affix accents and shared affix geometry (`js/affixes.js`).
 - Dev inspector (`js/dev-5c-inspector.js`, the ?dev=1 gate in index.html, and main.js hooks matching PR #7).

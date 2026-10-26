@@ -3,12 +3,9 @@
 // acid-green visors. This file defines every regular enemy type, how they look,
 // and how they behave. (Bosses live in boss.js, waves in waves.js.)
 import * as THREE from 'three';
-import { affixDamage } from './affixes.js?v=1.33.0';
-
-const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1); // shared by every enemy body part
-const VISOR_MAT = new THREE.MeshBasicMaterial({ color: 0xc8ff3a });  // acid-green glow
-const ELITE_VISOR_MAT = new THREE.MeshBasicMaterial({ color: 0xffb020 }); // elites glow amber
-const SPIT_MAT = new THREE.MeshBasicMaterial({ color: 0xff8a1e });   // spitter's molten tank
+import { affixDamage } from './affixes.js?v=1.33.0-p5c3';
+import { buildEnemyModel, coreMat, GLOW } from './enemy-models.js?v=1.33.0-p5c3';
+import { sound } from './audio.js?v=1.33.0-p5c3';
 
 // Every enemy type. Numbers here are for wave 1; waves.js multiplies them as waves climb.
 //   ai: 'melee'  = walk up, raise fists, swing
@@ -17,8 +14,32 @@ const SPIT_MAT = new THREE.MeshBasicMaterial({ color: 0xff8a1e });   // spitter'
 // Names used on the game over screen / share text ("died to an elite Ripper Hound")
 const DISPLAY_NAMES = { acolyte: 'Acolyte', hound: 'Ripper Hound', spitter: 'Slag Spitter', bulwark: 'Bulwark', splitter: 'Hive Splitter', mite: 'Mite',
   thurible: 'Thurible Monk', lancer: 'Cantor Lancer', mender: 'Oil Mender', grub: 'Gravel Grub', bomber: 'Hymn Bomber' };
-const GLOW = (c) => new THREE.MeshBasicMaterial({ color: c });
-const CENSER_MAT = GLOW(0xff9a2a), LANCE_MAT = GLOW(0xff3a3a), MEND_MAT = GLOW(0x6aff7a), BOMB_MAT = GLOW(0xffb020);
+// Phase 5C visuals: metal tint per type, gait personality, anchor heights (model units), gameplay LOD
+const METAL = { acolyte: 0x6a625a, bulwark: 0x5a5c60, lancer: 0x707684, spitter: 0x5e6248, hound: 0x666058, mite: 0x6a6458,
+  splitter: 0x6a5e48, thurible: 0x5e5258, mender: 0x56645a, grub: 0x6e6658, bomber: 0x625a52 };
+//   f = stride speed, stride/arm = swing, bob/sway/twist = body motion, lean = resting forward hunch, step = footfall cue
+const GAIT = {
+  acolyte: { f: 12, stride: 0.75, arm: 0.7, bob: 0.06, sway: 0.05, twist: 0.12, lean: 0.12 },
+  bulwark: { f: 6.5, stride: 0.45, arm: 0.3, bob: 0.09, sway: 0.09, twist: 0.06, lean: 0.04, step: 'stomp' },
+  lancer: { f: 9, stride: 0.55, arm: 0.25, bob: 0.03, sway: 0.02, twist: 0.05, lean: 0.0 },
+  spitter: { f: 8, stride: 0.5, arm: 0.35, bob: 0.05, sway: 0.04, twist: 0.04, lean: 0.06 },
+  splitter: { f: 8, stride: 0.55, arm: 0.45, bob: 0.07, sway: 0.08, twist: 0.05, lean: 0.1 },
+  thurible: { f: 7, stride: 0.42, arm: 0.2, bob: 0.05, sway: 0.06, twist: 0.0, lean: 0.06 },
+  mender: { f: 9, stride: 0.55, arm: 0.3, bob: 0.04, sway: 0.03, twist: 0.04, lean: 0.14 },
+  bomber: { f: 17, stride: 0.95, arm: 0.3, bob: 0.08, sway: 0.03, twist: 0.1, lean: 0.3 },
+  hound: { f: 17 }, mite: { f: 24 }, grub: { f: 9 },
+};
+for (const g of Object.values(GAIT)) for (const k of ['stride', 'arm', 'bob', 'sway', 'twist', 'lean']) g[k] ??= 0;
+const ANCHOR = { acolyte: 1.35, bulwark: 1.4, lancer: 1.4, spitter: 1.45, hound: 0.8, mite: 0.6, splitter: 1.35, thurible: 1.4, mender: 1.4, grub: 0.5, bomber: 1.2 };
+export const TOP = { acolyte: 2.3, bulwark: 2.2, lancer: 2.4, spitter: 2.0, hound: 1.3, mite: 1.0, splitter: 2.2, thurible: 2.4, mender: 2.6, grub: 0.95, bomber: 2.2 };
+// readability: subtle self-light + lifted palette for the darkest bodies (acolyte, spitter) so they don't sink into the floor
+const RIM = { acolyte: 0x2a1408, spitter: 0x1c2008, lancer: 0x0c0c16 };
+const LIFT = { acolyte: 1.3, spitter: 1.3 };
+const tint = (hex, k) => k === 1 ? hex : new THREE.Color(hex).multiplyScalar(k).getHex();
+const HEAVY = new Set(['bulwark', 'thurible']);
+const LOD = { mode: 'auto', on: true, t: -1 }; // auto: crowd LOD above 8 live enemies (light enemies stop casting shadows)
+export function setEnemyLOD(mode) { LOD.mode = mode; LOD.t = -1; }
+const HVT_GEO = new THREE.OctahedronGeometry(0.22); HVT_GEO.userData.cached = true;
 
 export const ENEMY_TYPES = {
   acolyte:  { hp: 30,  speed: 3.4, damage: 8,  scale: 1.0,  windup: 0.45, reach: 1.5, armored: false, points: 10, ai: 'melee',  main: 0x8a3b1e, dark: 0x3a3430 },
@@ -81,124 +102,40 @@ export class Enemy {
   get hidden() { return this.state === 'burrowed'; }
 
   buildModel() {
-    // Each enemy gets its own materials so it can flash white on its own
-    this.mats = {
-      main: new THREE.MeshLambertMaterial({ color: this.type.main }),
-      dark: new THREE.MeshLambertMaterial({ color: this.type.dark }),
-      mask: new THREE.MeshLambertMaterial({ color: 0xd8cfb8 }), // bone-white mask
-    };
-    const visor = this.elite ? ELITE_VISOR_MAT : VISOR_MAT;
-    const { main, dark, mask } = this.mats;
-    this.root = new THREE.Group();
-    this.body = new THREE.Group();
-    this.root.add(this.body);
-
-    const part = (parent, mat, w, h, d, x, y, z, shadow = true) => {
-      const m = new THREE.Mesh(UNIT_BOX, mat);
-      m.scale.set(w, h, d);
-      m.position.set(x, y, z);
-      m.castShadow = shadow;
-      parent.add(m);
-      return m;
-    };
-    const limb = (x, y, z) => { const g = new THREE.Group(); g.position.set(x, y, z); this.body.add(g); return g; };
-
-    if (this.typeName === 'hound') {
-      // Four-legged scrap hound with a long snout
-      part(this.body, main, 0.6, 0.45, 1.2, 0, 0.75, 0);
-      part(this.body, dark, 0.5, 0.15, 0.9, 0, 1.02, -0.05);           // spine plates
-      part(this.body, mask, 0.4, 0.35, 0.5, 0, 0.9, 0.75);             // masked head
-      part(this.body, visor, 0.32, 0.06, 0.03, 0, 0.95, 1.01, false);
-      part(this.body, dark, 0.06, 0.06, 0.5, 0, 1.05, -0.8).rotation.x = -0.6; // tail antenna
-      this.legs = [];
-      for (const [x, z] of [[0.22, 0.4], [-0.22, 0.4], [0.22, -0.4], [-0.22, -0.4]]) {
-        const g = limb(x, 0.6, z);
-        part(g, dark, 0.14, 0.6, 0.14, 0, -0.3, 0);
-        this.legs.push(g);
-      }
-    } else if (this.typeName === 'grub') {
-      // segmented gravel grub with a bone mask and mandibles
-      this.legs = [];
-      for (let i = 0; i < 4; i++) part(this.body, i % 2 ? dark : main, 0.75 - i * 0.1, 0.55 - i * 0.06, 0.45, 0, 0.42 - i * 0.03, -i * 0.42);
-      part(this.body, mask, 0.6, 0.45, 0.25, 0, 0.5, 0.32);
-      part(this.body, visor, 0.4, 0.06, 0.03, 0, 0.55, 0.45, false);
-      for (const x of [-0.22, 0.22]) part(this.body, dark, 0.08, 0.08, 0.35, x, 0.32, 0.55).rotation.y = -x;
-      for (let i = 0; i < 3; i++) part(this.body, mask, 0.16, 0.18, 0.16, (i - 1) * 0.18, 0.78, -0.4 - i * 0.2, false); // spine stones
-    } else if (this.typeName === 'mite') {
-      // Tiny skittering drone
-      part(this.body, main, 0.8, 0.5, 0.8, 0, 0.6, 0);
-      part(this.body, mask, 0.5, 0.3, 0.1, 0, 0.65, 0.42, false);
-      part(this.body, visor, 0.4, 0.08, 0.03, 0, 0.67, 0.48, false);
-      this.legs = [];
-      for (const [x, z] of [[0.45, 0.3], [-0.45, 0.3], [0.45, -0.3], [-0.45, -0.3]]) {
-        const g = limb(x, 0.5, z);
-        part(g, dark, 0.12, 0.5, 0.12, 0, -0.25, 0);
-        this.legs.push(g);
-      }
-    } else {
-      // Humanoid cultists: acolyte, spitter, bulwark, splitter
-      this.legL = limb(0.2, 0.8, 0);
-      this.legR = limb(-0.2, 0.8, 0);
-      part(this.legL, dark, 0.3, 0.8, 0.32, 0, -0.4, 0);
-      part(this.legR, dark, 0.3, 0.8, 0.32, 0, -0.4, 0);
-      part(this.body, main, 0.78, 0.75, 0.48, 0, 1.2, 0);           // rusty torso
-      part(this.body, dark, 0.84, 0.12, 0.52, 0, 1.0, 0);            // waist band
-      part(this.body, mask, 0.42, 0.44, 0.4, 0, 1.92, 0);            // bone mask head
-      part(this.body, visor, 0.3, 0.07, 0.03, 0, 1.95, 0.21, false); // glowing visor
-      part(this.body, dark, 0.5, 0.06, 0.5, 0, 2.17, 0);             // hood rim
-      part(this.body, main, 0.06, 0.3, 0.06, 0.14, 2.32, 0);         // antenna "choir pipes"
-      part(this.body, main, 0.06, 0.4, 0.06, -0.12, 2.37, -0.04);
-      this.armL = limb(0.52, 1.52, 0);
-      this.armR = limb(-0.52, 1.52, 0);
-      for (const a of [this.armL, this.armR]) {
-        part(a, dark, 0.22, 0.6, 0.24, 0, -0.32, 0);
-        part(a, main, 0.3, 0.28, 0.3, 0, -0.72, 0); // scrap fist
-      }
-      if (this.typeName === 'bulwark') {
-        part(this.body, dark, 1.2, 0.3, 0.62, 0, 1.6, 0);          // huge shoulder plate
-        part(this.armL, dark, 0.12, 0.9, 0.7, 0.18, -0.55, 0.05);   // scrap shield
-      } else if (this.typeName === 'spitter') {
-        const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.7, 8), SPIT_MAT);
-        tank.position.set(0, 1.45, -0.38);
-        tank.rotation.x = 0.3;
-        this.body.add(tank);
-        part(this.body, dark, 0.12, 0.12, 0.3, 0, 1.75, 0.3);       // nozzle by the mouth
-      } else if (this.typeName === 'thurible') {
-        part(this.body, dark, 1.0, 0.35, 0.6, 0, 1.62, 0);           // monk's shoulder cowl
-        this.orbit = new THREE.Group(); this.root.add(this.orbit);
-        const r = this.type.censer / this.scale;
-        const chain = part(this.orbit, dark, 0.05, 0.05, r, 0, 1.2, r / 2, false);
-        chain.castShadow = false;
-        this.ball = new THREE.Mesh(new THREE.IcosahedronGeometry(0.34, 0), CENSER_MAT);
-        this.ball.position.set(0, 1.0, r); this.orbit.add(this.ball);
-        part(this.orbit, dark, 0.5, 0.12, 0.5, 0, 1.3, r);          // censer lid
-      } else if (this.typeName === 'lancer') {
-        part(this.armR, dark, 0.12, 0.12, 1.4, 0, -0.75, 0.55);       // the long lance-pipe
-        part(this.armR, LANCE_MAT, 0.14, 0.14, 0.1, 0, -0.75, 1.25, false);
-        part(this.body, LANCE_MAT, 0.32, 0.07, 0.03, 0, 1.95, 0.22, false); // red visor over the green
-        part(this.body, dark, 0.7, 0.9, 0.08, 0, 1.25, -0.3);       // long cantor's mantle
-      } else if (this.typeName === 'mender') {
-        for (const x of [-0.2, 0.2]) { const t = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.6, 8), MEND_MAT); t.position.set(x, 1.35, -0.35); this.body.add(t); }
-        this.halo = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.04, 4, 18), MEND_MAT);
-        this.halo.rotation.x = Math.PI / 2; this.halo.position.set(0, 2.55, 0); this.body.add(this.halo);
-      } else if (this.typeName === 'bomber') {
-        const bomb = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42, 0), BOMB_MAT); bomb.position.set(0, 1.25, 0.22); this.body.add(bomb);
-        this.bomb = bomb;
-        this.fuse = part(this.body, BOMB_MAT, 0.08, 0.3, 0.08, 0.1, 2.4, 0, false);
-      } else if (this.typeName === 'splitter') {
-        for (const [x, y] of [[0.25, 1.45], [-0.25, 1.45], [0, 1.15]]) {
-          part(this.body, main, 0.3, 0.3, 0.3, x, y, -0.36);        // pods that become mites
-        }
-      }
+    // Each enemy gets its own (4) Lambert materials so it can flash white on its own; geometry is
+    // merged + cached per type in enemy-models.js and every glow material is shared.
+    // ONE flashable Lambert material per enemy: armour colours are baked into vertex colours (enemy-models.js)
+    const lift = LIFT[this.typeName] || 1; // dark-palette types are lifted a touch so they read on every arena floor
+    const palette = { main: tint(this.type.main, lift), dark: tint(this.type.dark, lift), metal: METAL[this.typeName] ?? 0x666058, mask: 0xd8cfb8 };
+    this.baseEmissive = RIM[this.typeName] || 0;
+    this.mats = { lit: new THREE.MeshLambertMaterial({ vertexColors: true, emissive: this.baseEmissive }) };
+    const m = buildEnemyModel(this.typeName, this.elite, this.mats.lit, palette, coreMat(this.typeName));
+    this.root = m.root; this.body = m.body; this.rig = m.groups; this.detail = m.detail; this.caster = m.caster;
+    const g = m.groups, P = m.pieces;
+    this.legL = g.legL; this.legR = g.legR; this.armL = g.armL; this.armR = g.armR; this.head = g.head;
+    if (g.leg0) this.legs = [g.leg0, g.leg1, g.leg2, g.leg3];
+    this.charge = P.charge; this.chamber = P.chamber; this.halo = P.halo;
+    if (this.charge) this.charge.scale.setScalar(0.01);
+    if (this.typeName === 'thurible') {
+      // the censer swings at the REAL hit radius (elites reach 15% further, see censerUpdate)
+      this.orbit = new THREE.Group(); this.root.add(this.orbit);
+      const r = this.type.censer * (this.elite ? 1.15 : 1) / this.scale;
+      g.chain.position.set(0, 1.25, 0.3); g.chain.scale.set(1, 1, r - 0.6); g.chain.rotation.x = 0.06; this.orbit.add(g.chain);
+      g.cage.position.set(0, 1.05, r); this.orbit.add(g.cage);
+      this.ball = P.censer; this.ball.position.set(0, 1.05, r); this.orbit.add(this.ball);
     }
-
-    if (this.elite) {
-      // spiky amber crown so elites are easy to spot
-      const crownY = this.typeName === 'hound' ? 1.15 : this.typeName === 'mite' ? 0.9 : 2.25;
-      const crownZ = this.typeName === 'hound' ? 0.7 : 0;
-      for (const x of [-0.18, 0, 0.18]) part(this.body, ELITE_VISOR_MAT, 0.08, 0.25, 0.08, x, crownY, crownZ, false);
+    if (P.pods) {
+      this.pods = [[0.15, 1.52, -0.5], [-0.15, 1.46, -0.52], [0.02, 1.22, -0.54]].map(([x, y, z], i) => {
+        const pm = i ? new THREE.Mesh(P.pods.geometry, P.pods.material) : P.pods; pm.position.set(x, y, z); this.body.add(pm); return pm;
+      });
     }
-
+    if (P.bomb) {
+      this.bomb = P.bomb; this.fuse = P.fuse;
+      this.lamps = [[0.24, 1.62, 0.3], [-0.24, 1.62, 0.3]].map(([x, y, z], i) => {
+        const lm = i ? new THREE.Mesh(P.lamps.geometry, P.lamps.material) : P.lamps; lm.position.set(x, y, z); this.body.add(lm); return lm;
+      });
+    }
+    this.topY = TOP[this.typeName] ?? 2.2;
     this.root.scale.setScalar(this.scale);
     this.root.position.set(this.position.x, -2.5, this.position.z); // start underground
     this.scene.add(this.root);
@@ -211,6 +148,7 @@ export class Enemy {
     else if (this.wardMult) damage *= this.wardMult;
     this.hp -= damage;
     this.flashTimer = 0.1;
+    this.hitDir = Math.atan2(knockX, knockZ); // Phase 5C: visual recoil direction only
     const resist = this.type.armored ? 0.4 : (this.elite ? 0.7 : 1);
     this.knockback.x += knockX * resist;
     this.knockback.z += knockZ * resist;
@@ -485,44 +423,66 @@ export class Enemy {
     this.stateTime = 0;
   }
 
+  // ---------- Phase 5C animation (visual only: reads state/stateTime, never changes them) ----------
+  // Melee damage lands on the windup -> recover transition, so every swing peaks at the end of the
+  // windup and the strike/follow-through plays in the first ~0.12 s of 'recover'.
   animate(dt, moving) {
-    this.walkPhase += dt * (moving ? 11 : 0);
-    const s = Math.sin(this.walkPhase) * (moving ? 0.6 : 0);
-    this.body.rotation.x = 0;
-    this.body.position.y = 0;
+    const T = this.typeName, ai = this.type.ai, st = this.state, B = this.body;
+    const gait = GAIT[T] || GAIT.acolyte;
+    this.walkPhase += dt * (moving ? gait.f : 0);
+    this.idleT = (this.idleT || 0) + dt;
+    const ph = this.walkPhase, s = moving ? Math.sin(ph) : 0, c = moving ? Math.cos(ph) : 1;
+    const wt = st === 'windup' ? Math.min(1, this.stateTime / this.type.windup) : 0;
+    const rt = st === 'recover' ? this.stateTime : -1;
+    const strike = rt >= 0 ? Math.min(1, rt / 0.12) : 0;            // 0 -> 1 during the follow-through
+    const settle = rt >= 0 ? Math.max(0, 1 - (rt - 0.12) / 0.33) : 0; // then eases back
+    const br = Math.sin(this.idleT * (this.elite ? 2.6 : 2.1)) * 0.5 + 0.5; // idle breathing
+    B.position.set(0, 0, 0); B.rotation.set(gait.lean + (this.elite ? 0.05 : 0), 0, 0);
+    this.lodTick();
 
-    if (this.legs) {
-      // hounds and mites: four legs
-      this.legs.forEach((l, i) => { l.rotation.x = (i % 2 === 0 ? s : -s) * 1.2; });
-      if (this.state === 'windup') { this.body.position.y = -0.2; this.body.rotation.x = -0.25; } // crouch
-      if (this.state === 'lunge') { this.body.position.y = 0.4; this.body.rotation.x = 0.3; }     // airborne
-    } else {
-      this.legL.rotation.x = s;
-      this.legR.rotation.x = -s;
-      if (this.state === 'windup') {
-        // raise fists overhead (or rear back to spit) - your warning to dodge!
-        const t = Math.min(1, this.stateTime / this.type.windup);
-        this.armL.rotation.x = this.armR.rotation.x = -t * (this.type.ai === 'ranged' ? 1.2 : 2.8);
-        this.body.rotation.x = -t * 0.25;
-      } else if (this.state === 'recover') {
-        this.armL.rotation.x = this.armR.rotation.x = -0.9;
-        this.body.rotation.x = 0.25;
-      } else {
-        this.armL.rotation.x = -s * 0.8;
-        this.armR.rotation.x = s * 0.8;
-      }
+    // hit reaction: short directional recoil (light enemies), a stiff jolt + sparks for armour
+    if (this.flashTimer > 0 && !this._flashSeen) { this._flashSeen = true; this.recoilT = 0.18; this.onHitVisual(); }
+    if (this.flashTimer <= 0) this._flashSeen = false;
+    const rc = this.recoilT > 0 ? (this.recoilT -= dt) / 0.18 : 0;
+
+    if (this.legs) this.animQuad(dt, moving, s, c, wt, st, br);
+    else if (T === 'grub') this.animGrub(dt, moving, ph, wt, strike, settle, st, br);
+    else this.animHumanoid(dt, moving, s, c, wt, strike, settle, st, br, gait);
+
+    if (rc > 0) {
+      const rel = (this.hitDir ?? this.facing + Math.PI) - this.facing, k = (this.type.armored ? 0.35 : 1) * Math.sin(rc * Math.PI);
+      B.rotation.x += 0.28 * k * Math.cos(rel); B.rotation.z -= 0.2 * k * Math.sin(rel);
+      if (this.head) this.head.rotation.x -= 0.3 * k;
     }
-    if (this.stun > 0) this.body.rotation.x = -0.3; // reel back when hit
+    if (this.stun > 0 && !this.type.armored) { B.rotation.x -= 0.18; B.rotation.z += Math.sin(this.idleT * 40) * 0.05; } // a real stagger
+
     // COREBURNZ extras
-    if (this.orbit) this.orbit.rotation.y = this.censerAngle - this.facing;
-    if (this.halo) this.halo.rotation.z += dt * 3;
-    if (this.bomb) { const lit = this.state === 'windup'; const k = lit ? 1 + 0.25 * Math.abs(Math.sin(this.stateTime * 18)) : 1; this.bomb.scale.setScalar(k); this.fuse.visible = !lit || Math.sin(this.stateTime * 30) > 0; }
-    if (this.type.ai === 'sniper' && this.state === 'windup') { this.armR.rotation.x = -1.5; this.armL.rotation.x = -1.2; }
-    if (this.type.ai === 'mender' && this.state === 'windup') { this.armL.rotation.x = this.armR.rotation.x = -2.6; }
+    if (this.orbit) { this.orbit.rotation.y = this.censerAngle - this.facing; this.ball.rotation.y += dt * 4; }
+    if (this.halo) { this.halo.rotation.z += dt * (st === 'windup' ? 9 : 2.5); this.halo.scale.setScalar(1 + (st === 'windup' ? 0.5 * wt : 0.05 * br)); }
+    if (this.pods) this.pods.forEach((p, i) => p.scale.setScalar(1 + 0.15 * Math.sin(this.idleT * 5 + i * 2)));
+    if (this.bomb) {
+      const lit = st === 'windup', f = lit ? 10 + 40 * wt : 3;
+      this.bomb.scale.setScalar(lit ? 1 + 0.12 * wt + 0.22 * Math.abs(Math.sin(this.stateTime * f)) : 1 + 0.04 * br);
+      this.bomb.rotation.y += dt * (lit ? 12 : 1.5);
+      const blink = Math.sin(this.idleT * f) > 0;
+      this.lamps[0].visible = blink; this.lamps[1].visible = !blink || lit && wt > 0.6;
+      this.fuse.visible = !lit || Math.sin(this.stateTime * 30) > 0;
+      if (lit) { B.position.x += Math.sin(this.idleT * 60) * 0.03 * wt; this.cue('fuse', 0.16 - 0.1 * wt); }
+    }
+    if (this.charge) { // Lancer's charge glow builds through the whole aim (fires at the end of the windup)
+      const k = ai === 'sniper' && st === 'windup' ? 0.3 + 1.4 * wt * wt + (wt > 0.85 ? 0.3 * Math.sin(this.idleT * 50) : 0) : rt >= 0 && rt < 0.1 ? 1.6 * (1 - rt / 0.1) : 0.01;
+      this.charge.scale.setScalar(Math.max(0.01, k));
+      if (st === 'windup' && this.stateTime < 0.05) this.cue('charge', 0.5);
+    }
+    if (this.chamber) { // Spitter's throat chamber swells, then empties when the bolt leaves
+      const k = st === 'windup' ? 1 + 1.3 * wt : rt >= 0 ? 0.5 + 0.5 * Math.min(1, rt / 0.4) : 1 + 0.1 * br; // empties at the shot
+      this.chamber.scale.setScalar(k);
+      if (st === 'windup' && this.stateTime < 0.05) this.cue('spitCharge', 0.4);
+    }
+    if (this.hvt) this.hvtMarker(dt); else if (this.hvtM) this.hvtM.visible = false;
 
     // white flash when hit, red glow while winding up an attack
     let emissive = this.hvt ? (Math.sin(this.stateTime * 8) > 0 ? 0x664400 : 0x332200) : this.elite ? 0x2a1500 : this.world.blackout ? 0x3a0e04 : 0x000000; // blackout: enemies glow
-
     if (this.flashTimer > 0) emissive = 0xffffff;
     else if (this.state === 'windup') emissive = 0x661100;
     this.setEmissive(emissive);
@@ -531,11 +491,154 @@ export class Enemy {
     this.root.rotation.y = this.facing;
   }
 
+  animHumanoid(dt, moving, s, c, wt, strike, settle, st, br, gait) {
+    const B = this.body, ai = this.type.ai, T = this.typeName;
+    const A = gait.stride;
+    this.legL.rotation.set(s * A, 0, 0); this.legR.rotation.set(-s * A, 0, 0);
+    B.position.y = moving ? -Math.abs(c) * gait.bob : -0.015 * br;
+    if (moving) { B.rotation.z = s * gait.sway; B.rotation.y = s * gait.twist; }
+    if (moving && gait.step && Math.sign(s) !== this._lastStep) { this._lastStep = Math.sign(s); this.cue(gait.step, 0.25); }
+    if (this.head) this.head.rotation.set(-gait.lean * 0.6 + 0.04 * br, moving ? 0 : Math.sin(this.idleT * 0.7) * 0.25, 0);
+    let aL = moving ? -s * gait.arm : -0.1 - 0.05 * br, aR = moving ? s * gait.arm : -0.1 - 0.05 * br;
+    let zL = 0.08, zR = -0.08;
+    const melee = ai === 'melee';
+    if (st === 'windup') {
+      if (melee) {
+        const up = T === 'bulwark' ? 2.9 : T === 'thurible' ? 1.4 : 2.6;
+        aR = -wt * up; aL = T === 'bulwark' ? -wt * 0.6 : -wt * up * 0.75; zR = -0.08 - wt * 0.2;
+        B.rotation.x -= wt * (T === 'bulwark' ? 0.32 : 0.25); B.rotation.y = -wt * (T === 'bulwark' ? 0.35 : 0.2);
+        B.position.y -= wt * 0.06;
+        if (wt > 0.8) B.position.x = Math.sin(this.idleT * 70) * 0.02; // tremble right before the hit
+      } else if (ai === 'ranged') { aL = aR = -wt * 0.9; zL = 0.3 * wt; zR = -0.3 * wt; B.rotation.x -= wt * 0.3; if (this.head) this.head.rotation.x -= wt * 0.35; }
+      else if (ai === 'sniper') { aR = -0.25 - 0.1 * wt; aL = -1.1 * wt; zL = -0.4 * wt; B.rotation.x += 0.22 * wt; B.position.y -= 0.12 * wt; this.legL.rotation.x = -0.35 * wt; this.legR.rotation.x = 0.3 * wt; } // braced
+      else if (ai === 'mender') { aL = aR = -2.6 * wt; zL = 0.4 * wt; zR = -0.4 * wt; B.rotation.x -= 0.2 * wt; }
+      else if (ai === 'bomber') { aL = aR = 0.6; zL = 0.5; zR = -0.5; B.rotation.x += 0.25; B.position.y -= 0.1; }
+    } else if (st === 'recover') {
+      if (melee) { // the strike: swing down past horizontal, then settle back
+        const swing = strike < 1 ? -2.6 + 3.1 * strike : 0.5 * settle - 0.1 * (1 - settle);
+        aR = T === 'bulwark' ? -2.9 + 3.3 * strike - (strike >= 1 ? 0.4 * (1 - settle) : 0) : swing; aL = T === 'bulwark' ? -0.3 : swing * 0.75;
+        B.rotation.x += (strike < 1 ? 0.35 * strike : 0.35 * settle);
+        B.rotation.y = (strike < 1 ? 0.25 * strike : 0.25 * settle);
+        if (T === 'bulwark' && strike >= 1 && settle > 0.95) this.cue('stomp', 0.4);
+      } else if (ai === 'ranged') { const k = Math.max(0, 1 - this.stateTime / 0.25); B.rotation.x += 0.3 * k; if (this.head) this.head.rotation.x += 0.4 * k; }
+      else if (ai === 'sniper') { const k = Math.max(0, 1 - this.stateTime / 0.3); aR = -0.25 + 0.9 * k; B.rotation.x -= 0.25 * k; } // recoil
+    }
+    if (ai === 'bomber' && st === 'chase') { aL = aR = 0.7 + s * 0.3; zL = 0.25; zR = -0.25; } // arms swept back, sprinting
+    if (T === 'thurible' && st !== 'windup' && st !== 'recover') { aR = -1.0 + 0.1 * Math.sin(this.idleT * 3.2); zR = -0.5; B.rotation.y = 0.15 * Math.sin(this.censerAngle); }
+    this.armL.rotation.set(aL, 0, zL); this.armR.rotation.set(aR, 0, zR);
+  }
+
+  // hounds and mites: trotting gait (diagonal pairs), crouch -> airborne lunge -> skid
+  animQuad(dt, moving, s, c, wt, st, br) {
+    const B = this.body, L = this.legs, hound = this.typeName === 'hound';
+    const A = hound ? 0.85 : 1.1;
+    L[0].rotation.x = L[3].rotation.x = s * A; L[1].rotation.x = L[2].rotation.x = -s * A;
+    for (const l of L) l.rotation.z = 0;
+    B.position.y = moving ? Math.abs(c) * (hound ? 0.07 : 0.05) : 0.01 * br;
+    B.rotation.x = moving ? 0.04 * s : 0;
+    if (!hound && moving) B.rotation.z = Math.sin(this.idleT * 30) * 0.06; // mites skitter
+    const H = this.head, J = this.rig.jaw, Tl = this.rig.tail;
+    if (H) H.rotation.set(moving ? 0.1 * c : 0.06 * br, moving ? 0 : Math.sin(this.idleT * 1.3) * 0.35, 0); // sensor sweep when idle
+    if (J) J.rotation.x = 0.1 + (moving ? 0.1 * Math.abs(s) : 0);
+    if (Tl) Tl.rotation.set(-0.2, Math.sin(this.idleT * (moving ? 12 : 3)) * 0.35, 0);
+    if (st === 'windup') {
+      B.position.y = -0.18 * wt; B.rotation.x = -0.2 * wt;
+      L[2].rotation.x = L[3].rotation.x = 0.5 * wt; L[0].rotation.x = L[1].rotation.x = -0.25 * wt;
+      if (J) J.rotation.x = 0.1 + 0.5 * wt;
+      if (H) H.rotation.x = -0.15 * wt;
+      if (wt > 0.7) B.position.x = Math.sin(this.idleT * 60) * 0.015;
+    } else if (st === 'lunge') {
+      const k = Math.min(1, this.stateTime / 0.32);
+      B.position.y = Math.sin(k * Math.PI) * 0.45; B.rotation.x = 0.3 - 0.5 * k;
+      L[0].rotation.x = L[1].rotation.x = -1.1; L[2].rotation.x = L[3].rotation.x = 1.0;
+      if (J) J.rotation.x = 0.7 * (1 - k * k);
+    } else if (st === 'recover' && hound) { // skid and shake it off
+      const k = Math.max(0, 1 - this.stateTime / 0.35);
+      B.rotation.x = 0.15 * k; B.position.y = -0.06 * k; if (H) H.rotation.z = Math.sin(this.stateTime * 30) * 0.2 * k;
+    }
+  }
+
+  // GRUB: undulating segments under the floor, nose-up eruption with claws flung open, then a snap shut
+  animGrub(dt, moving, ph, wt, strike, settle, st, br) {
+    const R = this.rig, B = this.body;
+    const wave = moving ? ph : this.idleT * 2;
+    ['seg0', 'seg1', 'seg2', 'seg3'].forEach((n, i) => { const g = R[n]; g.rotation.set(0, Math.sin(wave - i * 0.9) * (moving ? 0.22 : 0.08), 0); g.position.x = Math.sin(wave - i * 0.9) * 0.06 * i; });
+    let open = 0.15 + 0.08 * br;
+    if (st === 'windup') { B.rotation.x = -0.5 * wt; B.position.y = 0.1 * wt; open = 0.2 + 0.7 * wt; B.rotation.z = Math.sin(this.idleT * 50) * 0.04 * wt; }
+    else if (st === 'recover') { open = strike < 1 ? 0.9 * (1 - strike) : 0.12; B.rotation.x = strike < 1 ? -0.5 + 0.7 * strike : 0.2 * settle; }
+    else if (st === 'burrowed') { B.rotation.x = 0.15; open = 0.05; }
+    R.jawL.rotation.y = open; R.jawR.rotation.y = -open;
+  }
+
+  // gameplay LOD: hide rivets/cables/vents in big crowds (one check per 0.25 s, shared by every enemy)
+  lodTick() {
+    const now = performance.now();
+    if (now - LOD.t > 250 || LOD.t < 0) {
+      LOD.t = now;
+      LOD.on = LOD.mode === 'hi' ? true : LOD.mode === 'lo' ? false : (this.world.enemies?.list?.length ?? 0) <= 8;
+    }
+    if (this.detailOn !== LOD.on) { this.detailOn = LOD.on; for (const m of this.detail) m.visible = LOD.on; if (this.caster) this.caster.castShadow = LOD.on || HEAVY.has(this.typeName) || this.elite; }
+  }
+
+  // local-only (never sent over the network: visual rising edge of the hit flash on host AND clients)
+  onHitVisual() {
+    const fx = this.world.effects, now = this.idleT;
+    if (now - (this._lastSpark || -1) < 0.12) return;
+    this._lastSpark = now;
+    const y = (ANCHOR[this.typeName] || 1.3) * this.scale;
+    if (this.type.armored) { fx?.localSparks?.(this.position.clone().setY(y), 0xffc070, 3, 4); this.cue('clank', 0.08); }
+    else if (this.elite) fx?.localSparks?.(this.position.clone().setY(y), 0xffb020, 2, 3);
+  }
+
+  // sounds that come from the model itself (local on every machine, existing sound engine + settings)
+  cue(name, gap) {
+    if (this.idleT - (this._cue?.[name] ?? -9) < gap) return;
+    (this._cue ||= {})[name] = this.idleT;
+    sound.play(name);
+  }
+
+  // Phase 4 HIGH-VALUE TARGET: keep the gold pulse, plus a bobbing gold diamond beacon over its head
+  hvtMarker(dt) {
+    if (!this.hvtM) { this.hvtM = new THREE.Mesh(HVT_GEO, GLOW.amber); this.root.add(this.hvtM); }
+    this.hvtM.visible = !this.dead;
+    this.hvtM.position.y = (TOP[this.typeName] || 2.6) + 0.35 + Math.sin(this.idleT * 4) * 0.12;
+    this.hvtM.rotation.y += dt * 3;
+  }
+
   animateDeath() {
-    // topple over, then sink into the floor
-    const t = this.stateTime;
+    // mechanical collapse: knees buckle / core shuts down, topple away from the killing blow, sink
+    const t = this.stateTime, T = this.typeName, B = this.body;
     this.setEmissive(t < 0.1 ? 0xffffff : 0x000000);
-    this.body.rotation.x = -Math.min(1, t / 0.35) * Math.PI / 2;
+    if (!this._deathFx) {
+      this._deathFx = true;
+      const fx = this.world.effects, heavy = HEAVY.has(T) || (this.elite && T !== 'mite');
+      const y = (ANCHOR[T] || 1.2) * this.scale;
+      if (!this.crumble || (this.nid || 0) % 2) { // boss-death crumble waves: half the debris
+        fx?.scrap?.(this.position, T === 'mite' ? 2 : heavy ? 7 : 4, [this.type.main, METAL[T] ?? 0x666058, this.type.dark], y, heavy ? 1.3 : 1);
+        fx?.localSparks?.(this.position.clone().setY(y), coreMat(T).color.getHex(), heavy ? 6 : 3, heavy ? 6 : 4);
+        if (heavy) fx?.localRing?.(this.position, coreMat(T).color.getHex(), 2.2 * this.scale, 0.35);
+      }
+      this.cue(heavy ? 'stomp' : 'scrap', 0.05);
+      this.fallDir = Math.cos((this.hitDir ?? this.facing + Math.PI) - this.facing) > 0 ? 1 : -1; // forward if hit from behind
+      if (this.charge) this.charge.scale.setScalar(0.01);
+      if (this.chamber) this.chamber.scale.setScalar(0.4);
+      if (this.bomb) this.bomb.scale.setScalar(0.6);
+      if (this.hvtM) this.hvtM.visible = false;
+    }
+    const k = Math.min(1, t / (HEAVY.has(T) ? 0.45 : 0.32)), e = k * k;
+    if (this.legs) { // quadrupeds roll onto their side, legs splay
+      B.rotation.set(0, 0, e * Math.PI / 2 * 0.9); B.position.y = -0.1 * e;
+      this.legs.forEach((l, i) => { l.rotation.x = (i % 2 ? 0.6 : -0.6) * e; });
+    } else if (T === 'grub') {
+      B.rotation.set(0.3 * e, 0, e * 1.2); ['seg1', 'seg2', 'seg3'].forEach((n, i) => { this.rig[n].rotation.y = e * (0.4 + i * 0.2); });
+    } else {
+      const buckle = Math.min(1, t / 0.15);
+      B.position.y = -0.25 * buckle;
+      this.legL.rotation.x = -0.9 * buckle; this.legR.rotation.x = -0.6 * buckle;
+      B.rotation.set(this.fallDir * e * Math.PI / 2 * 0.95, 0, 0.15 * e);
+      this.armL.rotation.set(-0.6 * e, 0, 0.5 * e); this.armR.rotation.set(-1.2 * e, 0, -0.4 * e);
+      if (this.head) this.head.rotation.x = 0.5 * e;
+    }
     this.root.position.y = t > 0.5 ? -(t - 0.5) * 3 : 0;
     if (t > 1.1) this.remove = true;
   }
@@ -543,11 +646,12 @@ export class Enemy {
   setEmissive(hex) {
     if (this.currentEmissive === hex) return;
     this.currentEmissive = hex;
-    for (const m of Object.values(this.mats)) m.emissive.setHex(hex);
+    for (const m of Object.values(this.mats)) m.emissive.setHex(hex || this.baseEmissive);
   }
 
   dispose() {
     this.scene.remove(this.root);
     for (const m of Object.values(this.mats)) m.dispose();
+    // affix rings/accents/tags use shared, cached geometry + materials (js/affixes.js): nothing to dispose
   }
 }

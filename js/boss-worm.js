@@ -7,7 +7,7 @@
 //   volley - spits fans of acid-green bolts
 //   summon - coughs up a swarm of mites
 import * as THREE from 'three';
-import { Boss } from './boss.js?v=1.33.0';
+import { Boss } from './boss.js?v=1.33.0-p5c3';
 
 const MAW_MAT = new THREE.MeshBasicMaterial({ color: 0x0c0f0c });
 const GLOW_MAT = new THREE.MeshBasicMaterial({ color: 0xb8ff4a });

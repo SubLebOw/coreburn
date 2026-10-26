@@ -2,11 +2,11 @@
 // (scripts/build-web.mjs skips dev-*.js) and only imported by main.js when js/dev-boot.js ran, which
 // sandboxes localStorage, so nothing done here touches the real profile. Console API: window.cbDev.
 // Cards come from the game's own registry (upgrades.js) at runtime, so new cards show up automatically.
-import { RULES } from './rules.js?v=1.33.0';
-import { isBossWave } from './waves.js?v=1.33.0';
-import { arenaForWave } from './arena.js?v=1.33.0';
-import { UPGRADES, CURSES, BOSS_CARDS, EVOLUTIONS, MYTHICS, PICK_EVERY, cardForHero } from './upgrades.js?v=1.33.0';
-import { MASTERIES } from './mastery.js?v=1.33.0';
+import { RULES } from './rules.js?v=1.33.0-p5c3';
+import { isBossWave } from './waves.js?v=1.33.0-p5c3';
+import { arenaForWave } from './arena.js?v=1.33.0-p5c3';
+import { UPGRADES, CURSES, BOSS_CARDS, EVOLUTIONS, MYTHICS, PICK_EVERY, cardForHero } from './upgrades.js?v=1.33.0-p5c3';
+import { MASTERIES } from './mastery.js?v=1.33.0-p5c3';
 
 const HEROES = [['sarrow', 'Sarrow'], ['zaleks', 'Zaleks'], ['iskra', 'Iskra'], ['orin', 'Orin'], ['ninja', 'Kagero'], ['axiom', 'Axiom']];
 const ARENAS = [['slag', 'Slag Yard', 0, true], ['foundry', 'Foundry (lava)', 1, false], ['tundra', 'Tundra (ice)', 2, false], ['cathedral', 'Cathedral', 3, true], ['rooftop', 'Rooftop', 4, true]]; // [id, label, index, Containment Shift layout]

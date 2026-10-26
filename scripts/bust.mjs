@@ -2,7 +2,7 @@
 // main.js / style.css tags in index.html, so browsers never mix cached old modules with new ones.
 // Runs automatically from release:update. Idempotent (replaces any existing ?v=).
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
-const v = readFileSync('js/version.js', 'utf8').match(/GAME_VERSION\s*=\s*'([^']+)'/)[1];
+const v = process.env.BUST || readFileSync('js/version.js', 'utf8').match(/GAME_VERSION\s*=\s*'([^']+)'/)[1]; // BUST=<tag> for preview-only busts (no version bump)
 const q = (p) => `${p.replace(/\?v=[^'"]*$/, '')}?v=${v}`;
 let n = 0;
 for (const f of readdirSync('js')) {

@@ -6,6 +6,7 @@
 // Every attack is telegraphed: red strips on the floor for charges, filling red circles
 // for slams, and a glow before summons/volleys.
 import * as THREE from 'three';
+import { dressBoss, tickDress, undressBoss } from './boss-models.js?v=1.33.0-p5c3';
 
 const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);
 const VISOR_MAT = new THREE.MeshBasicMaterial({ color: 0xc8ff3a });
@@ -360,6 +361,7 @@ export class Boss {
     this.body = new THREE.Group();
     this.root.add(this.body);
     this.buildModel(this.mats);
+    dressBoss(this); // Phase 5C: armour, detail, weak points + merged static geometry
     this.root.scale.setScalar(this.scale);
     this.root.position.set(this.position.x, -(this.def.introDepth || 4), this.position.z);
     this.scene.add(this.root);
@@ -441,6 +443,7 @@ export class Boss {
     this.setEmissive(glow);
     if (this.state !== 'intro') this.root.position.set(this.position.x, this.rootY || 0, this.position.z);
     this.root.rotation.y = this.facing;
+    tickDress(this, dt, t);
   }
 
   // Body language for each state; returns the glow colour. Newer bosses override this.
@@ -482,6 +485,7 @@ export class Boss {
     if (Math.random() < 0.3) this.world.effects.spawnSparks(this.position.clone().setY(1.5 + Math.random() * 2), 0xffb060, 3, 7);
     if (t > 1.0) this.root.position.y = (this.rootY || 0) - (t - 1.0) * 3;
     if (t > 2.2) this.remove = true;
+    tickDress(this, dt, performance.now() / 1000);
   }
 
   setEmissive(hex) {
@@ -493,5 +497,6 @@ export class Boss {
   dispose() {
     this.scene.remove(this.root);
     for (const m of Object.values(this.mats)) m.dispose();
+    undressBoss(this);
   }
 }

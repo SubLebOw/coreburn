@@ -7,7 +7,7 @@
 //            Hit the twin that's linking to snap the beam!
 //   When one twin falls, the other one ENRAGES: faster and angrier.
 import * as THREE from 'three';
-import { Boss } from './boss.js?v=1.33.0';
+import { Boss } from './boss.js?v=1.33.0-p5c3';
 
 const IRON_MAT = new THREE.MeshBasicMaterial({ color: 0xffa040 });
 const QUENCH_MAT = new THREE.MeshBasicMaterial({ color: 0x5ad8ff });

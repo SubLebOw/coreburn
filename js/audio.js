@@ -207,7 +207,7 @@ class SoundEngine {
 }
 
 // How often (seconds) each sound may repeat
-const THROTTLE = { hit: 0.045, shot: 0.06, enemyDeath: 0.05, hurt: 0.12, bossWarning: 0.3, zap: 0.08, sizzle: 0.3, heal: 0.06, shieldBlock: 0.1 };
+const THROTTLE = { stomp: 0.18, clank: 0.09, charge: 0.35, spitCharge: 0.3, fuse: 0.06, scrap: 0.07, hit: 0.045, shot: 0.06, enemyDeath: 0.05, hurt: 0.12, bossWarning: 0.3, zap: 0.08, sizzle: 0.3, heal: 0.06, shieldBlock: 0.1 };
 
 // ---------- The sound effects ----------
 const SFX = {
@@ -238,6 +238,13 @@ const SFX = {
     a.noise(t, { dur: 0.35, vol: 0.32, filter: 'lowpass', f0: 2500, f1: 200 });
     a.tone(t, { type: 'square', f0: 240, f1: 40, dur: 0.25, vol: 0.08, lowpass: 1200 });
   },
+  // ---- Phase 5C enemy cues (quiet, throttled) ----
+  stomp(a, t) { a.tone(t, { type: 'sine', f0: 85, f1: 38, dur: 0.16, vol: 0.16 }); a.noise(t, { dur: 0.08, vol: 0.08, filter: 'lowpass', f0: 500 }); },
+  clank(a, t) { a.tone(t, { type: 'square', f0: 1250, f1: 900, dur: 0.05, vol: 0.05, lowpass: 4000 }); a.noise(t, { dur: 0.05, vol: 0.1, filter: 'bandpass', f0: 2600, q: 3 }); },
+  charge(a, t) { a.tone(t, { type: 'sawtooth', f0: 220, f1: 1100, dur: 0.9, vol: 0.07, lowpass: 2400 }); a.tone(t + 0.75, { type: 'square', f0: 1320, dur: 0.06, vol: 0.05, lowpass: 3000 }); },
+  spitCharge(a, t) { a.noise(t, { dur: 0.45, vol: 0.09, filter: 'bandpass', f0: 300, f1: 1400, q: 4 }); a.tone(t, { type: 'sine', f0: 160, f1: 420, dur: 0.45, vol: 0.06 }); },
+  fuse(a, t) { a.tone(t, { type: 'square', f0: 1760, dur: 0.035, vol: 0.05, lowpass: 5000 }); },
+  scrap(a, t) { a.noise(t, { dur: 0.12, vol: 0.08, filter: 'highpass', f0: 2500, f1: 5000 }); },
   // spitter / boss firing a bolt
   shot(a, t) {
     a.tone(t, { type: 'sine', f0: 620, f1: 200, dur: 0.12, vol: 0.08 });

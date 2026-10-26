@@ -9,6 +9,7 @@ const SPARK_COUNT = 70;
 const RING_COUNT = 8;
 const WARNING_COUNT = 24; // enough for the busiest boss attacks + lightning
 const ZAP_COUNT = 8;
+const SCRAP_COUNT = 36; // Phase 5C: pooled scrap fragments for enemy deaths (opaque, shared geometry)
 
 export class Effects {
   constructor(scene) {
@@ -49,6 +50,15 @@ export class Effects {
       group.visible = false;
       scene.add(group);
       this.warnings.push({ group, fill, edge, strip, life: 0, maxLife: 1, kind: 'circle', radius: 1 });
+    }
+    // Phase 5C death debris: tumbling scrap plates/shards that bounce once and shrink away
+    this.scrapMats = new Map();
+    const scrapGeos = [new THREE.BoxGeometry(0.2, 0.05, 0.14), new THREE.TetrahedronGeometry(0.11), new THREE.BoxGeometry(0.07, 0.07, 0.22)];
+    this.scraps = [];
+    for (let i = 0; i < SCRAP_COUNT; i++) {
+      const mesh = new THREE.Mesh(scrapGeos[i % 3], this.scrapMat(0x555555));
+      mesh.visible = false; scene.add(mesh);
+      this.scraps.push({ mesh, vel: new THREE.Vector3(), spin: new THREE.Vector3(), life: 0, maxLife: 1 });
     }
     // Lightning zaps (ARC TALONS): 3 jagged segments between two points
     this.zaps = [];
@@ -116,8 +126,32 @@ export class Effects {
     return this.materials.get(color);
   }
 
+  scrapMat(color) {
+    if (!this.scrapMats.has(color)) this.scrapMats.set(color, new THREE.MeshLambertMaterial({ color }));
+    return this.scrapMats.get(color);
+  }
+  // Phase 5C (local only - never recorded for co-op, every machine plays these from the enemy's own state)
+  localSparks(pos, color, count, speed) { this._sparks(pos, color, count, speed); }
+  localRing(pos, color, maxScale, duration) { this._ring(pos, color, maxScale, duration); }
+  scrap(pos, count, colors, y = 1, power = 1) {
+    let made = 0;
+    for (const s of this.scraps) {
+      if (s.life > 0) continue;
+      s.mesh.material = this.scrapMat(colors[made % colors.length]);
+      s.mesh.position.set(pos.x + (Math.random() - 0.5) * 0.4, y * (0.6 + Math.random() * 0.5), pos.z + (Math.random() - 0.5) * 0.4);
+      const a = Math.random() * Math.PI * 2, v = (2 + Math.random() * 2.5) * power;
+      s.vel.set(Math.cos(a) * v, 3 + Math.random() * 3 * power, Math.sin(a) * v);
+      s.spin.set(Math.random() * 14 - 7, Math.random() * 14 - 7, Math.random() * 14 - 7);
+      s.mesh.scale.setScalar(power);
+      s.life = s.maxLife = 0.6 + Math.random() * 0.3;
+      s.mesh.visible = true;
+      if (++made >= count) break;
+    }
+  }
+
   // Burst of little cubes flying out from a point
-  spawnSparks(pos, color = 0xfff2a0, count = 8, speed = 6) {
+  spawnSparks(pos, color = 0xfff2a0, count = 8, speed = 6) { this._sparks(pos, color, count, speed); }
+  _sparks(pos, color = 0xfff2a0, count = 8, speed = 6) {
     let made = 0;
     for (const s of this.sparks) {
       if (s.life > 0) continue;
@@ -132,7 +166,8 @@ export class Effects {
   }
 
   // Expanding flat ring on the floor
-  spawnRing(pos, color = 0xc8ff3a, maxScale = 2, duration = 0.6) {
+  spawnRing(pos, color = 0xc8ff3a, maxScale = 2, duration = 0.6) { this._ring(pos, color, maxScale, duration); }
+  _ring(pos, color = 0xc8ff3a, maxScale = 2, duration = 0.6) {
     const r = this.rings.find((x) => x.life <= 0);
     if (!r) return;
     r.mesh.material.color.setHex(color);
@@ -149,6 +184,16 @@ export class Effects {
       s.vel.y -= 18 * dt; // gravity
       s.mesh.position.addScaledVector(s.vel, dt);
       s.mesh.scale.setScalar(Math.max(0.01, s.life / s.maxLife));
+      if (s.life <= 0) s.mesh.visible = false;
+    }
+    for (const s of this.scraps) {
+      if (s.life <= 0) continue;
+      s.life -= dt;
+      s.vel.y -= 20 * dt;
+      s.mesh.position.addScaledVector(s.vel, dt);
+      if (s.mesh.position.y < 0.05 && s.vel.y < 0) { s.mesh.position.y = 0.05; s.vel.y *= -0.35; s.vel.x *= 0.5; s.vel.z *= 0.5; s.spin.multiplyScalar(0.5); }
+      s.mesh.rotation.x += s.spin.x * dt; s.mesh.rotation.y += s.spin.y * dt; s.mesh.rotation.z += s.spin.z * dt;
+      const k = s.life / s.maxLife; if (k < 0.35) s.mesh.scale.setScalar(Math.max(0.01, k / 0.35) * (s.mesh.scale.x > 0 ? 1 : 1));
       if (s.life <= 0) s.mesh.visible = false;
     }
     for (const w of this.warnings) {
@@ -177,6 +222,7 @@ export class Effects {
 
   reset() {
     for (const s of this.sparks) { s.life = 0; s.mesh.visible = false; }
+    for (const s of this.scraps) { s.life = 0; s.mesh.visible = false; }
     for (const r of this.rings) { r.life = 0; r.mesh.visible = false; }
     for (const w of this.warnings) { w.life = 0; w.group.visible = false; }
     for (const z of this.zaps) { z.life = 0; for (const m of z.segs) m.visible = false; }

@@ -2,7 +2,7 @@
 // Body space, model units (the root is scaled by def.scale; collision radius stays 0.6 * scale).
 // Each design: build(r, b, H) declares geometry per animated handle; anim() adds model-specific motion
 // on top of the boss's own pose() (rotors, pistons, bellows, pendulums...). Visual only.
-import { box, cyl, cone, sph, oct, ico, dod, tor, shell, lathe, slab, tube } from './boss-rigs.js?v=1.33.0';
+import { box, cyl, cone, sph, oct, ico, dod, tor, shell, lathe, slab, tube } from './boss-rigs.js?v=1.33.0-p5c3';
 
 const PI = Math.PI;
 const busy = (st) => st === 'telegraph' || st === 'charging' || st === 'beaming' || st === 'spiraling' || st === 'ledgering' || st === 'mirroring' || st === 'linking' || st === 'inhaling';

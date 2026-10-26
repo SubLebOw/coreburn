@@ -6,7 +6,7 @@
 // Every attack is telegraphed: red strips on the floor for charges, filling red circles
 // for slams, and a glow before summons/volleys.
 import * as THREE from 'three';
-import { dressBoss, tickDress, undressBoss } from './boss-models.js?v=1.33.0';
+import { dressBoss, tickDress, undressBoss } from './boss-models.js?v=1.33.0-p5c3';
 
 const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);
 const VISOR_MAT = new THREE.MeshBasicMaterial({ color: 0xc8ff3a });

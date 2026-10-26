@@ -79,3 +79,12 @@ No merge, version bump or deploy. PR #7 is not touched.
 - Cleanup (pw/p5c-boss-clean.mjs: Vell, twins, Hymnworks, Nail, Klaxon): boss roots/beams gone from scene and list after death; remaining new scene children are arena/wave groups, same pattern on v1.33.0.
 - Dev gate: no flag -> no dev requests/panel; ?dev=1 -> inspector; sublebow.github.io + https://localhost (Capacitor) with ?dev=1 -> no dev code; build-web dry run (temp copy) ships 0 dev-*/.local files. Mobile boss picker tap test (jump + spawn here + remove) OK: shots/phase5c/boss/dev-picker-mobile-*.png.
 - Nail Chorus trim: head throats/eyes share one glow mat (no per-head pulse) 48 -> 43 calls; fingerprint still IDENTICAL.
+
+## Stage 3 - genuine boss redesign (2026-10-28 NZDT)
+Root cause of "bosses look the same": stage 2 dressBoss only ADDED trim on top of the original primitive bodies, which stayed visible. Also every import was `?v=1.33.0` (same as prod), so cached browsers could serve old modules.
+- js/boss-rigs.js + js/boss-designs.js: old non-handle meshes stripped, each pose handle re-skinned with merged vertex-colour bodies (1 flashable Lambert hull + shared glow per boss), per-design anim on top of existing pose().
+- All 12 remodelled (a5ccab4 and earlier 16769b1, 9aad6be). Cache-bust: `?v=1.33.0-p5c3` (scripts/bust.mjs honours BUST=, no version bump).
+- Verified: boss timing fingerprint (24 sims) IDENTICAL to v1.33.0; standard-enemy fingerprint IDENTICAL; Variant E 24/24; fight harness desktop+mobile 12/12, 0 errors, zBosses 12; save/events/cleanup/dev gate/build OK.
+- In-game per boss: 8-29 draw calls incl. shadows, 0.9k-4k tris, 0 transparent mats, no lights.
+- Shots: /workspace/coreburn-shots/phase5c/boss2/
+- Not done: mechanics WIP patch intentionally NOT applied.

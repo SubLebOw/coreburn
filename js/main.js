@@ -4,53 +4,53 @@
 //   2. creates the arena, Sarrow, the waves, power-ups, the HUD and the controls
 //   3. runs the game loop ~60 times a second: update everything, then draw
 //   4. handles SLOW-MO (everything but Sarrow runs slower) and the fade between arenas
-import('./screenmode.js?v=1.33.0').catch((e) => console.warn('screenmode optional module failed', e)); // optional, never blocks boot
-import { Allies } from './allies.js?v=1.33.0';
+import('./screenmode.js?v=1.33.0-p5c3').catch((e) => console.warn('screenmode optional module failed', e)); // optional, never blocks boot
+import { Allies } from './allies.js?v=1.33.0-p5c3';
 import * as THREE from 'three';
-import { Input } from './input.js?v=1.33.0';
-import { isTouchDevice, setupTouchControls } from './touch.js?v=1.33.0';
-import { createArena, arenaForWave } from './arena.js?v=1.33.0';
-import { Player } from './player.js?v=1.33.0';
-import { WaveManager, isBossWave } from './waves.js?v=1.33.0';
-import { Projectiles } from './projectiles.js?v=1.33.0';
-import { Effects } from './effects.js?v=1.33.0';
-import { Hud } from './hud.js?v=1.33.0';
-import { PowerUps } from './powerups.js?v=1.33.0';
-import { sound } from './audio.js?v=1.33.0';
-import { ads } from './monetize.js?v=1.33.0';
-import { checkForUpdates } from './updater.js?v=1.33.0';
-import { GAME_VERSION } from './version.js?v=1.33.0';
-import { shareScore, copyScore } from './share.js?v=1.33.0';
-import { IS_NATIVE } from './native.js?v=1.33.0';
-import { Combo } from './combo.js?v=1.33.0';
-import { CHARACTERS, CHARACTER_ORDER, heroOrder, displayName } from './characters.js?v=1.33.0';
-import { isPickWave } from './upgrades.js?v=1.33.0';
-import { Coop } from './coop.js?v=1.33.0';
-import { meta, scrapForRun, RARE_DROPS, SHOP } from './meta.js?v=1.33.0';
-import { MUTATORS, isMutatorWave, rollMutator } from './mutators.js?v=1.33.0';
-import { GOLD_TIME } from './golden.js?v=1.33.0';
-import { ShopUI } from './shop-ui.js?v=1.33.0';
-import { Twitch } from './twitch.js?v=1.33.0';
-import { checkAchievements, rewardText } from './achievements.js?v=1.33.0';
-import { isLocked, lockHint, lockBars, migrateUnlocks, migrateAxiom, onZKill, onWaveReached, onBossDefeated } from './unlocks.js?v=1.33.0';
-import { rngFor, dailyKey, weekKey, rushOrder, RUSH_BOSSES, rushTierBefore, rushScore, rushLabel, formatTime, dailyStartCard } from './modes.js?v=1.33.0';
-import { BOSS_ROTATION } from './bosses.js?v=1.33.0';
-import { Leaderboard } from './leaderboard.js?v=1.33.0';
-import { UPGRADES } from './upgrades.js?v=1.33.0';
-import { RanksUI } from './ranks-ui.js?v=1.33.0';
-import { RULES, setRules, Z_TUNING } from './rules.js?v=1.33.0';
-import { rotation } from './bosses.js?v=1.33.0';
-import { progress, xpForRun, ARENA_SKINS, skinFor, variantById, progressHooks } from './progress.js?v=1.33.0';
+import { Input } from './input.js?v=1.33.0-p5c3';
+import { isTouchDevice, setupTouchControls } from './touch.js?v=1.33.0-p5c3';
+import { createArena, arenaForWave } from './arena.js?v=1.33.0-p5c3';
+import { Player } from './player.js?v=1.33.0-p5c3';
+import { WaveManager, isBossWave } from './waves.js?v=1.33.0-p5c3';
+import { Projectiles } from './projectiles.js?v=1.33.0-p5c3';
+import { Effects } from './effects.js?v=1.33.0-p5c3';
+import { Hud } from './hud.js?v=1.33.0-p5c3';
+import { PowerUps } from './powerups.js?v=1.33.0-p5c3';
+import { sound } from './audio.js?v=1.33.0-p5c3';
+import { ads } from './monetize.js?v=1.33.0-p5c3';
+import { checkForUpdates } from './updater.js?v=1.33.0-p5c3';
+import { GAME_VERSION } from './version.js?v=1.33.0-p5c3';
+import { shareScore, copyScore } from './share.js?v=1.33.0-p5c3';
+import { IS_NATIVE } from './native.js?v=1.33.0-p5c3';
+import { Combo } from './combo.js?v=1.33.0-p5c3';
+import { CHARACTERS, CHARACTER_ORDER, heroOrder, displayName } from './characters.js?v=1.33.0-p5c3';
+import { isPickWave } from './upgrades.js?v=1.33.0-p5c3';
+import { Coop } from './coop.js?v=1.33.0-p5c3';
+import { meta, scrapForRun, RARE_DROPS, SHOP } from './meta.js?v=1.33.0-p5c3';
+import { MUTATORS, isMutatorWave, rollMutator } from './mutators.js?v=1.33.0-p5c3';
+import { GOLD_TIME } from './golden.js?v=1.33.0-p5c3';
+import { ShopUI } from './shop-ui.js?v=1.33.0-p5c3';
+import { Twitch } from './twitch.js?v=1.33.0-p5c3';
+import { checkAchievements, rewardText } from './achievements.js?v=1.33.0-p5c3';
+import { isLocked, lockHint, lockBars, migrateUnlocks, migrateAxiom, onZKill, onWaveReached, onBossDefeated } from './unlocks.js?v=1.33.0-p5c3';
+import { rngFor, dailyKey, weekKey, rushOrder, RUSH_BOSSES, rushTierBefore, rushScore, rushLabel, formatTime, dailyStartCard } from './modes.js?v=1.33.0-p5c3';
+import { BOSS_ROTATION } from './bosses.js?v=1.33.0-p5c3';
+import { Leaderboard } from './leaderboard.js?v=1.33.0-p5c3';
+import { UPGRADES } from './upgrades.js?v=1.33.0-p5c3';
+import { RanksUI } from './ranks-ui.js?v=1.33.0-p5c3';
+import { RULES, setRules, Z_TUNING } from './rules.js?v=1.33.0-p5c3';
+import { rotation } from './bosses.js?v=1.33.0-p5c3';
+import { progress, xpForRun, ARENA_SKINS, skinFor, variantById, progressHooks } from './progress.js?v=1.33.0-p5c3';
 // Phase 3B gear: scrap-bought cosmetics are owned in the scrap save, earned ones read the lifetime stats
 progressHooks.shopOwns = (id) => meta.owns(id); progressHooks.stats = () => meta.data.stats;
-import { Wardrobe } from './cosmetics.js?v=1.33.0';
-import { HeroPreview } from './hero-preview.js?v=1.33.0';
-import { CosmeticsUI } from './cosmetics-ui.js?v=1.33.0';
-import { Shrine } from './shrine.js?v=1.33.0';
-import { EventDirector } from './events.js?v=1.33.0';
-import { getMastery } from './mastery.js?v=1.33.0';
-import { readSave, writeSave, deleteSave } from './saves.js?v=1.33.0';
-import { Showcase } from './showcase.js?v=1.33.0';
+import { Wardrobe } from './cosmetics.js?v=1.33.0-p5c3';
+import { HeroPreview } from './hero-preview.js?v=1.33.0-p5c3';
+import { CosmeticsUI } from './cosmetics-ui.js?v=1.33.0-p5c3';
+import { Shrine } from './shrine.js?v=1.33.0-p5c3';
+import { EventDirector } from './events.js?v=1.33.0-p5c3';
+import { getMastery } from './mastery.js?v=1.33.0-p5c3';
+import { readSave, writeSave, deleteSave } from './saves.js?v=1.33.0-p5c3';
+import { Showcase } from './showcase.js?v=1.33.0-p5c3';
 
 const IS_TOUCH = isTouchDevice();
 if (IS_TOUCH) document.body.classList.add('touch'); // shows the touch controls (see style.css)
@@ -1173,14 +1173,14 @@ function frame() {
 frame();
 // PHASE 5C DEV INSPECTOR (js/dev-5c-inspector.js): only when index.html's ?dev=1 gate loaded js/dev-boot.js;
 // excluded from the production build, and nothing happens if the file is missing.
-if (window.__CB_DEV && !IS_NATIVE) import('./dev-5c-inspector.js?v=1.33.0').then((m) => m.install({ enemies, player, startGame, getState: () => state })).catch(() => {});
+if (window.__CB_DEV && !IS_NATIVE) import('./dev-5c-inspector.js?v=1.33.0-p5c3').then((m) => m.install({ enemies, player, startGame, getState: () => state })).catch(() => {});
 
 // Testing helpers for the browser console live in js/dev.local.js, which is NOT part of the
 // game: it's git-ignored and left out of the build, so it never reaches the website or the
 // Android app. It only loads when you run the game on your own computer (http://localhost...).
 const LOCAL_DEV = !IS_NATIVE && ['localhost', '127.0.0.1'].includes(location.hostname);
 if (LOCAL_DEV) {
-  import('./dev.local.js?v=1.33.0')
+  import('./dev.local.js?v=1.33.0-p5c3')
     .then((m) => m.install({ renderer, scene, showcase, player, enemies, world, progress, allies, arena, powerups, projectiles, effects, hud, sound, ads, startGame, snapCamera: () => updateCamera(0, true), getScore: () => score, combo, meta, twitch, input, getState: () => state, getLastRun: () => lastRun, getMode: () => mode, bursts, openPicker: () => { normalPick = true; openUpgradePicker(); } }))
     .catch(() => {}); // no dev file = no helpers, that's fine
 }

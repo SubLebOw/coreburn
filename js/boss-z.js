@@ -105,7 +105,7 @@ export class SisterKlaxon extends Boss {
     const glow = super.pose(dt, t);
     const k = this.state === 'telegraph' ? Math.min(1, this.stateTime / this.telegraphTime) : 0;
     this.horn.scale.setScalar(1 + 0.25 * k + (this.state === 'recover' ? 0.1 : 0));
-    this.throat.scale.setScalar(1 + 2 * k);
+    this.throat.scale.set(0.22, 0.22, 0.05).multiplyScalar(1 + 2 * k); // (was setScalar: blew the 0.22 m throat up to a 1 m cube)
     return glow;
   }
 }
@@ -173,7 +173,7 @@ export class BellowsAbbot extends Boss {
     const inhaling = this.state === 'telegraph' && this.attack === 'inhale';
     const k = inhaling ? Math.min(1, this.stateTime / this.telegraphTime) : 0;
     this.lungs.scale.set(1 + 0.35 * k, 1 + 0.25 * k, 1 + 0.35 * k);
-    this.mouth.scale.setScalar(1 + 3 * k);
+    this.mouth.scale.set(0.14, 0.14, 0.03).multiplyScalar(1 + 3 * k);
     // INHALE: drags the local hero in (each co-op player is pulled on their own screen)
     const me = this.world.player;
     if (inhaling && me && !me.dead && me.state !== 'dash') {
@@ -260,7 +260,7 @@ export class SaintGravelmouth extends Boss {
     const glow = super.pose(dt, t);
     const spitting = this.attack === 'gravelspit' && this.state === 'telegraph';
     this.jaw.rotation.x = spitting ? 0.6 : this.state === 'telegraph' ? 0.3 : 0.05;
-    this.maw.scale.y = spitting ? 2.5 : 1;
+    this.maw.scale.y = 0.18 * (spitting ? 2.5 : 1);
     if (this.state === 'charging') this.body.rotation.x = 0.5 + Math.sin(t * 25) * 0.1; // tucks and rolls
     return glow;
   }
@@ -450,7 +450,7 @@ export class NailChorus extends Boss {
     const singing = this.state === 'spiraling' || this.state === 'telegraph';
     this.heads.forEach((h, i) => { h.rotation.x = singing ? -0.5 + Math.sin(t * 14 + i) * 0.2 : Math.sin(t * 2 + i) * 0.15; });
     if (this.state === 'spiraling') this.body.rotation.y = (t * 3) % (Math.PI * 2);
-    this.core.scale.setScalar(singing ? 1.4 + Math.sin(t * 20) * 0.2 : 1);
+    this.core.scale.setScalar(0.3 * (singing ? 1.4 + Math.sin(t * 20) * 0.2 : 1));
     return glow;
   }
 }

@@ -261,3 +261,233 @@ DESIGNS.deacon = {
     P.fire.pivot.scale.set(1, 1 + (st === 'telegraph' ? 0.8 * k : 0.2 * Math.sin(t * 9)), 1);
   },
 };
+
+// =====================================================================================================
+// GULLETWORM - a burrowing scrap-annelid: five armoured ring segments of overlapping plates with
+// clawed side-legs and cable bundles, rising from a mound of torn girders, topped by a lamprey drill-
+// head: three mandible petals that peel open on the wind-up around a glowing toothed gullet (the
+// VOLLEY / CHAIN come out of it), sensor eyes and a rotating tooth ring inside the throat.
+DESIGNS.worm = {
+  wear: { rust: 0.32, var: 0.25 },
+  build(r) {
+    const A = 0x4a4c40, A2 = 0x34362e, BR = 0x8a7a4a, D = 0x1e1f1a, BONE = 0xd8d0b0, EN = 0xc8ff3a, EN2 = 0xeaffa0;
+    // mound of torn girders + slag
+    for (let i = 0; i < 9; i++) { const a = (i / 9) * PI * 2 + 0.2, rr = 1.0 + (i % 3) * 0.12;
+      r.h('root', i % 2 ? A2 : D, box(0.75, 0.32, 0.42), Math.cos(a) * rr, 0.14, Math.sin(a) * rr, 0.3 * ((i % 3) - 1), -a, 0.25);
+      if (i % 3 === 0) r.h('root', BR, box(0.12, 0.12, 1.1), Math.cos(a) * 1.15, 0.35, Math.sin(a) * 1.15, 0.6, -a + 0.8, 0.3); }
+    r.h('root', D, cyl(1.0, 1.25, 0.18, 10), 0, 0.09, 0);
+    r.e('root', EN, tor(0.85, 0.04, 3, 16), 0, 0.17, 0, PI / 2, 0, 0);
+    // the segments (each sways on its own handle)
+    for (let i = 0; i < 5; i++) {
+      const g = 'segments' + i, y0 = 0.62 * i, rad = 0.66 - i * 0.04;
+      r.h(g, D, cyl(rad * 0.8, rad * 0.85, 0.62, 8), 0, y0 + 0.3, 0);
+      for (let j = 0; j < 8; j++) { const a = (j / 8) * PI * 2 + (i % 2) * 0.39;
+        r.h(g, j % 2 ? A : A2, box(rad * 0.75, 0.46, 0.1), Math.sin(a) * rad, y0 + 0.34, Math.cos(a) * rad, -0.18, a, 0); }
+      r.h(g, BR, cyl(rad + 0.04, rad + 0.04, 0.07, 10), 0, y0 + 0.6, 0);
+      r.rivets(g, BONE, [0, 1, 2, 3, 4, 5].map((j) => [Math.sin(j * 1.05) * (rad + 0.06), y0 + 0.6, Math.cos(j * 1.05) * (rad + 0.06)]), 0.05);
+      if (i < 4) r.sym((s) => { // clawed side legs
+        r.h(g, A2, box(0.14, 0.14, 0.4), s * (rad + 0.15), y0 + 0.32, 0.08, 0.3, s * 0.6, 0);
+        r.h(g, BONE, cone(0.05, 0.32, 4), s * (rad + 0.3), y0 + 0.18, 0.28, 0.8, 0, s * 0.3); });
+      r.e(g, EN, box(0.1, 0.22, 0.04), 0, y0 + 0.32, -rad - 0.02);
+      r.h(g, D, tube([[0.25, y0 + 0.05, -rad + 0.05], [0.32, y0 + 0.35, -rad - 0.12], [0.25, y0 + 0.66, -rad + 0.05]], 0.04, 5, 4));
+    }
+    // drill head
+    const H = 'head', hy = 3.23;
+    r.h(H, A2, cyl(0.62, 0.5, 0.5, 9), 0, hy + 0.1, 0);
+    r.h(H, A, lathe([[0.001, -0.1], [0.6, -0.05], [0.72, 0.25], [0.62, 0.6], [0.3, 0.85], [0.001, 0.9]], 9), 0, hy + 0.1, -0.1, -0.5, 0, 0);
+    r.h(H, BR, tor(0.6, 0.06, 4, 14), 0, hy + 0.3, 0.42, -0.5 + PI / 2, 0, 0);
+    // gullet + teeth (rotating tooth ring)
+    r.e(H, 0x6aff2a, cyl(0.42, 0.42, 0.04, 12), 0, hy + 0.26, 0.4, -0.5 + PI / 2, 0, 0);
+    r.e(H, EN2, cyl(0.16, 0.16, 0.05, 8), 0, hy + 0.27, 0.42, -0.5 + PI / 2, 0, 0);
+    r.sub('teeth', H, 0, hy + 0.26, 0.44);
+    for (let i = 0; i < 12; i++) { const a = (i / 12) * PI * 2; r.h('teeth', BONE, cone(0.06, 0.26, 4), Math.cos(a) * 0.38, hy + 0.26 + Math.sin(a) * 0.38 * Math.cos(0.5), 0.44 + Math.sin(a) * 0.38 * Math.sin(0.5), 0, 0, a + PI / 2); }
+    // three mandible petals (peel open on the wind-up)
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * PI * 2 + PI / 2, px = Math.cos(a) * 0.55, py = hy + 0.26 + Math.sin(a) * 0.5, pz = 0.4;
+      const g = r.sub('petal' + i, H, px, py, pz);
+      r.h(g, A, slab([[-0.24, 0], [0.24, 0], [0.08, 0.6], [0, 0.7], [-0.08, 0.6]], 0.07), px, py, pz + 0.05, -0.6, 0, a - PI / 2);
+      r.h(g, BONE, cone(0.05, 0.22, 4), px * 0.8, py - (py - hy - 0.26) * 0.2, pz + 0.3, PI / 2, 0, 0);
+    }
+    r.sym((s) => { r.e(H, EN, sph(0.08, 6, 4), s * 0.45, hy + 0.65, 0.15); r.h(H, D, cyl(0.1, 0.1, 0.08, 6), s * 0.45, hy + 0.65, 0.1, PI / 2, 0, 0); });
+    r.h(H, BONE, cone(0.08, 0.5, 5), 0, hy + 1.05, -0.3, -0.7, 0, 0);
+    r.vents.push([0, 3.8, -0.3], [0.5, 1.5, 0], [-0.5, 2.1, 0]);
+    r.weak.push(['head', 0, 3.5, 0.42], ['segments1', 0, 0.95, -0.6], ['segments3', 0, 2.2, -0.55], ['head', 0.45, 3.9, 0.15]);
+  },
+  anim(b, P, t, dt, st, k) {
+    const open = st === 'telegraph' ? k : st === 'recover' ? 0.2 : 0.15 + 0.08 * Math.sin(t * 3);
+    for (let i = 0; i < 3; i++) { const a = (i / 3) * PI * 2 + PI / 2; P['petal' + i].pivot.rotation.set(-open * 0.8 * Math.sin(a), open * 0.8 * Math.cos(a), 0); }
+    P.teeth.pivot.rotation.z += dt * (busy(st) ? 8 : 1.2);
+  },
+};
+
+// =====================================================================================================
+// THE HYMNWORKS - a stationary cathedral-engine fortress: a stepped octagonal plinth braced by four
+// flying-buttress legs, a towering fan of mouthed organ pipes behind, a bell-spire, piston-driven
+// bellows on the flanks that pump while it plays, and the rotating turret drum whose four bell-mouthed
+// beam emitters line up with the real BEAMS (same positions as before) under a red cyclops eye.
+DESIGNS.hymnworks = {
+  wear: { rust: 0.25, var: 0.22, soot: 0.15 },
+  build(r) {
+    const I = 0x34302c, I2 = 0x4a4440, BR = 0xc8a050, BR2 = 0x8a6a30, D = 0x1c1a18, BONE = 0xd8cfb8, EN = 0xff3a4a, EN2 = 0xffb0a0;
+    // stepped plinth
+    r.h('body', D, cyl(1.5, 1.65, 0.35, 8), 0, 0.17, 0, 0, PI / 8, 0);
+    r.h('body', I, cyl(1.35, 1.45, 0.3, 8), 0, 0.5, 0, 0, PI / 8, 0);
+    r.h('body', BR2, cyl(1.28, 1.3, 0.08, 8), 0, 0.68, 0, 0, PI / 8, 0);
+    r.h('body', I2, cyl(1.15, 1.25, 0.2, 8), 0, 0.8, 0, 0, PI / 8, 0);
+    for (let i = 0; i < 8; i++) { const a = (i / 8) * PI * 2; r.h('body', BONE, box(0.06, 0.06, 0.06), Math.sin(a) * 1.42, 0.62, Math.cos(a) * 1.42); }
+    // four flying-buttress legs
+    for (let i = 0; i < 4; i++) { const a = (i / 4) * PI * 2 + PI / 4, sx = Math.sin(a), sz = Math.cos(a);
+      r.h('body', I, slab([[0, 0], [0.75, 0], [0.75, 0.25], [0.1, 1.4], [0, 1.4]], 0.24), sx * 1.05, 0, sz * 1.05, 0, a - PI / 2, 0);
+      r.h('body', D, box(0.5, 0.2, 0.5), sx * 1.75, 0.1, sz * 1.75, 0, a, 0);
+      r.h('body', BR2, cone(0.12, 0.45, 4), sx * 1.15, 1.6, sz * 1.15, 0, a, 0); }
+    // organ pipe fan behind (mouthed pipes, tallest centre)
+    for (let i = 0; i < 11; i++) {
+      const a = PI + PI * 0.12 + (i / 10) * PI * 0.76, c = 1 - Math.abs(i - 5) / 5, h = 1.4 + c * 2.3, rr = 0.11 + c * 0.06;
+      const x = Math.sin(a) * 1.05, z = Math.cos(a) * 1.05;
+      r.h('body', i % 2 ? BR : BR2, cyl(rr, rr, h, 8), x, 0.9 + h / 2, z);
+      r.h('body', BR, cone(rr * 1.35, 0.3, 8), x, 0.9 + h + 0.12, z, PI, 0, 0);
+      r.h('body', D, box(rr * 1.1, 0.12, 0.04), x - Math.sin(a) * rr, 1.25 + c * 0.3, z - Math.cos(a) * rr, 0, a, 0);       // pipe mouth
+      r.e('body', EN, box(rr * 0.8, 0.04, 0.02), x - Math.sin(a) * (rr + 0.02), 1.22 + c * 0.3, z - Math.cos(a) * (rr + 0.02), 0, a, 0);
+      for (const y of [1.0, 0.9 + h * 0.6]) r.h('body', I, cyl(rr + 0.02, rr + 0.02, 0.05, 8), x, y, z);
+    }
+    // bell spire on the back
+    r.h('body', I2, box(0.5, 1.2, 0.5), 0, 4.2, -1.0); r.h('body', D, cone(0.42, 1.0, 4), 0, 5.3, -1.0, 0, PI / 4, 0);
+    r.h('body', BR, lathe([[0.001, 0], [0.18, 0.02], [0.2, 0.2], [0.12, 0.4], [0.001, 0.42]], 8), 0, 3.8, -1.0);
+    // flank bellows on pistons (pump while playing)
+    r.sym((s) => {
+      r.h('body', D, box(0.3, 0.5, 0.9), s * 1.2, 1.05, -0.1);
+      const g = r.sub('bel' + (s > 0 ? 'L' : 'R'), 'body', s * 1.25, 1.35, -0.1);
+      for (let i = 0; i < 3; i++) r.h(g, i % 2 ? I : 0x5a3a2a, box(0.32 - i * 0.04, 0.12, 0.85 - i * 0.08), s * 1.25, 1.38 + i * 0.12, -0.1);
+      r.h(g, BR, cyl(0.04, 0.04, 0.5, 6), s * 1.25, 1.55, 0.35);
+    });
+    // the turret drum (old drum handle: spins in world space; emitters at the same 4 angles, r ~1.08)
+    const dy = 1.25;
+    r.h('drum', I2, cyl(0.78, 0.82, 0.7, 12), 0, dy, 0);
+    r.h('drum', BR2, cyl(0.85, 0.85, 0.08, 12), 0, dy - 0.3, 0); r.h('drum', BR2, cyl(0.85, 0.85, 0.08, 12), 0, dy + 0.3, 0);
+    r.h('drum', D, lathe([[0.82, 0], [0.7, 0.2], [0.4, 0.45], [0.001, 0.5]], 12), 0, dy + 0.34, 0);
+    for (let i = 0; i < 4; i++) { const a = (i / 4) * PI * 2, sx = Math.sin(a), sz = Math.cos(a);
+      r.h('drum', D, box(0.34, 0.34, 0.4), sx * 0.85, dy, sz * 0.85, 0, a, 0);
+      r.h('drum', BR, shell([[0.1, 0], [0.12, 0.15], [0.22, 0.28]], 0.03, 8), sx * 0.95, dy, sz * 0.95, PI / 2, a, 0, 1, 1, 1);
+      r.e('drum', EN, cyl(0.12, 0.12, 0.03, 8), sx * 1.1, dy, sz * 1.1, PI / 2, 0, 0, 1, 1, 1);
+      r.h('drum', BONE, box(0.05, 0.05, 0.05), sx * 0.86, dy + 0.22, sz * 0.86); }
+    // fix: orient the emitter discs/bells along their radial axis
+    // red cyclops eye on top
+    r.h('drum', BR2, tor(0.24, 0.05, 4, 12), 0, dy + 0.85, 0, PI / 2, 0, 0);
+    r.e('drum', EN, sph(0.2, 8, 6), 0, dy + 0.85, 0); r.e('drum', EN2, sph(0.09, 6, 4), 0, dy + 0.9, 0.12);
+    r.vents.push([0, 4.3, -1.05], [0.6, 3.6, -0.9], [-0.6, 3.6, -0.9]);
+    r.weak.push(['drum', 0, 2.1, 0], ['body', 0.9, 1.2, 0.0], ['body', -0.9, 1.2, 0.0], ['body', 0, 3.5, -1.0]);
+  },
+  anim(b, P, t, dt, st) {
+    const playing = st === 'beaming' || st === 'telegraph';
+    const f = playing ? 9 : 2.2, amp = playing ? 0.12 : 0.04;
+    P.belL.pivot.position.y = 1.35 + Math.sin(t * f) * amp; P.belR.pivot.position.y = 1.35 + Math.sin(t * f + PI) * amp;
+  },
+};
+
+// =====================================================================================================
+// BRAND - the short, wide forge-twin: a squat dwarf-smith with a hearth-mouth chest, a stiff leather
+// apron of riveted plates, massive stepped pauldrons, a horned furnace helm with a slot visor, a bellows
+// gauntlet on the left and the great BRANDING IRON (glowing glyph-head) in the right for the charge/slam.
+DESIGNS.brand = {
+  wear: { rust: 0.18, var: 0.22, soot: 0.3, heat: 0.12 },
+  build(r) {
+    const I = 0x2e2a26, I2 = 0x4a423a, L = 0x5a3a24, CU = 0xc0702a, BONE = 0xd8c8a8, EN = 0xff8a3a, EN2 = 0xffd090;
+    r.sym((s) => heavyLeg(r, 'body', s * 0.3, 0, { hip: 0.72, w: 0.38, c1: I2, c2: CU, c3: I, flare: s * 0.15 }));
+    r.h('body', I, box(0.95, 0.28, 0.62), 0, 0.8, 0);
+    // barrel chest with hearth mouth
+    r.h('body', I2, lathe([[0.001, 0.82], [0.6, 0.86], [0.7, 1.15], [0.68, 1.45], [0.5, 1.68], [0.001, 1.7]], 9), 0, 0, 0, 0, 0, 0, 1.08, 1, 0.85);
+    r.h('body', I, box(0.56, 0.38, 0.12), 0, 1.22, 0.55);
+    r.e('body', EN, box(0.44, 0.24, 0.03), 0, 1.22, 0.61); r.e('body', EN2, box(0.24, 0.1, 0.02), 0, 1.18, 0.625);
+    for (const x of [-0.12, 0, 0.12]) r.h('body', CU, box(0.03, 0.3, 0.05), x, 1.22, 0.63);
+    // apron of riveted leather plates
+    for (let i = 0; i < 3; i++) for (const s of [-1, 0, 1]) r.h('body', L, box(0.28, 0.28, 0.04), s * 0.27, 0.9 - i * 0.2, 0.5 + i * 0.03, 0.12, s * 0.15, 0);
+    r.rivets('body', CU, [[-0.27, 1.0, 0.53], [0.27, 1.0, 0.53], [0, 1.0, 0.53], [-0.27, 0.6, 0.58], [0.27, 0.6, 0.58]]);
+    // stepped pauldrons
+    r.sym((s) => { for (let i = 0; i < 3; i++) r.h('body', i === 1 ? CU : I2, box(0.62 - i * 0.1, 0.16, 0.7 - i * 0.08), s * (0.72 + i * 0.05), 1.66 - i * 0.14, 0, 0, 0, -s * (0.25 + i * 0.1));
+      r.h('body', BONE, cone(0.06, 0.3, 4), s * 0.85, 1.85, -0.1, 0, 0, -s * 0.6); });
+    // horned furnace helm
+    r.h('body', I, cyl(0.28, 0.32, 0.42, 8), 0, 1.86, 0.06);
+    r.h('body', I2, cyl(0.33, 0.33, 0.06, 8), 0, 2.07, 0.06);
+    r.h('body', I, box(0.4, 0.14, 0.12), 0, 1.84, 0.33);
+    r.e('body', EN, box(0.32, 0.04, 0.02), 0, 1.86, 0.4);
+    r.sym((s) => { r.h('body', BONE, tube([[s * 0.28, 1.95, 0.05], [s * 0.6, 2.1, 0.0], [s * 0.66, 2.45, -0.1]], 0.06, 6, 5)); r.h('body', BONE, cone(0.06, 0.2, 4), s * 0.66, 2.55, -0.1); });
+    r.h('body', D_(I), cyl(0.08, 0.1, 0.35, 6), 0, 2.25, -0.08);
+    r.e('body', EN, cyl(0.05, 0.05, 0.02, 6), 0, 2.43, -0.08);
+    // left: bellows gauntlet
+    r.h('armL', I2, sph(0.24, 8, 6), 0.78, 1.4, 0);
+    r.h('armL', I, cyl(0.14, 0.12, 0.5, 7), 0.78, 1.08, 0);
+    r.h('armL', L, box(0.36, 0.3, 0.34), 0.78, 0.75, 0.02); r.h('armL', I, box(0.4, 0.06, 0.38), 0.78, 0.88, 0.02); r.h('armL', I, box(0.4, 0.06, 0.38), 0.78, 0.62, 0.02);
+    for (let i = 0; i < 4; i++) r.h('armL', I2, box(0.07, 0.18, 0.07), 0.66 + i * 0.08, 0.5, 0.12);
+    // right: the branding iron
+    r.h('armR', I2, sph(0.24, 8, 6), -0.78, 1.4, 0);
+    r.h('armR', I, cyl(0.14, 0.12, 0.5, 7), -0.78, 1.1, 0);
+    r.h('armR', I2, box(0.3, 0.28, 0.3), -0.78, 0.8, 0.05);
+    r.h('armR', I, cyl(0.05, 0.05, 1.6, 6), -0.78, 0.75, 0.65, PI / 2, 0, 0);
+    r.h('armR', CU, cyl(0.07, 0.07, 0.3, 6), -0.78, 0.75, 0.2, PI / 2, 0, 0);
+    r.h('armR', I, box(0.55, 0.55, 0.12), -0.78, 0.75, 1.42);
+    r.e('armR', EN, slab([[0, 0.22], [0.08, 0.05], [0.22, 0], [0.08, -0.05], [0, -0.22], [-0.08, -0.05], [-0.22, 0], [-0.08, 0.05]], 0.05), -0.78, 0.75, 1.5);
+    r.e('armR', EN2, box(0.06, 0.06, 0.04), -0.78, 0.75, 1.53);
+    r.vents.push([0, 2.45, -0.08], [0, 1.22, 0.62]);
+    r.weak.push(['body', 0, 1.22, 0.6], ['armR', -0.78, 0.75, 1.45], ['body', 0, 1.86, 0.4], ['body', 0, 2.4, -0.08]);
+  },
+};
+function D_(x) { return x; }
+
+// =====================================================================================================
+// TEMPER - the tall, lean forge-twin: a gaunt quench-knight in a long segmented coat, a tall stacked
+// helm with a vertical slit visor and a crest fin, a glowing quench tank on its back with coolant hoses to
+// both arms and a spinning cooling fan, long serrated TONGS on the left and a sprayer nozzle on the
+// right (the VOLLEY / BURST).
+DESIGNS.temper = {
+  wear: { rust: 0.15, var: 0.2 },
+  build(r) {
+    const S = 0x3a4450, S2 = 0x56606c, D = 0x1c2026, CU = 0x8ab0c8, BONE = 0xd8dce0, EN = 0x5ad8ff, EN2 = 0xc8f4ff;
+    // stilted legs
+    r.sym((s) => {
+      r.h('body', S2, box(0.22, 0.5, 0.26), s * 0.2, 0.8, 0);
+      r.h('body', D, cyl(0.06, 0.06, 0.4, 6), s * 0.2, 0.5, 0.05, 0.25, 0, 0);
+      r.h('body', S, box(0.18, 0.45, 0.2), s * 0.2, 0.25, -0.02, -0.1, 0, 0);
+      r.h('body', D, box(0.26, 0.1, 0.44), s * 0.2, 0.05, 0.08);
+      r.h('body', CU, box(0.2, 0.14, 0.12), s * 0.2, 0.55, 0.15);
+    });
+    // long segmented coat
+    r.h('body', S, lathe([[0.001, 0.4], [0.52, 0.42], [0.42, 0.8], [0.34, 1.1], [0.001, 1.12]], 8), 0, 0, 0, 0, PI / 8, 0, 1, 1, 0.8);
+    for (let i = 0; i < 6; i++) { const a = (i / 6) * PI * 2 + PI / 6; r.h('body', i % 2 ? S2 : S, box(0.26, 0.55, 0.04), Math.sin(a) * 0.42, 0.72, Math.cos(a) * 0.34, -0.2 * Math.cos(a), a, 0); }
+    // torso cuirass
+    r.h('body', S2, lathe([[0.001, 1.05], [0.32, 1.08], [0.42, 1.45], [0.4, 1.8], [0.25, 1.95], [0.001, 1.96]], 8), 0, 0, 0, 0, 0, 0, 1, 1, 0.72);
+    for (const y of [1.25, 1.45, 1.65]) r.h('body', S, box(0.62, 0.05, 0.08), 0, y, 0.28);
+    r.e('body', EN, box(0.08, 0.5, 0.02), 0, 1.45, 0.32);
+    r.sym((s) => r.h('body', S, slab([[0, 0.14], [0.36, 0.04], [0.32, -0.14], [0, -0.16]], 0.42), s * 0.4, 1.9, 0, 0, s > 0 ? 0 : PI, -s * 0.35));
+    // tall stacked helm
+    r.h('body', S, box(0.36, 0.42, 0.36), 0, 2.15, 0);
+    r.h('body', S2, box(0.3, 0.32, 0.3), 0, 2.48, -0.02);
+    r.h('body', D, box(0.04, 0.5, 0.5), 0, 2.6, -0.06);
+    r.h('body', CU, box(0.4, 0.06, 0.4), 0, 2.35, 0);
+    r.e('body', EN, box(0.05, 0.34, 0.02), 0, 2.2, 0.185);
+    // quench tank + fan
+    r.h('body', D, cyl(0.3, 0.3, 1.0, 10), 0, 1.5, -0.45);
+    r.e('body', EN, cyl(0.24, 0.24, 0.8, 10), 0, 1.5, -0.47);
+    for (let i = 0; i < 4; i++) { const a = (i / 4) * PI * 2 + PI / 4; r.h('body', S2, box(0.05, 0.9, 0.05), Math.sin(a) * 0.27, 1.5, -0.45 + Math.cos(a) * 0.27); }
+    for (const y of [1.0, 2.0]) r.h('body', CU, cyl(0.33, 0.33, 0.07, 10), 0, y, -0.45);
+    r.e('body', EN2, sph(0.05, 5, 4), 0.08, 1.3, -0.2); r.e('body', EN2, sph(0.04, 5, 4), -0.06, 1.6, -0.2); r.e('body', EN2, sph(0.035, 5, 4), 0.04, 1.85, -0.2);
+    r.sub('fan', 'body', 0, 2.1, -0.45);
+    for (let i = 0; i < 4; i++) { const a = (i / 4) * PI * 2; r.h('fan', S2, box(0.06, 0.03, 0.3), Math.sin(a) * 0.15, 2.1, -0.45 + Math.cos(a) * 0.15, 0.4, a, 0); }
+    r.h('fan', CU, cyl(0.06, 0.06, 0.08, 6), 0, 2.1, -0.45);
+    r.sym((s) => r.h('body', D, tube([[s * 0.2, 1.9, -0.6], [s * 0.55, 2.0, -0.4], [s * 0.5, 1.85, 0]], 0.035, 6, 4)));
+    // left: long serrated tongs
+    r.h('armL', S2, sph(0.15, 7, 5), 0.5, 1.85, 0);
+    r.h('armL', S, cyl(0.08, 0.06, 0.8, 6), 0.5, 1.45, 0);
+    r.h('armL', CU, box(0.16, 0.16, 0.16), 0.5, 1.02, 0.02);
+    for (const d of [0.06, -0.06]) { r.h('armL', D, box(0.04, 0.05, 1.15), 0.5 + d, 1.0, 0.6); for (let i = 0; i < 4; i++) r.h('armL', BONE, cone(0.02, 0.07, 3), 0.5 + d * 0.6, 1.0, 0.75 + i * 0.12, 0, 0, d > 0 ? PI / 2 : -PI / 2); }
+    r.e('armL', EN, box(0.12, 0.08, 0.08), 0.5, 1.0, 1.18);
+    // right: sprayer nozzle
+    r.h('armR', S2, sph(0.15, 7, 5), -0.5, 1.85, 0);
+    r.h('armR', S, cyl(0.08, 0.06, 0.8, 6), -0.5, 1.45, 0);
+    r.h('armR', D, cyl(0.12, 0.08, 0.35, 8), -0.5, 1.0, 0.05);
+    r.h('armR', CU, shell([[0.05, 0], [0.07, 0.15], [0.14, 0.25]], 0.025, 8), -0.5, 0.82, 0.05, PI, 0, 0);
+    r.e('armR', EN, cyl(0.08, 0.08, 0.03, 8), -0.5, 0.58, 0.05);
+    r.vents.push([0, 2.15, -0.45], [0, 2.85, -0.06]);
+    r.weak.push(['body', 0, 1.5, -0.7], ['body', 0, 2.2, 0.2], ['armL', 0.5, 1.0, 1.18], ['body', 0, 1.45, 0.32]);
+  },
+  anim(b, P, t, dt, st) { P.fan.pivot.rotation.y += dt * (busy(st) ? 18 : 5); },
+};

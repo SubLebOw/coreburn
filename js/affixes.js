@@ -47,24 +47,46 @@ function tagSprite(names, color) {
   return s;
 }
 
+// Phase 5C: every affix visual is built from SHARED geometry + opaque materials (nothing created per enemy
+// except the meshes themselves), and the name tag texture is cached per affix combination.
+const RING_GEO = [0, 1, 2].map((i) => new THREE.RingGeometry(0.85 + i * 0.22, 1.0 + i * 0.22, 24));
+const BUBBLE_GEO = new THREE.SphereGeometry(1.25, 14, 10);
+const BUBBLE_MAT = new THREE.MeshBasicMaterial({ color: 0x4ab8ff, transparent: true, opacity: 0.2, depthWrite: false }); // the only see-through affix part
+const MAT = {}; const mat = (c) => (MAT[c] ??= new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide }));
+// one small accent per affix, concise and readable from the gameplay camera
+const ACCENT = {
+  volatile: { geo: new THREE.OctahedronGeometry(0.2), y: 1.0, z: 0.42 },          // unstable core on the chest, flickers
+  vampiric: { geo: new THREE.OctahedronGeometry(0.16), y: 1.25, z: 0.42 },        // red heart core, pulses like a heartbeat
+  warded: { geo: new THREE.TorusGeometry(0.34, 0.045, 4, 6), top: 0.45 },          // violet hex sigil above the head
+  hasted: { geo: new THREE.ConeGeometry(0.12, 0.5, 4), y: 1.2, z: -0.5 },         // green exhaust fin on the back
+  splitting: { geo: new THREE.TetrahedronGeometry(0.14), top: 0.2, orbit: 0.45 },  // yellow pod circling the head
+};
+const TAG_CACHE = new Map();
 export function applyAffixVisuals(e, mask) {
   e.affixMask = mask;
   if (!mask) return;
   const list = AFFIXES.filter((a, i) => mask & (1 << i));
-  e.affixFx = [];
+  e.affixFx = []; e.affixAcc = [];
   list.forEach((a, i) => {
-    const ring = new THREE.Mesh(new THREE.RingGeometry(0.85 + i * 0.22, 1.0 + i * 0.22, 32),
-      new THREE.MeshBasicMaterial({ color: a.color, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }));
-    ring.rotation.x = -Math.PI / 2; ring.position.y = 0.06;
+    const ring = new THREE.Mesh(RING_GEO[Math.min(i, 2)], mat(a.color));
+    ring.rotation.x = -Math.PI / 2; ring.position.y = 0.06 + i * 0.01;
     e.root.add(ring); e.affixFx.push(ring);
+    const A = ACCENT[a.id];
+    if (A) {
+      const m = new THREE.Mesh(A.geo, mat(a.color));
+      m.position.set(0, A.top !== undefined ? (e.topY || 2.2) + A.top : A.y * (e.topY || 2.3) / 2.3, A.z || 0); // chest height scales with the body
+      if (a.id === 'warded') m.rotation.x = Math.PI / 2;
+      if (a.id === 'hasted') m.rotation.x = -Math.PI / 2 - 0.5;
+      m.userData.affix = a.id; m.userData.y0 = m.position.y; m.userData.orbit = A.orbit || 0;
+      e.root.add(m); e.affixAcc.push(m);
+    }
   });
-  if (has(e, 'shielded')) {
-    e.bubble = new THREE.Mesh(new THREE.SphereGeometry(1.25, 18, 12),
-      new THREE.MeshBasicMaterial({ color: 0x4ab8ff, transparent: true, opacity: 0.22, depthWrite: false }));
-    e.bubble.position.y = 1.1; e.root.add(e.bubble);
-  }
-  e.affixTag = tagSprite(list.map((a) => a.name).join(' · '), list[0].color);
-  const k = 1 / (e.scale || 1); e.affixTag.scale.multiplyScalar(k); e.affixTag.position.y = 2.2 + 0.9 * k; e.root.add(e.affixTag);
+  if (has(e, 'shielded')) { e.bubble = new THREE.Mesh(BUBBLE_GEO, BUBBLE_MAT); e.bubble.position.y = 1.1; e.root.add(e.bubble); }
+  const text = list.map((a) => a.name).join(' · ');
+  if (!TAG_CACHE.has(text)) TAG_CACHE.set(text, tagSprite(text, list[0].color));
+  const proto = TAG_CACHE.get(text);
+  e.affixTag = new THREE.Sprite(proto.material); e.affixTag.scale.copy(proto.scale); e.affixTag.renderOrder = 999;
+  const k = 1 / (e.scale || 1); e.affixTag.scale.multiplyScalar(k); e.affixTag.position.y = (e.topY || 2.2) + 0.9 * k; e.root.add(e.affixTag);
 }
 
 // host only: stats when it spawns
@@ -98,8 +120,21 @@ export function tickAffixes(list, dt, world) {
   }
 }
 
+let affT = 0;
 export function tickAffixVisuals(list, dt) {
-  for (const e of list) if (e.affixFx) e.affixFx.forEach((r, i) => { r.rotation.z += dt * (i ? -1.5 : 1.5); });
+  affT += dt;
+  for (const e of list) {
+    if (!e.affixFx) continue;
+    e.affixFx.forEach((r, i) => { r.rotation.z += dt * (i ? -1.5 : 1.5); });
+    for (const m of e.affixAcc) {
+      const id = m.userData.affix, ph = affT + (e.nid || 0) * 0.7;
+      if (id === 'volatile') m.scale.setScalar(0.8 + 0.4 * Math.abs(Math.sin(ph * 9) * Math.sin(ph * 23)));
+      else if (id === 'vampiric') { const b = ph % 0.9; m.scale.setScalar(1 + 0.35 * Math.max(0, Math.sin(b * 14)) * (b < 0.45 ? 1 : 0)); }
+      else if (id === 'warded') { m.rotation.z = ph * 1.2; m.position.y = m.userData.y0 + Math.sin(ph * 2) * 0.06; }
+      else if (id === 'hasted') m.scale.set(1, 1 + 0.3 * Math.sin(ph * 30), 1);
+      else if (id === 'splitting') { const o = m.userData.orbit; m.position.set(Math.cos(ph * 3) * o, m.userData.y0, Math.sin(ph * 3) * o); m.rotation.y = ph * 5; }
+    }
+  }
 }
 
 // host only: on death

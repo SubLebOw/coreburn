@@ -132,6 +132,7 @@ export class Enemy {
         const lm = i ? new THREE.Mesh(P.lamps.geometry, P.lamps.material) : P.lamps; lm.position.set(x, y, z); this.body.add(lm); return lm;
       });
     }
+    this.topY = TOP[this.typeName] ?? 2.2;
     this.root.scale.setScalar(this.scale);
     this.root.position.set(this.position.x, -2.5, this.position.z); // start underground
     this.scene.add(this.root);
@@ -648,6 +649,6 @@ export class Enemy {
   dispose() {
     this.scene.remove(this.root);
     for (const m of Object.values(this.mats)) m.dispose();
-    if (this.affixTag) { this.affixTag.material.map?.dispose(); this.affixTag.material.dispose(); } // name-tag canvas texture
+    // affix rings/accents/tags use shared, cached geometry + materials (js/affixes.js): nothing to dispose
   }
 }

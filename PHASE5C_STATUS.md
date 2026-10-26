@@ -27,8 +27,12 @@ No merge, version bump or deploy. PR #7 is not touched.
   that does not grow with enemy count.
   **TODO:** cut draw calls (merge detail meshes into the main groups when LOD is lo, or bake static groups).
 
+- `js/affixes.js`: the 6 existing affixes now share ring and bubble geometry, use opaque shared materials
+  (only the shield bubble is transparent), and cache the name tag per combination, which fixes the old
+  per-enemy geometry and texture leak. Each affix gets one accent: volatile has a flickering chest core,
+  vampiric a heartbeat core, warded a hex sigil above the head, hasted an exhaust fin and splitting an orbiting pod.
+
 ### Remaining
-- Affix accents and shared affix geometry (`js/affixes.js`).
 - Dev inspector (`js/dev-5c-inspector.js`, the ?dev=1 gate in index.html, and main.js hooks matching PR #7).
 - Full screenshot set with before/after pairs, Variant E, arena smoke tests, Phase 4 events, perf, and the githack check.
 

@@ -695,7 +695,7 @@ async function submitRun() {
   const r = mode === 'rush'
     ? { mode, hero: player.char.id, score: rushScore(run.bosses, runTime), wave: enemies.wave, kills, seconds: runTime, week: modeKey }
     : { mode, hero: player.char.id, score, wave: enemies.wave, kills, seconds: runTime, day: modeKey };
-  r.tainted = LOCAL_DEV;
+  r.tainted = LOCAL_DEV || !!window.__CB_DEV; // dev tools: never submit
   r.z = RULES.z; // CoreBurnZ boards are separate // never submit online from a local test build
   if (mode === 'daily') { meta.data.stats.dailies++; } else if (mode === 'rush') { meta.data.stats.rushes++; if (rushWon) meta.data.stats.rushClears = (meta.data.stats.rushClears || 0) + 1; }
   milestones();
@@ -1171,6 +1171,9 @@ function frame() {
   }
 }
 frame();
+// PHASE 5C DEV INSPECTOR (js/dev-5c-inspector.js): only when index.html's ?dev=1 gate loaded js/dev-boot.js;
+// excluded from the production build, and nothing happens if the file is missing.
+if (window.__CB_DEV && !IS_NATIVE) import('./dev-5c-inspector.js?v=1.33.0').then((m) => m.install({ enemies, player, startGame, getState: () => state })).catch(() => {});
 
 // Testing helpers for the browser console live in js/dev.local.js, which is NOT part of the
 // game: it's git-ignored and left out of the build, so it never reaches the website or the

@@ -23,6 +23,11 @@
   window.addEventListener('unhandledrejection',function(e){if(!window.__cbReady)show('Rejection: '+(e.reason&&(e.reason.stack||e.reason.message)||e.reason));});
   setTimeout(function(){show('Timed out waiting for game start (6s)');},6000);})();
   </script>
+  <script>
+  // DEV TOOLS gate: only with ?dev=1 on the raw.githack preview or a local http server, never in the
+  // Android app (Capacitor) and never on sublebow.github.io. The dev files are not in the production build.
+  (function(){try{var h=location.hostname,C=window.Capacitor;if(new URLSearchParams(location.search).get('dev')==='1'&&(h==='raw.githack.com'||((h==='localhost'||h==='127.0.0.1')&&location.protocol==='http:'))&&!(C&&C.isNativePlatform&&C.isNativePlatform()))document.write('<script src="js/dev-boot.js"><\/script>');}catch(e){}})();
+  </script>
   <script type="importmap">
     {
       "imports": {

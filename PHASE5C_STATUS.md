@@ -31,8 +31,14 @@ No merge, version bump or deploy. PR #7 is not touched.
   Triangles are higher (gameplay 2.0k -> 7.4k; crowd 3.0k -> 12.3k). Merged geometry is cached per type and
   form, so it does not grow with enemy count.
 
+- Dev inspector `js/dev-5c-inspector.js`. It loads only through PR #7's identical `?dev=1` gate (raw.githack.com or
+  http://localhost/127.0.0.1, never in the Capacitor app, never on sublebow.github.io) and uses dev-boot's sessionStorage
+  sandbox; dev runs are marked `tainted`. It can spawn any type, toggle elite, toggle each affix, spawn 10 mixed,
+  clear adds, set LOD auto/hi/lo, and has a "spawn next boss" hook for stage 2. The panel scrolls and starts folded on phones.
+  Tested: without the flag there is no panel, no `__CB_DEV` and no dev-*.js request. A build dry run in a temp
+  dir leaves out js/dev-*.js.
+
 ### Remaining
-- Dev inspector (`js/dev-5c-inspector.js`, the ?dev=1 gate in index.html, and main.js hooks matching PR #7).
 - Full screenshot set with before/after pairs, Variant E, arena smoke tests, Phase 4 events, perf, and the githack check.
 
 ### Next steps

@@ -38,12 +38,24 @@ No merge, version bump or deploy. PR #7 is not touched.
   Tested: without the flag there is no panel, no `__CB_DEV` and no dev-*.js request. A build dry run in a temp
   dir leaves out js/dev-*.js.
 
-### Remaining
-- Full screenshot set with before/after pairs, Variant E, arena smoke tests, Phase 4 events, perf, and the githack check.
+### Stage 1 verification (latest)
+- Timing/radii fingerprint: 22/22 sims identical to v1.33.0.
+- Variant E: UNIT PASS (24 checks). Desktop and mobile smoke runs show 0 JS errors.
+- Mixed wave (all 11 types, normal and elite with affixes, 22 spawned) in all 5 arenas (slag, foundry, tundra, cathedral,
+  rooftop), desktop and mobile: 0 errors. On desktop, one bulwark stays at its spawn point on rooftop; v1.33.0 does
+  the same (pre-existing).
+- Phase 4 events (blackout, relays, HVT kill and escape, containment shift in 3 arenas, client snapshot): same results
+  as v1.33.0. The HVT keeps its amber marker and its kill is credited.
+- Perf, in-game with 24 live enemies (software render, simulated mobile viewport, not a real device):
+  draw calls 427 -> 333 (desktop) and 435 -> 333 (mobile); median frame 51 -> 54 ms (desktop) and 49 -> 49 ms (mobile,
+  SwiftShader); triangles 6.6k -> 17.5k. Geometries after 3 kill/respawn waves: v1.33.0 134 -> 170,
+  5C 277 -> 280 (shared caches, so no per-enemy growth).
+- Without ?dev=1: no dev panel and no dev files requested. The build dry run leaves out js/dev-*.js.
 
-### Next steps
-1. Affix visuals, then commit and push.
-2. Inspector, then commit and push.
-3. Verification pass and screenshots.
+## Remaining
+- Stage 2 (bosses): not started, as instructed.
 
-## Stage 2 (bosses): not started
+## Next steps (stage 2)
+1. Boss models (12 bosses, a separate Boss class in boss*.js) reusing `enemy-models.js` (vertex-colour merge), keeping boss IDs.
+2. A boss timing fingerprint like p5c-timing.mjs, run before changing anything.
+3. A boss picker in the inspector's "BOSSES" section (it currently only has "spawn next boss").

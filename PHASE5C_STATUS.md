@@ -88,3 +88,6 @@ Root cause of "bosses look the same": stage 2 dressBoss only ADDED trim on top o
 - In-game per boss: 8-29 draw calls incl. shadows, 0.9k-4k tris, 0 transparent mats, no lights.
 - Shots: /workspace/coreburn-shots/phase5c/boss2/
 - Not done: mechanics WIP patch intentionally NOT applied.
+
+## Merged + released as v1.34.0 (2026-10-27 NZDT)
+PR #7 then PR #8 merged to main (merge commits d454618, cf1ef85). Dev tools moved out of this repo into fatalbananas7/coreburn-dev (see DEV_BUILD.md).

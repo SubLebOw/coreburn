@@ -15,3 +15,5 @@ android/capacitor-cordova-android-plugins/build/
 keystore.properties
 # Local-only testing helpers (never shipped: also excluded from the build)
 *.local.js
+# Dev-only files live in fatalbananas7/coreburn-dev (devtools/), never here - see DEV_BUILD.md
+js/dev-*.js

@@ -469,25 +469,46 @@ function design(type, elite) {
   return (CACHE[id] = d.done());
 }
 
-// Build one enemy's model. mats = { main, dark, metal, mask } (per-instance Lambert, flashable);
-// core = the type's glow material. Returns { root, body, groups, pieces, detail[] }.
-export function buildEnemyModel(type, elite, mats, core) {
+// Phase 5C perf pass: every rig group is drawn with at most TWO meshes - one lit mesh (all armour,
+// joints and detail parts merged, colour baked into vertex colours, drawn with the enemy's single
+// flashable Lambert material) and one unlit glow mesh (eyes, cores, channels; vertex colours, one material
+// shared by every enemy). Merged geometry is cached per type + elite form + palette.
+const GLOW_VC = new THREE.MeshBasicMaterial({ vertexColors: true }); GLOW_VC.userData.shared = true;
+const _c = new THREE.Color();
+function paint(list, hexOf) { // list of [key, geometry] -> one merged geometry with a colour attribute
+  let n = 0; for (const [, g] of list) n += g.attributes.position.count;
+  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3); let o = 0;
+  for (const [k, g] of list) {
+    const c = g.attributes.position.count; pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3);
+    _c.setHex(hexOf(k)); for (let i = 0; i < c; i++) { col[(o + i) * 3] = _c.r; col[(o + i) * 3 + 1] = _c.g; col[(o + i) * 3 + 2] = _c.b; }
+    o += c;
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  out.setAttribute('color', new THREE.BufferAttribute(col, 3)); out.computeBoundingSphere(); out.userData.cached = true;
+  return out;
+}
+const BAKED = {};
+// Build one enemy's model. lit = the enemy's own (flashable) vertex-colour Lambert material;
+// palette = { main, dark, metal, mask } hex colours; core = the type's glow material.
+export function buildEnemyModel(type, elite, lit, palette, core) {
   const d = design(type, elite);
-  const allMats = { ...mats, core, eye: GLOW.visor, eye2: GLOW.eliteVisor, red: GLOW.red, spit: GLOW.spit, mend: GLOW.mend, bomb: GLOW.bomb, censer: GLOW.censer, pod: GLOW.pod, warn: GLOW.warn };
+  const glowHex = { core: core.color.getHex(), eye: GLOW.visor.color.getHex(), eye2: GLOW.eliteVisor.color.getHex(), red: GLOW.red.color.getHex(), spit: GLOW.spit.color.getHex(), mend: GLOW.mend.color.getHex(), bomb: GLOW.bomb.color.getHex(), censer: GLOW.censer.color.getHex(), pod: GLOW.pod.color.getHex(), warn: GLOW.warn.color.getHex() };
+  const id = type + (elite ? ':e:' : ':') + Object.values(palette).join(',');
+  const baked = BAKED[id] || (BAKED[id] = Object.fromEntries(Object.entries(d.parts).map(([gname, byMat]) => {
+    const lits = [], glows = [];
+    for (const [mk0, geo] of Object.entries(byMat)) { const key = mk0.replace('~', ''); (key in palette ? lits : glows).push([key, geo]); }
+    return [gname, { lit: lits.length ? paint(lits, (k) => palette[k]) : null, glow: glows.length ? paint(glows, (k) => glowHex[k]) : null }];
+  })));
+  const allMats = { core, eye: GLOW.visor, eye2: GLOW.eliteVisor, red: GLOW.red, spit: GLOW.spit, mend: GLOW.mend, bomb: GLOW.bomb, censer: GLOW.censer, pod: GLOW.pod, warn: GLOW.warn };
   const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
   const groups = { body };
   for (const [name, at] of Object.entries(d.rig)) { const g = new THREE.Group(); g.position.set(...at); body.add(g); groups[name] = g; }
-  const detail = [];
   const mk = (gname) => groups[gname] || (groups[gname] = new THREE.Group()); // cage / chain / orbit are placed by enemy.js
-  for (const [gname, byMat] of Object.entries(d.parts)) {
-    for (const [mk0, geo] of Object.entries(byMat)) {
-      const isDet = mk0.endsWith('~'), key = isDet ? mk0.slice(0, -1) : mk0;
-      const mat = allMats[key];
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.castShadow = !mat.isMeshBasicMaterial && !isDet && gname === 'body';
-      mk(gname).add(mesh);
-      if (isDet) detail.push(mesh);
-    }
+  let caster = null;
+  for (const [gname, b] of Object.entries(baked)) {
+    if (b.lit) { const m = new THREE.Mesh(b.lit, lit); if (gname === 'body') { m.castShadow = true; caster = m; } mk(gname).add(m); } // one shadow caster per enemy
+    if (b.glow) mk(gname).add(new THREE.Mesh(b.glow, GLOW_VC));
   }
   const pieces = {};
   for (const [name, p] of Object.entries(d.keep)) {
@@ -496,7 +517,7 @@ export function buildEnemyModel(type, elite, mats, core) {
     pieces[name] = mesh;
     if (p.group !== 'orbit') mk(p.group).add(mesh);
   }
-  return { root, body, groups, pieces, detail };
+  return { root, body, groups, pieces, caster, detail: [] };
 }
 // glow colour of each type's internal energy system (shared material per colour)
 const CORE_COL = { acolyte: 0xff6a1a, bulwark: 0xff4a14, lancer: 0xff3a3a, spitter: 0xff8a1e, hound: 0xff7a1a, mite: 0x3ff6e0, splitter: 0xffd23a, thurible: 0xff9a2a, mender: 0x6aff7a, grub: 0x3ff6e0, bomber: 0xffb020 };

@@ -32,8 +32,12 @@ const GAIT = {
 for (const g of Object.values(GAIT)) for (const k of ['stride', 'arm', 'bob', 'sway', 'twist', 'lean']) g[k] ??= 0;
 const ANCHOR = { acolyte: 1.35, bulwark: 1.4, lancer: 1.4, spitter: 1.45, hound: 0.8, mite: 0.6, splitter: 1.35, thurible: 1.4, mender: 1.4, grub: 0.5, bomber: 1.2 };
 export const TOP = { acolyte: 2.3, bulwark: 2.2, lancer: 2.4, spitter: 2.0, hound: 1.3, mite: 1.0, splitter: 2.2, thurible: 2.4, mender: 2.6, grub: 0.95, bomber: 2.2 };
+// readability: subtle self-light + lifted palette for the darkest bodies (acolyte, spitter) so they don't sink into the floor
+const RIM = { acolyte: 0x2a1408, spitter: 0x1c2008, lancer: 0x0c0c16 };
+const LIFT = { acolyte: 1.3, spitter: 1.3 };
+const tint = (hex, k) => k === 1 ? hex : new THREE.Color(hex).multiplyScalar(k).getHex();
 const HEAVY = new Set(['bulwark', 'thurible']);
-const LOD = { mode: 'auto', on: true, t: -1 }; // auto: small details only while <= 14 enemies are alive
+const LOD = { mode: 'auto', on: true, t: -1 }; // auto: crowd LOD above 8 live enemies (light enemies stop casting shadows)
 export function setEnemyLOD(mode) { LOD.mode = mode; LOD.t = -1; }
 const HVT_GEO = new THREE.OctahedronGeometry(0.22); HVT_GEO.userData.cached = true;
 
@@ -100,14 +104,13 @@ export class Enemy {
   buildModel() {
     // Each enemy gets its own (4) Lambert materials so it can flash white on its own; geometry is
     // merged + cached per type in enemy-models.js and every glow material is shared.
-    this.mats = {
-      main: new THREE.MeshLambertMaterial({ color: this.type.main }),
-      dark: new THREE.MeshLambertMaterial({ color: this.type.dark }),
-      metal: new THREE.MeshLambertMaterial({ color: METAL[this.typeName] ?? 0x666058 }),
-      mask: new THREE.MeshLambertMaterial({ color: 0xd8cfb8 }), // bone-white mask
-    };
-    const m = buildEnemyModel(this.typeName, this.elite, this.mats, coreMat(this.typeName));
-    this.root = m.root; this.body = m.body; this.rig = m.groups; this.detail = m.detail;
+    // ONE flashable Lambert material per enemy: armour colours are baked into vertex colours (enemy-models.js)
+    const lift = LIFT[this.typeName] || 1; // dark-palette types are lifted a touch so they read on every arena floor
+    const palette = { main: tint(this.type.main, lift), dark: tint(this.type.dark, lift), metal: METAL[this.typeName] ?? 0x666058, mask: 0xd8cfb8 };
+    this.baseEmissive = RIM[this.typeName] || 0;
+    this.mats = { lit: new THREE.MeshLambertMaterial({ vertexColors: true, emissive: this.baseEmissive }) };
+    const m = buildEnemyModel(this.typeName, this.elite, this.mats.lit, palette, coreMat(this.typeName));
+    this.root = m.root; this.body = m.body; this.rig = m.groups; this.detail = m.detail; this.caster = m.caster;
     const g = m.groups, P = m.pieces;
     this.legL = g.legL; this.legR = g.legR; this.armL = g.armL; this.armR = g.armR; this.head = g.head;
     if (g.leg0) this.legs = [g.leg0, g.leg1, g.leg2, g.leg3];
@@ -572,9 +575,9 @@ export class Enemy {
     const now = performance.now();
     if (now - LOD.t > 250 || LOD.t < 0) {
       LOD.t = now;
-      LOD.on = LOD.mode === 'hi' ? true : LOD.mode === 'lo' ? false : (this.world.enemies?.list?.length ?? 0) <= 14;
+      LOD.on = LOD.mode === 'hi' ? true : LOD.mode === 'lo' ? false : (this.world.enemies?.list?.length ?? 0) <= 8;
     }
-    if (this.detailOn !== LOD.on) { this.detailOn = LOD.on; for (const m of this.detail) m.visible = LOD.on; }
+    if (this.detailOn !== LOD.on) { this.detailOn = LOD.on; for (const m of this.detail) m.visible = LOD.on; if (this.caster) this.caster.castShadow = LOD.on || HEAVY.has(this.typeName) || this.elite; }
   }
 
   // local-only (never sent over the network: visual rising edge of the hit flash on host AND clients)
@@ -643,7 +646,7 @@ export class Enemy {
   setEmissive(hex) {
     if (this.currentEmissive === hex) return;
     this.currentEmissive = hex;
-    for (const m of Object.values(this.mats)) m.emissive.setHex(hex);
+    for (const m of Object.values(this.mats)) m.emissive.setHex(hex || this.baseEmissive);
   }
 
   dispose() {

@@ -22,15 +22,14 @@ No merge, version bump or deploy. PR #7 is not touched.
   no stat, AI, timing or radius changes.
 
 - Variant E: 24/24 pass. Desktop and mobile smoke runs (wave 3) show 0 JS errors.
-- Perf (software render, 11 enemies, gallery scene, includes the shadow pass): draw calls 145 -> 236 and
-  triangles about 1.9k -> 7.1k. The geometry cache holds about 238 entries per type set; this is a one-time cost
-  that does not grow with enemy count.
-  **TODO:** cut draw calls (merge detail meshes into the main groups when LOD is lo, or bake static groups).
-
-- `js/affixes.js`: the 6 existing affixes now share ring and bubble geometry, use opaque shared materials
-  (only the shield bubble is transparent), and cache the name tag per combination, which fixes the old
-  per-enemy geometry and texture leak. Each affix gets one accent: volatile has a flickering chest core,
-  vampiric a heartbeat core, warded a hex sigil above the head, hasted an exhaust fin and splitting an orbiting pod.
+- Draw-call pass: each rig group is now 1 lit mesh (vertex colours, the enemy's single flashable Lambert material)
+  plus at most 1 glow mesh (one shared material). One shadow caster per enemy; above 8 live enemies, light
+  non-elite enemies stop casting shadows. Death scrap uses 3 InstancedMeshes. The acolyte and spitter get a lifted
+  palette and a subtle self-light.
+  Draw calls (software render, includes the shadow pass), v1.33.0 -> 5C:
+  11 types close-up 145 -> 103, gameplay camera 152 -> 109, elites 185 -> 110, 20-enemy mixed crowd 246 -> 185.
+  Triangles are higher (gameplay 2.0k -> 7.4k; crowd 3.0k -> 12.3k). Merged geometry is cached per type and
+  form, so it does not grow with enemy count.
 
 ### Remaining
 - Dev inspector (`js/dev-5c-inspector.js`, the ?dev=1 gate in index.html, and main.js hooks matching PR #7).

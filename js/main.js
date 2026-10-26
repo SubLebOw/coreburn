@@ -695,7 +695,7 @@ async function submitRun() {
   const r = mode === 'rush'
     ? { mode, hero: player.char.id, score: rushScore(run.bosses, runTime), wave: enemies.wave, kills, seconds: runTime, week: modeKey }
     : { mode, hero: player.char.id, score, wave: enemies.wave, kills, seconds: runTime, day: modeKey };
-  r.tainted = LOCAL_DEV;
+  r.tainted = LOCAL_DEV || !!window.__CB_DEV; // dev tools: never submit
   r.z = RULES.z; // CoreBurnZ boards are separate // never submit online from a local test build
   if (mode === 'daily') { meta.data.stats.dailies++; } else if (mode === 'rush') { meta.data.stats.rushes++; if (rushWon) meta.data.stats.rushClears = (meta.data.stats.rushClears || 0) + 1; }
   milestones();
@@ -1180,5 +1180,12 @@ if (LOCAL_DEV) {
   import('./dev.local.js?v=1.33.0')
     .then((m) => m.install({ renderer, scene, showcase, player, enemies, world, progress, allies, arena, powerups, projectiles, effects, hud, sound, ads, startGame, snapCamera: () => updateCamera(0, true), getScore: () => score, combo, meta, twitch, input, getState: () => state, getLastRun: () => lastRun, getMode: () => mode, bursts, openPicker: () => { normalPick = true; openUpgradePicker(); } }))
     .catch(() => {}); // no dev file = no helpers, that's fine
+}
+// DEV TOOLS (js/dev-tools.js): only when index.html's gate loaded js/dev-boot.js (?dev=1 on the preview /
+// localhost). Not in the production build; if the file is missing nothing happens.
+if (window.__CB_DEV && !IS_NATIVE) {
+  import('./dev-tools.js?v=1.33.0')
+    .then((m) => m.install({ player, enemies, world, events, arena, allies, projectiles, effects, hud, startGame, getState: () => state, getRun: () => run, getMode: () => mode, setMode: (m) => { mode = m; }, openPicker: () => { normalPick = true; openUpgradePicker(); } }))
+    .catch(() => {});
 }
 window.__cbReady = true; // boot failsafe in index.html checks this

@@ -180,7 +180,7 @@ export const MYTHICS = {
   myStand:   MY({ name: 'Last Stand', icon: '♛', text: 'Once per boss wave, lethal damage leaves you at 1 HP with +50% damage for 5s' }),
   // PHASE 5B (phase5.js)
   myRift:    MY({ name: 'Graviton Rift', icon: '◍', text: 'Every 25 attack hits tears a gravity rift at your target for 2.5s: drags foes in, crushes them, then collapses (10s cooldown; bosses only slowed)' }),
-  myParadox: MY({ name: 'Paradox Engine', icon: '⧖', text: 'Alternate attacks and abilities 6 times: 5s PARADOX, attack hits fracture in bursts, one free mobility charge, and it ends in a collapse blast (15s cooldown)' }),
+  myParadox: MY({ name: 'Paradox Engine', icon: '∞', text: 'Alternate attacks and abilities 6 times: 5s PARADOX, attack hits fracture in bursts, one free mobility charge, and it ends in a collapse blast (15s cooldown)' }),
   myWarforge:MY({ name: 'Warforge Array', icon: '⚙', text: 'Every 12s your next 5 attack hits forge 2 phantom gun drones that fire an extra bolt at the target' }),
 };
 export const MYTHIC_FROM_WAVE = 75, MYTHIC_EVERY = 5, MYTHIC_MAX = 3;

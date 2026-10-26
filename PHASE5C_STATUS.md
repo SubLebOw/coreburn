@@ -59,3 +59,12 @@ No merge, version bump or deploy. PR #7 is not touched.
 1. Boss models (12 bosses, a separate Boss class in boss*.js) reusing `enemy-models.js` (vertex-colour merge), keeping boss IDs.
 2. A boss timing fingerprint like p5c-timing.mjs, run before changing anything.
 3. A boss picker in the inspector's "BOSSES" section (it currently only has "spawn next boss").
+
+## Stage 2 — Bosses (in progress, 2026-10-27)
+- DONE models: js/boss-models.js dresses all 12 bosses (13 DRESS fns incl. twins), merged static geometry, telegraph/impact/recover/staged-death presentation (local-only fx, no RNG/network). Commit 7303bcf.
+- DONE pose fix (pre-existing v1.33.0 bug): pose setScalar reset UNIT_BOX parts to 1 m glow cubes (Klaxon throat, Bellows mouth, Gravel maw, Nail core).
+- PROOF: 24-sim boss timing fingerprint (12 bosses x lap 0/1, 70 s each) IDENTICAL vs v1.33.0 — shots/phase5c/baseline-boss-timing.json == new-boss-timing.json.
+- DONE dev inspector boss picker (?dev=1): 12 buttons, jump-to-wave / spawn-here, remove bosses; mobile-sized buttons.
+- DONE in-game fights (pw/p5c-boss-fight.mjs, desktop+mobile+baseline): all 12 spawn clear of obstacles, phase 2 fires, attacks seen, exactly 1 onBossKilled + 1 BOSS RELIC each, stats.zBosses reaches 12, all 5 arenas covered, 0 JS errors, no boss left in list / no scene growth. Baseline behaves identically.
+- Perf (calls/tris all 12 in one scene): 257/4.5k -> 281/17.4k.
+- TODO: before/after per-pose shot pairs, Phase 4 events, Variant E 24, save/resume across boss wave, boss+crowd perf, sim co-op, optional mechanics (3-4 bosses), PR body.

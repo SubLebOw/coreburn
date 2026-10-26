@@ -13,6 +13,7 @@ import { RULES, zHero } from './rules.js?v=1.33.0-p5c3';
 import { Loadout, tierColor } from './upgrades.js?v=1.33.0-p5c3';
 import { CHARACTERS } from './characters.js?v=1.33.0-p5c3';
 import { KIT } from './allies.js?v=1.33.0-p5c3';
+import * as P5 from './phase5.js?v=1.33.0-p5c3'; // CoreBurnZ Phase 5A/5B
 
 // The camera looks at the arena from the +X/+Z corner. These are the floor directions
 // that match "up the screen" and "right on the screen", so W always moves up the screen.
@@ -206,6 +207,7 @@ export class Player {
     this.powers = {};                 // active power-ups (type -> { time, max, hits })
     this.loadout.mastery = RULES.z ? (this.masteryNodes || []) : []; // CoreBurnZ hero mastery
     this.mJobs = [];
+    P5.p5Reset(this); // Phase 5 state (all timers / charges / team links) starts clean every run
     this.loadout.reset();
     if (this.startCard) { this.loadout.levels[this.startCard] = 1; this.loadout.version++; this.loadout.recompute(); } // shop starting perk
     this.applyLoadout();
@@ -258,6 +260,7 @@ export class Player {
     }
     if (this.standT > 0) this.standT -= dt; // MYTHIC Last Stand buff
     if (this.wraths?.length) this.wrathUpdate(dt);
+    if (RULES.z) P5.p5Tick(this, dt);
     this.comboGrace -= dt;
     this.attackBuffer -= dt;
     this.hurtTimer -= dt;
@@ -302,15 +305,17 @@ export class Player {
     if (this.mobBuffer > 0 && this.dashCharges > 0 && (this.state === 'normal' || this.state === 'attack')) {
       this.mobBuffer = 0;
       this.useMobility(aim);
+      if (RULES.z) P5.p5OnAbility(this, 'mob');
     }
     if (this.ultBuffer > 0 && this.spinCooldown <= 0 && this.state !== 'dash' && this.state !== 'spin') {
       this.ultBuffer = 0;
       this.useUltimate();
+      if (RULES.z) P5.p5OnAbility(this, 'ult');
     }
 
     this.stateTime += dt;
     this.velocity.set(0, 0, 0);
-    const walk = this.char.speed * (zHero(this.char.id).speed || 1) * this.stats.speed * (1 + 0.03 * (this.flow || 0)); // CoreBurnZ Flow
+    const walk = this.char.speed * (zHero(this.char.id).speed || 1) * this.stats.speed * (1 + 0.03 * (this.flow || 0)) * (RULES.z ? P5.p5Speed(this) : 1); // CoreBurnZ Flow (+ Phase 5 Vents / Overdrive Engine)
 
     switch (this.state) {
       case 'normal':
@@ -569,6 +574,7 @@ export class Player {
       if (RULES.z && !zal && this.kit === 'sarrow') this.world.allies?.addBleed(this, e, fin ? 2 : 1); // CoreBurnZ BLEED
     }
     if (zal && fin) this.world.effects.spawnRing(this.position.clone().addScaledVector(forward, 1.8), 0xffa030, 1.6, 0.3);
+    if (zal && RULES.z && !this.world.netClient) P5.p5ZalBash(this, forward); // JUGGERNAUT COUNTER (after a block)
     // Shockwave Finisher (Sarrow): the 3rd hit sends out a ring that hits everything around you
     if (fin && s.shock > 0) {
       const radius = 2.8 + 0.3 * s.shock, pct = 0.24 + 0.07 * s.shock;
@@ -636,7 +642,9 @@ export class Player {
           kx = side.x * k; kz = side.z * k;
         }
         this.strike(e, this.char.dashDmg * (zal ? this.stats.chargeDmg : this.stats.dashDmg), kx, kz, zal, 'dash');
+        const bled = !zal && RULES.z && this.kit === 'sarrow' && !!e.bleed?.stacks;
         if (!zal && RULES.z && this.kit === 'sarrow') this.world.allies?.burstBleed(this, e); // CoreBurnZ: Blink bursts BLEED
+        if (bled && !this.world.netClient) P5.p5Bloodstep(this, e, true); // BLOODSTEP COMBO
         if (zal) this.stun(e, this.char.chargeStun + this.stats.chargeStun); // after the hit (a hit resets the flinch timer)
         if (zal && RULES.z && !e.isBoss && !e.dead && (this.dragged ||= []).length < ZK.dragMax) this.dragged.push(e); // CoreBurnZ: carried along
         this.world.effects.spawnSparks(e.position.clone().setY(1.1), zal ? 0xffd090 : 0x9ffff5, zal ? 10 : 6);
@@ -799,7 +807,7 @@ export class Player {
         this.world.effects.spawnRing(this.position, 0xffd27a, 1.1, 0.4);
         this.world.effects.spawnSparks(this.position.clone().setY(1.3), 0xffd27a, 6, 3);
       }
-    } else this.world.allies?.fireNeedle(this, this.position, aim, nd.damage, opts);
+    } else this.world.allies?.fireNeedle(this, this.position, aim, nd.damage, RULES.z && this.kit === 'iskra' ? P5.p5RelayOpts(this, opts, aim) : opts); // NEEDLE RELAY after a hop
     for (let i = 1; i <= (star ? 0 : s.split); i++) {
       for (const sgn of [-1, 1]) {
         const a = this.facing + sgn * 0.16 * i;
@@ -867,6 +875,7 @@ export class Player {
     if (marked) { // consume the mark: bonus hit + part of the cooldown back (once per 1.2s)
       t.markT = 0;
       if (t.canBeHit) this.strike(t, c.stepDmg * s.stepDmg * c.markBonus, 0, 0, true, 'dash');
+      if (RULES.z && !this.world.netClient) P5.p5KageroExec(this, t); // SHADOW EXECUTION
       fx.spawnRing(t.position, 0xff4ad8, 1.6, 0.3);
       if (now - (this.markRefundAt ?? -9) >= c.markRefundCd && this.dashCooldown > 0) { this.markRefundAt = now; this.dashCooldown *= 1 - c.markRefund; }
     }
@@ -930,6 +939,7 @@ export class Player {
     this.world.effects.spawnZap(hand, t.position, col);
     this.strike(t, b.damage, 0, 0, false, 'beam');
     this.stun(t, b.lock); // locked on: the tethered enemy can't move or swing
+    if (RULES.z && !this.world.netClient) P5.p5OrinTether(this, t); // GRAVITY CONDUCTOR
     // chain to the next nearest enemies
     const done = new Set([t]);
     let src = t;
@@ -1065,6 +1075,7 @@ export class Player {
     const wasDead = e.dead;
     e.hit(dmg, kx, kz, heavy);
     if (RULES.z) this.zOnStrike(e, kind, !wasDead && e.dead);
+    if (RULES.z) P5.p5OnStrike(this, e, dmg, kind); // Phase 5 cards / Mythics / team links (ignores its own 'p5' procs)
     if (kind === 'adroneH') { this.world.effects.spawnRing(e.position, 0xffa02a, 1.8, 0.2); for (const o of this.world.enemies.list) if (o !== e && o.canBeHit && o.position.distanceTo(e.position) < 1.8 + o.radius) this.strike(o, base * 0.6, 0, 0, false, 'splash'); }
     this.world.onComboHit?.(); // COMBO +1 per hit
     const attack = ATTACK_KINDS.has(kind);
@@ -1120,6 +1131,7 @@ export class Player {
       else if (over && ax.mine(this, 'asc').length < over) { ax.add(this, 'asc'); made++; }
     }
     if (!made) { this.axClockT = c.overclock; this.world.effects.spawnRing(this.position, 0xff8a3a, 2.4, 0.35); } // at capacity: OVERCLOCK
+    if (RULES.z) P5.p5OnReforge(this); // SWARM DIRECTIVE + REFORGE GUARDIAN LINK
     this.world.effects.spawnRing(this.position, 0xff3a3a, 1.8, 0.3);
     this.world.sfx('powerup');
   }
@@ -1127,6 +1139,7 @@ export class Player {
     const c = this.char, ax = this.swarm;
     this.ascendMax = (echo ? c.ascendTime / 2 : c.ascendTime) + (this.stats.m?.aAscend ? 2 : 0);
     this.ascendT = this.ascendMax;
+    if (RULES.z) P5.p5OnAscend(this); // SWARM DIRECTIVE (longer) + ASCENSION UPLINK pool
     this.dashCharges = this.maxCharges; this.dashCooldown = 0; // Reforge refreshes
     this.world.effects.spawnRing(this.position, 0xff2a3a, 4, 0.5);
     this.world.effects.spawnSparks(this.position.clone().setY(1.5), 0xff3a3a, 24, 9);
@@ -1306,6 +1319,7 @@ export class Player {
         const dx = source.position.x - this.position.x, dz = source.position.z - this.position.z, d = Math.hypot(dx, dz) || 1;
         if ((dx * Math.sin(this.facing) + dz * Math.cos(this.facing)) / d > 0.3) {
           amount *= 1 - (c.block + this.stats.block);
+          if (RULES.z && this.p5) P5.p5OnBlock(this); // JUGGERNAUT COUNTER ready
           this.world.effects.spawnSparks(this.position.clone().addScaledVector(this.facingDir, 0.8).setY(1.2), 0xffd090, 4);
         }
       }
@@ -1313,6 +1327,7 @@ export class Player {
     if (this.stats.shell && this.world.allies?.drones.some((d) => d.owner === this && d.life > 0)) amount *= 1 - this.stats.shell; // ORIN: Hymn Shell
     if (this.kit === 'axiom') { const ax = this.world.allies?.axiom; if (ax) { if (this.stats.axPlating) amount *= 1 - Math.min(0.2, 0.02 * ax.mine(this).length); if (source && (source.elite || source.isBoss) && Math.random() < 0.35) ax.lose(this, 1); } } // Reactive Plating / elites + bosses smash a drone
     amount *= this.stats.hurtMult || 1;                   // cursed cards (Greed Engine, Glass Heart)
+    if (this.p5?.guard) amount *= P5.p5DamageTaken(this); // Phase 5 REFORGE GUARDIAN LINK (co-op, one 15% at most)
     if (this.shieldHp > 0) {                              // ZALEKS' slam shield soaks it first
       const soak = Math.min(this.shieldHp, amount);
       this.shieldHp -= soak;
@@ -1325,6 +1340,7 @@ export class Player {
       this.addRage(amount * ZK.rageHurt);
     }
     this.hp -= amount;
+    if (RULES.z && this.p5 && amount > 0) P5.p5OnHurt(this, amount); // Phase 5 Kinetic Plating / Emergency Vents
     source?.onHurtHero?.(amount);                       // CoreBurnZ: Vampiric affix heals off you
     this.hurtTimer = 0.15;
     this.timeSinceHit = 0;

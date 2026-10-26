@@ -3,6 +3,7 @@
 // Drones: permanent (count against capacity), 'asc' (Ascension extras, explode at the end) or
 // 'evo' (Extinction Protocol, 12s). Elites and bosses that touch a drone wear it down fast; normal enemies chip them slowly (v1.28.1).
 import * as THREE from 'three';
+import { p5Focus } from './phase5.js?v=1.33.0-p5c3';
 
 const POOL = 48;
 export const AX = { hp: 2.5, eliteTouch: 1, bossTouch: 2.2, normTouch: 0.15, ringR: 1.6, wingR: 2.6, ascBoom: 2.5, evoLife: 12, evoMax: 4, eliteEvery: 20, eliteMax: 3 };
@@ -122,8 +123,9 @@ export class AxiomSwarm {
     o.axCd = c.droneRate / rate;
     const range = c.droneRange * (s.m?.aRange ? 1.2 : 1);
     const shots = [];
+    const f = p5Focus(o); // Phase 5 SWARM DIRECTIVE: the swarm focuses its priority target while it is in range
     for (const d of ds) {
-      const t = this.nearest(d.obj.position, range); if (!t) continue;
+      const t = (f && Math.hypot(f.position.x - d.obj.position.x, f.position.z - d.obj.position.z) < range) ? f : this.nearest(d.obj.position, range); if (!t) continue;
       const k = (d.elite ? 2 : 1);
       for (let j = 0; j < k; j++) shots.push([d, t, d.elite && asc ? 1.5 : 1]);
     }

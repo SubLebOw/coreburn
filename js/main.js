@@ -1184,4 +1184,11 @@ if (LOCAL_DEV) {
     .then((m) => m.install({ renderer, scene, showcase, player, enemies, world, progress, allies, arena, powerups, projectiles, effects, hud, sound, ads, startGame, snapCamera: () => updateCamera(0, true), getScore: () => score, combo, meta, twitch, input, getState: () => state, getLastRun: () => lastRun, getMode: () => mode, bursts, openPicker: () => { normalPick = true; openUpgradePicker(); } }))
     .catch(() => {}); // no dev file = no helpers, that's fine
 }
+// DEV TOOLS (js/dev-tools.js): only when index.html's gate loaded js/dev-boot.js (?dev=1 on the preview /
+// localhost). Not in the production build; if the file is missing nothing happens.
+if (window.__CB_DEV && !IS_NATIVE) {
+  import('./dev-tools.js?v=1.33.0-p5c3')
+    .then((m) => m.install({ player, enemies, world, events, arena, allies, projectiles, effects, hud, startGame, getState: () => state, getRun: () => run, getTransition: () => transition, getMode: () => mode, setMode: (m) => { mode = m; }, openPicker: () => { normalPick = true; openUpgradePicker(); } }))
+    .catch(() => {});
+}
 window.__cbReady = true; // boot failsafe in index.html checks this

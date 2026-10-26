@@ -9,6 +9,8 @@
 import * as THREE from 'three';
 import { CHARACTERS } from './characters.js?v=1.33.0-p5c3';
 import { AxiomSwarm } from './axiom.js?v=1.33.0-p5c3';
+import { RULES } from './rules.js?v=1.33.0-p5c3';
+import { p5CloneTarget } from './phase5.js?v=1.33.0-p5c3';
 
 // Returning Edge: stuck 2s, fly home, orbit 2s (hit each enemy at most every 0.45s for 30% of the return hit)
 const RET_TIME = 2.0, ORBIT_TIME = 2.0, ORBIT_R = 1.7, ORBIT_HIT_CD = 0.45, ORBIT_DMG = 0.3, REFUND_CAP = 0.5;
@@ -569,8 +571,8 @@ export class Allies {
       // on its own when you're not throwing: a slower throw at the nearest enemy
       c.idle += dt; c.cd -= dt;
       if (c.idle > 0.6 && c.cd <= 0) {
-        let best = null, bd = 12;
-        for (const e of enemies) { if (!e.canBeHit) continue; const d = e.position.distanceTo(c.position); if (d < bd) { bd = d; best = e; } }
+        let best = RULES.z ? p5CloneTarget(c, enemies) : null, bd = 12; // Phase 5 SHADOW EXECUTION: marked enemies first
+        if (!best) for (const e of enemies) { if (!e.canBeHit) continue; const d = e.position.distanceTo(c.position); if (d < bd) { bd = d; best = e; } }
         if (best) { c.cd = 0.45; this.cloneFire(c, best); }
       }
       if (c.idle > 0.6 && c.cd > 0.2) c.facing += Math.atan2(Math.sin(o.facing - c.facing), Math.cos(o.facing - c.facing)) * Math.min(1, dt * 6);

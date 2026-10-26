@@ -67,4 +67,15 @@ No merge, version bump or deploy. PR #7 is not touched.
 - DONE dev inspector boss picker (?dev=1): 12 buttons, jump-to-wave / spawn-here, remove bosses; mobile-sized buttons.
 - DONE in-game fights (pw/p5c-boss-fight.mjs, desktop+mobile+baseline): all 12 spawn clear of obstacles, phase 2 fires, attacks seen, exactly 1 onBossKilled + 1 BOSS RELIC each, stats.zBosses reaches 12, all 5 arenas covered, 0 JS errors, no boss left in list / no scene growth. Baseline behaves identically.
 - Perf (calls/tris all 12 in one scene): 257/4.5k -> 281/17.4k.
-- TODO: before/after per-pose shot pairs, Phase 4 events, Variant E 24, save/resume across boss wave, boss+crowd perf, sim co-op, optional mechanics (3-4 bosses), PR body.
+
+### Stage 2A — review-ready checks (2026-10-27, all vs v1.33.0 on :8011)
+- Boss-fight harness (fixed relic-picker handling) — desktop, mobile AND v1.33.0 all clean: 12/12 spawn clear, phase 2, 1 kill + 1 BOSS RELIC each, zBosses 1..12, 5 arenas, 0 JS errors.
+- Rivetjaw "lingering": NOT a bug and identical on v1.33.0. Every boss keeps its 2.2 s death animation; the boss relic picker pauses the game (state 'upgrade') so the dead boss stays in the list until the card is picked. Measured the same for Choirmother/Bellows/Rivetjaw/Tithe/Nail on both builds. No fix.
+- Phase 4 events (pw/p5c-boss-events.mjs, desktop+mobile): boss waves 25/30 never start an event (main.js isBossWave gate), wave after a boss can; identical to v1.33.0, 0 errors.
+- Variant E: UNIT PASS (24 checks), 0 errors.
+- Save/resume (pw/p5c-boss-save.mjs): Save&Quit mid-boss (w25) resumes at w25 with the same boss, killing it = 1 onBossKilled, zBosses +1 once; save at w26 resumes with no boss, no extra kill. Identical to v1.33.0.
+- Perf (pw/p5c-boss-perf.mjs, Nail Chorus + 24 mixed crowd, SwiftShader software GL, mobile = emulated viewport): v1.33.0 desktop 466 calls / 8.1k tris / median 61.5 ms, phase5c 395 calls / 20.6k tris / 69.1 ms; mobile 475/8.3k/65.3 ms -> 402/20.7k/62.8 ms. Frame times are CPU-rasterizer bound; not representative of real GPUs.
+- Simulated co-op (pw/p5c-boss-coopsim.mjs — SIMULATED in one browser: host snapshot tuple replayed into a client-style puppet): 12/12 puppets show the same telegraphs as the host, play death, 0 exceptions, 0 kill callbacks and 0 relic toasts from the puppet, root removed. coop.js unchanged. Same on v1.33.0.
+- Cleanup (pw/p5c-boss-clean.mjs: Vell, twins, Hymnworks, Nail, Klaxon): boss roots/beams gone from scene and list after death; remaining new scene children are arena/wave groups, same pattern on v1.33.0.
+- Dev gate: no flag -> no dev requests/panel; ?dev=1 -> inspector; sublebow.github.io + https://localhost (Capacitor) with ?dev=1 -> no dev code; build-web dry run (temp copy) ships 0 dev-*/.local files. Mobile boss picker tap test (jump + spawn here + remove) OK: shots/phase5c/boss/dev-picker-mobile-*.png.
+- Nail Chorus trim: head throats/eyes share one glow mat (no per-head pulse) 48 -> 43 calls; fingerprint still IDENTICAL.

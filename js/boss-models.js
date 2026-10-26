@@ -341,8 +341,8 @@ const DRESS = {
     b.heads.forEach((h, i) => {
       k.box(h, 'metal', 0.28, 0.06, 0.26, 0, 0.16, 0);
       k.cone(h, 'mask', 0.03, 0.22 + (i % 2) * 0.1, 4, 0, 0.3, -0.02);
-      const m = k.box(h, 0x9ad8ff, 0.1, 0.05, 0.02, 0, -0.06, 0.125); k.pulse(m, 0.5, 11 + i);
-      k.box(h, 0xd8f0ff, 0.04, 0.03, 0.02, 0.06, 0.05, 0.115); k.box(h, 0xd8f0ff, 0.04, 0.03, 0.02, -0.06, 0.05, 0.115);
+      k.box(h, 0x9ad8ff, 0.1, 0.05, 0.02, 0, -0.06, 0.125); // glowing throat + eyes share one glow material, so each head merges to 3 draws
+      k.box(h, 0x9ad8ff, 0.04, 0.03, 0.02, 0.06, 0.05, 0.115); k.box(h, 0x9ad8ff, 0.04, 0.03, 0.02, -0.06, 0.05, 0.115);
     });
     const wheel = k.grp(B, 0, 2.55, -0.55); k.spin(wheel, 'z', 0.5, 7);
     k.tor(wheel, 'metal', 0.95, 0.05, 0, 0, 0, 0, 0, 0, 28);

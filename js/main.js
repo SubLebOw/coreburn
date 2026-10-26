@@ -1185,7 +1185,7 @@ if (LOCAL_DEV) {
 // localhost). Not in the production build; if the file is missing nothing happens.
 if (window.__CB_DEV && !IS_NATIVE) {
   import('./dev-tools.js?v=1.33.0')
-    .then((m) => m.install({ player, enemies, world, events, arena, allies, projectiles, effects, hud, startGame, getState: () => state, getRun: () => run, getMode: () => mode, setMode: (m) => { mode = m; }, openPicker: () => { normalPick = true; openUpgradePicker(); } }))
+    .then((m) => m.install({ player, enemies, world, events, arena, allies, projectiles, effects, hud, startGame, getState: () => state, getRun: () => run, getTransition: () => transition, getMode: () => mode, setMode: (m) => { mode = m; }, openPicker: () => { normalPick = true; openUpgradePicker(); } }))
     .catch(() => {});
 }
 window.__cbReady = true; // boot failsafe in index.html checks this

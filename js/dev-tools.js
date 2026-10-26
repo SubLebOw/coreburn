@@ -52,9 +52,9 @@ export function install(c) {
   const css = document.createElement('style');
   css.textContent = `#cbdev-badge{position:fixed;left:50%;top:2px;transform:translateX(-50%);z-index:2147483600;background:#ff2bd6;color:#000;font:700 11px monospace;padding:2px 8px;border-radius:0 0 6px 6px;pointer-events:none}
 #cbdev-btn{position:fixed;left:6px;bottom:6px;z-index:2147483601;width:44px;height:44px;border-radius:50%;border:2px solid #ff2bd6;background:#000c;color:#ff2bd6;font:700 12px monospace;touch-action:manipulation}
-#cbdev{position:fixed;left:56px;bottom:6px;z-index:2147483601;width:min(420px,calc(100vw - 64px));max-height:calc(100vh - 30px);overflow:auto;background:#0b0710f0;border:2px solid #ff2bd6;border-radius:8px;color:#eee;font:12px monospace;padding:6px;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+#cbdev{position:fixed;left:56px;bottom:6px;z-index:2147483601;width:min(420px,calc(100vw - 64px));max-height:calc(100vh - 30px);max-height:calc(100dvh - 30px);overflow-y:auto;overscroll-behavior:contain;background:#0b0710f0;border:2px solid #ff2bd6;border-radius:8px;color:#eee;font:12px monospace;padding:6px;touch-action:pan-y;-webkit-overflow-scrolling:touch}
 #cbdev.hidden{display:none}#cbdev h4{margin:6px 0 3px;color:#ff8af0;font-size:11px}#cbdev button{margin:2px;padding:6px 7px;min-height:30px;background:#2a1830;color:#fff;border:1px solid #ff2bd655;border-radius:4px;font:11px monospace}
-#cbdev .row{display:flex;flex-wrap:wrap;align-items:center}#cbdev .nm{width:150px}#cbdev .msg{color:#7ff;min-height:14px}#cbdev .on{background:#ff2bd6;color:#000}`;
+#cbdev .row{display:flex;flex-wrap:wrap;align-items:center}#cbdev .nm{width:150px}#cbdev .msg{color:#7ff;min-height:14px}#cbdev .on{background:#ff2bd6;color:#000}#cbdev .hd{position:sticky;top:-6px;z-index:1;background:#0b0710;display:flex;align-items:center;justify-content:space-between;margin:-6px -6px 0;padding:4px 6px;border-bottom:1px solid #ff2bd655}#cbdev .hd button{min-width:40px}`;
   document.head.appendChild(css);
   const badge = el('div', { id: 'cbdev-badge' }, 'DEV TOOLS — not saved');
   const btn = el('button', { id: 'cbdev-btn' }, 'DEV');
@@ -62,7 +62,8 @@ export function install(c) {
   const msg = el('div', { class: 'msg' });
   const run = (f) => () => { try { const r = f(); msg.textContent = '✓ ' + (r ?? 'ok'); } catch (e) { msg.textContent = '✗ ' + e.message; } };
   const row = (label, btns) => { const r = el('div', { class: 'row' }); if (label) r.appendChild(el('span', { class: 'nm' }, label)); for (const [t, f] of btns) { const b = el('button', {}, t); b.onclick = run(f); r.appendChild(b); } return r; };
-  pan.append(el('div', {}, 'DEV TOOLS — sandboxed, nothing is saved to your real profile'), msg);
+  const hd = el('div', { class: 'hd' }); const x = el('button', { id: 'cbdev-close' }, '✕ CLOSE'); x.onclick = () => pan.classList.add('hidden');
+  hd.append(el('span', {}, 'DEV TOOLS — sandboxed, not saved'), x); pan.append(hd, msg);
   pan.append(el('h4', {}, 'START RUN (CoreBurnZ, locks bypassed)'), row('', HEROES.map(([id, n]) => [n, () => api.start(id)])));
   pan.append(el('h4', {}, 'NEW CARDS'));
   for (const [id, n] of CARDS) pan.append(row(n, [0, 1, 2, 3].map((lv) => ['L' + lv, () => api.grant(id, lv)])));
@@ -74,7 +75,7 @@ export function install(c) {
   const godB = el('button', {}, 'God mode: OFF'); godB.onclick = () => { const on = api.god(); godB.textContent = 'God mode: ' + (on ? 'ON' : 'OFF'); godB.classList.toggle('on', on); };
   const r2 = row('', [['Full heal', () => api.heal()], ['Reset sandbox', () => api.resetSandbox()]]); r2.prepend(godB); pan.append(el('h4', {}, 'PLAYER'), r2);
   btn.onclick = () => pan.classList.toggle('hidden');
-  for (const n of [btn, pan]) for (const ev of ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'keydown']) n.addEventListener(ev, (e) => e.stopPropagation()); // keep taps out of the game's input
+  for (const n of [btn, pan]) for (const ev of ['pointerdown', 'pointermove', 'pointerup', 'touchstart', 'touchmove', 'touchend', 'mousedown', 'wheel', 'keydown']) n.addEventListener(ev, (e) => e.stopPropagation(), { passive: true }); // keep taps out of the game's input
   document.body.append(badge, btn, pan);
 }
 function el(tag, attrs = {}, text) { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (text != null) e.textContent = text; return e; }

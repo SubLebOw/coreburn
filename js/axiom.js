@@ -3,7 +3,7 @@
 // Drones: permanent (count against capacity), 'asc' (Ascension extras, explode at the end) or
 // 'evo' (Extinction Protocol, 12s). Elites and bosses that touch a drone wear it down fast; normal enemies chip them slowly (v1.28.1).
 import * as THREE from 'three';
-import { p5Focus } from './phase5.js?v=1.33.0-p5c3';
+import { p5Focus } from './phase5.js?v=1.34.0';
 
 const POOL = 48;
 export const AX = { hp: 2.5, eliteTouch: 1, bossTouch: 2.2, normTouch: 0.15, ringR: 1.6, wingR: 2.6, ascBoom: 2.5, evoLife: 12, evoMax: 4, eliteEvery: 20, eliteMax: 3 };

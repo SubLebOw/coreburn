@@ -2,8 +2,8 @@
 // The COSMETICS screen (title menu and hero select): pick a hero, equip/remove the hats, masks,
 // capes, auras, talon trails and banners you've unlocked by levelling up, and see that hero's five
 // ARENA SKINS (with a spinning 3D preview). Arena skins: AUTO (CoreBurnZ only) / ALWAYS / OFF.
-import { COSMETICS, ARENA_SKINS, SLOTS, SLOT_LABEL, HERO_IDS, xpNeeded, SKIN_VARIANTS, TITLES, PLATES, ACCOUNT_MAX, RARITY } from './progress.js?v=1.33.0-p5c3';
-import { CHARACTERS } from './characters.js?v=1.33.0-p5c3';
+import { COSMETICS, ARENA_SKINS, SLOTS, SLOT_LABEL, HERO_IDS, xpNeeded, SKIN_VARIANTS, TITLES, PLATES, ACCOUNT_MAX, RARITY } from './progress.js?v=1.34.0';
+import { CHARACTERS } from './characters.js?v=1.34.0';
 
 const $ = (id) => document.getElementById(id);
 const hex = (c) => '#' + c.toString(16).padStart(6, '0');

@@ -6,14 +6,14 @@
 //   ISKRA   auto-aimed needles / Phase Hop (2 charges, decoy) / Needle Storm (fan barrage)
 //   ORIN    chaining arc tether/ Magnet Grapple (yank / pull) / Hymn Engine (vortex + drones)
 // Also: core recharge (regen), weapon tier + upgrade cards (upgrades.js), power-ups (powerups.js).
-import { disposeModel } from './hero-models.js?v=1.33.0-p5c3';
+import { disposeModel } from './hero-models.js?v=1.34.0';
 import * as THREE from 'three';
-import { decorateSkin } from './cosmetics.js?v=1.33.0-p5c3';
-import { RULES, zHero } from './rules.js?v=1.33.0-p5c3';
-import { Loadout, tierColor } from './upgrades.js?v=1.33.0-p5c3';
-import { CHARACTERS } from './characters.js?v=1.33.0-p5c3';
-import { KIT } from './allies.js?v=1.33.0-p5c3';
-import * as P5 from './phase5.js?v=1.33.0-p5c3'; // CoreBurnZ Phase 5A/5B
+import { decorateSkin } from './cosmetics.js?v=1.34.0';
+import { RULES, zHero } from './rules.js?v=1.34.0';
+import { Loadout, tierColor } from './upgrades.js?v=1.34.0';
+import { CHARACTERS } from './characters.js?v=1.34.0';
+import { KIT } from './allies.js?v=1.34.0';
+import * as P5 from './phase5.js?v=1.34.0'; // CoreBurnZ Phase 5A/5B
 
 // The camera looks at the arena from the +X/+Z corner. These are the floor directions
 // that match "up the screen" and "right on the screen", so W always moves up the screen.

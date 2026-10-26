@@ -40,7 +40,7 @@ export function install(c) {
     return lv;
   };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const waitTransition = async () => { for (let i = 0; i < 60 && c.getTransition?.(); i++) await sleep(100); };
+  const waitTransition = async () => { for (let i = 0; i < 300 && c.getTransition?.(); i++) await sleep(100); };
 
   // realistic late-game build: what a genuine run has by wave n, from the game's own offer rate
   function realistic(n, h = hero()) {

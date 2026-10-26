@@ -116,6 +116,13 @@ export const UPGRADES = {
   iTar:     { zonly: true, name: 'Tar Mines', heroes: I, group: 'mobility', icon: '◍', color: 0xa060c0, max: 2, desc: () => 'Mine blasts slow enemies by 40% (+1.5s)' },
   iChain:   { zonly: true, name: 'Sympathetic Charge', heroes: I, group: 'mobility', icon: '⁂', color: 0xe070ff, max: 1, desc: () => 'A mine blast sets off your other mines nearby' },
   oWellAmp: { zonly: true, name: 'Event Horizon', heroes: O, group: 'attack', icon: '◎', color: 0x5a8aff, max: 3, desc: () => 'Tether +10% more damage to enemies inside your Gravity Well' },
+  // CoreBurnZ PHASE 5B build cards (universal; effects + tunables in phase5.js). No flat stat bumps: each one rewards a play pattern.
+  p5Momentum: { zonly: true, name: 'Momentum Capacitor', group: 'mobility', icon: '⇶', color: 0x6af0ff, max: 3, desc: (l) => l === 0 ? 'Using your mobility charges your next attack hit (3s): it releases a small kinetic burst' : 'Bigger kinetic burst' },
+  p5Plating:  { zonly: true, name: 'Kinetic Plating', group: 'core', icon: '⛉', color: 0xffb060, max: 3, desc: (l) => l === 0 ? 'Survive a heavy hit (8%+ of max health): 0.5s later you release a knockback shockwave (7s cooldown)' : '-1s shockwave cooldown' },
+  p5Conductor:{ zonly: true, name: 'Conductor Matrix', group: 'attack', icon: '⌁', color: 0x7ae8ff, max: 3, desc: (l) => l === 0 ? 'Attack hits on enemies with a status (bleed, mark, stun, slow, Gravity Well) arc to 2 more foes (1.5s per target)' : l === 2 ? 'Arcs reach 3 foes, more damage' : 'Arcs hit harder' },
+  p5Overload: { zonly: true, name: 'Overload Circuit', group: 'ultimate', icon: '⚡', color: 0xffd040, max: 2, desc: (l) => l === 0 ? 'Switching between attacks and abilities builds energy: at 4, your next attack hit bursts (4s cooldown)' : 'Bursts at 3 energy and hit harder' },
+  p5Vents:    { zonly: true, name: 'Emergency Vents', group: 'core', icon: '♨', color: 0xc8f0ff, max: 2, desc: (l) => l === 0 ? 'Dropping below 35% health vents: +30% speed for 2.5s and slows nearby enemies (25s cooldown). Not a death save' : 'Vent cooldown 20s' },
+  p5Echo:     { zonly: true, name: 'Echo Chamber', group: 'ultimate', icon: '◌', color: 0x9affc8, max: 3, desc: (l) => l === 0 ? 'Ability hits store echo charge: at 5, your next attack hit echoes onto its target and one more foe' : 'Stronger echo' },
 
 };
 // COREBURNZ BOSS CARDS: one gold pick after every boss kill (never in the normal pool). Rarer and
@@ -152,6 +159,10 @@ export const EVOLUTIONS = {
   eSingular:EV({ name: 'Singularity', icon: '◎', heroes: O, needs: ['oGrapple', 'oVortex'], text: 'Gravity Well +40% bigger, +1.5s, and detonates when it ends' }),
   eExtinct:EV({ name: 'Extinction Protocol', icon: '☢', heroes: A, needs: ['axFactory', 'axFeedback'], text: 'Every 5 drone kills builds a temporary drone (max 4, 12s, not counted against capacity)' }),
   eLegion: EV({ name: 'Shadow Legion', icon: '⧉', heroes: N, needs: ['nShade', 'nMirror'], text: 'Shadow Clone +15% of your damage and lasts 2s longer' }),
+  // PHASE 5B (phase5.js)
+  eOverdrive:EV({ name: 'Overdrive Engine', icon: '⇶', needs: ['p5Momentum', 'speed'], text: '5 attack hits within 2s of moving = 3s OVERDRIVE: +20% speed and every attack hit pulses (10s cooldown). Replaces the capacitor burst while active' }),
+  eAegis:   EV({ name: 'Reactive Aegis', icon: '⛉', needs: ['p5Plating', 'maxHp'], text: 'Plating shockwave is bigger and stuns; go 2s without being hit after it for a second recovery pulse' }),
+  eCascade: EV({ name: 'Resonance Cascade', icon: '⌁', needs: ['p5Conductor', 'storm'], text: 'Conductor arcs on enemies with 2+ statuses cascade through 5 foes (fading) and slow them' }),
 };
 // COREBURNZ MYTHIC CARDS (v1.27): from wave 75, about one offer per 5 waves takes a slot in a normal pick.
 // Hold at most 3. They change how a hero plays (effects live in player.js / allies.js, read from stats.my*).
@@ -167,6 +178,10 @@ export const MYTHICS = {
   myGlass:   MY({ name: 'Glass Cannon', icon: '◈', text: 'x2 damage, but health orbs no longer heal you' }),
   myClock:   MY({ name: 'Overclock', icon: '⧗', text: 'Every 30s: 5s with no Blink or ultimate cooldowns' }),
   myStand:   MY({ name: 'Last Stand', icon: '♛', text: 'Once per boss wave, lethal damage leaves you at 1 HP with +50% damage for 5s' }),
+  // PHASE 5B (phase5.js)
+  myRift:    MY({ name: 'Graviton Rift', icon: '◍', text: 'Every 25 attack hits tears a gravity rift at your target for 2.5s: drags foes in, crushes them, then collapses (10s cooldown; bosses only slowed)' }),
+  myParadox: MY({ name: 'Paradox Engine', icon: '∞', text: 'Alternate attacks and abilities 6 times: 5s PARADOX, attack hits fracture in bursts, one free mobility charge, and it ends in a collapse blast (15s cooldown)' }),
+  myWarforge:MY({ name: 'Warforge Array', icon: '⚙', text: 'Every 12s your next 5 attack hits forge 2 phantom gun drones that fire an extra bolt at the target' }),
 };
 export const MYTHIC_FROM_WAVE = 75, MYTHIC_EVERY = 5, MYTHIC_MAX = 3;
 export const GROUP_LABELS = { mythic: 'MYTHIC', evolved: 'EVOLVED', attack: 'ATTACK', mobility: 'MOBILITY', ultimate: 'ULTIMATE', core: 'CORE', cursed: 'CURSED', boss: 'BOSS RELIC' };
@@ -349,6 +364,7 @@ export class Loadout {
     // CoreBurnZ MYTHICS
     s.myCuts = L('myCuts'); s.myTempest = L('myTempest'); s.myWrath = L('myWrath'); s.myField = L('myField'); s.myCollapse = L('myCollapse');
     s.axCap = L('axCap'); s.axFactory = L('axFactory'); s.axServo = 0.15 * L('axServo'); s.axPayload = L('axPayload'); s.axFeedback = L('axFeedback'); s.axPlating = L('axPlating'); s.axEvo = L('eExtinct'); s.myAxSing = L('myAxSing');
+    s.p5 = { momentum: L('p5Momentum'), plating: L('p5Plating'), conductor: L('p5Conductor'), overload: L('p5Overload'), vents: L('p5Vents'), echo: L('p5Echo'), overdrive: L('eOverdrive'), aegis: L('eAegis'), cascade: L('eCascade'), rift: L('myRift'), paradox: L('myParadox'), warforge: L('myWarforge') }; // PHASE 5
     s.myEcho = L('myEcho'); s.myClock = L('myClock'); s.myStand = L('myStand'); s.noOrbHeal = L('myGlass');
     if (L('myGlass')) s.dmg *= 2;
     // CoreBurnZ v1.26 kits

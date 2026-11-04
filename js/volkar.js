@@ -15,7 +15,7 @@ const now = () => performance.now() / 1000;
 const isShocked = (e) => (e.vShockUntil || 0) > now();
 
 // ---------------- pooled VFX (one per scene) ----------------
-const BOLTS = 8, ARCS = 18, TELES = 10;
+const BOLTS = 8, ARCS = 18, TELES = 10, CRACKS = 4, PTRS = 6;
 class VolkarFX {
   constructor(scene) {
     this.scene = scene;
@@ -33,7 +33,22 @@ class VolkarFX {
       const ring = new THREE.Mesh(ringGeo, this.teleMat), fill = new THREE.Mesh(discGeo, this.fillMat);
       ring.visible = fill.visible = false; scene.add(ring); scene.add(fill); return { ring, fill, life: 0, max: 1, r: 1 };
     });
+    // v2: maul-slam ground cracks (3 flat dark shards each) and Skyfall direction pointers (flat chevrons at the hero's feet
+    // that point at far / off-screen marked targets for the telegraph's whole duration). Opaque, pooled, made once.
+    this.crackMat = new THREE.MeshBasicMaterial({ color: 0x0a0d12 });
+    this.cracks = Array.from({ length: CRACKS }, () => ({ segs: [0, 1, 2, 3].map(() => mk(this.crackMat)), life: 0 }));
+    const chev = new THREE.ConeGeometry(0.32, 0.9, 3); chev.rotateX(Math.PI / 2); chev.scale(1, 0.15, 1);
+    this.ptrMat = new THREE.MeshBasicMaterial({ color: 0x6ae4ff });
+    this.ptrs = Array.from({ length: PTRS }, () => { const m = new THREE.Mesh(chev, this.ptrMat); m.visible = false; m.frustumCulled = false; scene.add(m); return { m, life: 0 }; });
   }
+  crack(pos, dir, size) { // radiating dark shards on the floor at a slam impact
+    const c = this.cracks.find((x) => x.life <= 0) || this.cracks[0];
+    c.life = 0.6; const base = Math.atan2(dir.x, dir.z);
+    c.segs.forEach((m, i) => { const a = base + (i - 1.5) * 0.9 + (Math.random() - 0.5) * 0.4, L = size * (0.7 + Math.random() * 0.5);
+      m.position.set(pos.x + Math.sin(a) * L * 0.5, 0.03, pos.z + Math.cos(a) * L * 0.5); m.rotation.set(0, a, 0); m.quaternion.setFromEuler(m.rotation); m.scale.set(0.09, 0.02, L); m.visible = true; });
+  }
+  ptr(life) { const q = this.ptrs.find((x) => x.life <= 0) || this.ptrs[0]; q.life = life; q.m.visible = true; return q; }
+  aimPtr(q, from, to) { const dx = to.x - from.x, dz = to.z - from.z, d = Math.hypot(dx, dz) || 1; q.m.position.set(from.x + dx / d * 1.9, 0.12, from.z + dz / d * 1.9); q.m.rotation.set(0, Math.atan2(dx, dz), 0); }
   _jag(segs, pts) {
     const up = _up;
     segs.forEach((m, i) => {
@@ -66,6 +81,8 @@ class VolkarFX {
   update(dt) {
     for (const b of this.bolts) if (b.life > 0 && (b.life -= dt) <= 0) for (const s of b.segs) s.visible = false;
     for (const z of this.arcs) if (z.life > 0 && (z.life -= dt) <= 0) for (const s of z.segs) s.visible = false;
+    for (const c of this.cracks) if (c.life > 0 && (c.life -= dt) <= 0) for (const s of c.segs) s.visible = false;
+    for (const q of this.ptrs) if (q.life > 0 && (q.life -= dt) <= 0) q.m.visible = false;
     for (const t of this.teles) {
       if (t.life <= 0) continue;
       t.life -= dt;
@@ -73,7 +90,7 @@ class VolkarFX {
       t.fill.scale.setScalar(Math.max(0.01, t.r * (1 - t.life / t.max)));
     }
   }
-  clear() { for (const b of [...this.bolts, ...this.arcs]) { b.life = 0; for (const s of b.segs) s.visible = false; } for (const t of this.teles) { t.life = 0; t.ring.visible = t.fill.visible = false; } }
+  clear() { for (const b of [...this.bolts, ...this.arcs]) { b.life = 0; for (const s of b.segs) s.visible = false; } for (const t of this.teles) { t.life = 0; t.ring.visible = t.fill.visible = false; } for (const c of this.cracks) { c.life = 0; for (const s of c.segs) s.visible = false; } for (const q of this.ptrs) { q.life = 0; q.m.visible = false; } }
   get live() { return this.bolts.filter((b) => b.life > 0).length + this.arcs.filter((b) => b.life > 0).length + this.teles.filter((t) => t.life > 0).length; }
 }
 const _up = new THREE.Vector3(0, 1, 0), _v = new THREE.Vector3();
@@ -157,15 +174,31 @@ export function onMaulHit(p, e, swingDmg, struck) {
 export function onSwingStart(p) { p.vk.swingGain = 0; p.vk.discharge = p.vk.charge >= chargeMax(p); if (p.vk.discharge) p.world.sfx('vMark'); }
 export const swingMult = (p) => (p.vk?.empowerT > 0 ? 1 + p.char.surge.empowerPct : 1);
 // after the swing's own hits: the Ground Discharge
+// v2: every maul hit is an overhead SLAM; this is the visual ground impact (no damage, purely cosmetic).
+// Hits 1-2 are quick slams, the 3rd a heavier one; a Ground Discharge is the same slam, bigger again.
+function slamImpact(p, forward, heavy, discharge) {
+  const at = p.position.clone().addScaledVector(forward, 1.6), fx = p.world.effects, f = vfx(p);
+  const big = discharge ? 1.9 : heavy ? 1.35 : 1;
+  fx.spawnRing(at, discharge ? 0x4ad8ff : 0x9adfff, 1.3 * big, 0.25);
+  fx.localSparks(at.clone().setY(0.2), 0x7a6a58, heavy || discharge ? 10 : 6, 4); // dust
+  fx.localSparks(at.clone().setY(0.3), 0xe8fbff, heavy || discharge ? 8 : 4, 5); // static flash
+  f.crack(at, forward, 1.1 * big);
+  f.arc(at, at.clone().add(new THREE.Vector3(forward.z, 0, -forward.x).multiplyScalar(1.2 * big)));
+  f.arc(at, at.clone().add(new THREE.Vector3(-forward.z, 0, forward.x).multiplyScalar(1.2 * big)));
+  if (heavy && !discharge) f.bolt(at);
+  if (!discharge) p.world.shake(heavy ? 0.28 : 0.14);
+  return at;
+}
 export function afterSwing(p, forward, struck) {
-  const v = p.vk;
-  if (!v.discharge) return;
+  const v = p.vk, heavy = p.comboStep >= p.combo.length;
+  if (!v.discharge) { slamImpact(p, forward, heavy, false); return; }
   v.discharge = false; v.charge = 0;
   const d = p.char.charge.discharge, at = p.position.clone().addScaledVector(forward, 1.2), fx = p.world.effects;
+  slamImpact(p, forward, true, true);
   fx.spawnRing(at, 0x4ad8ff, d.r, 0.35); fx.spawnRing(at, 0xe8fbff, d.r * 0.55, 0.22);
   fx.spawnSparks(at.clone().setY(0.5), 0x9ae8ff, 16, 8);
-  vfx(p).bolt(at);
-  p.world.sfx('vDischarge'); p.world.shake(0.5); p.world.hitstop(0.06);
+  vfx(p).bolt(at); vfx(p).bolt(at.clone().addScaledVector(forward, 0.6));
+  p.world.sfx('vDischarge'); p.world.shake(0.6); p.world.hitstop(0.06);
   const hitSet = new Set();
   for (const e of near(p, at, d.r)) {
     const dx = e.position.x - at.x, dz = e.position.z - at.z, dd = Math.hypot(dx, dz) || 1;
@@ -197,7 +230,8 @@ export function skyfall(p, aim) {
   if (!targets.length) p.vk.strikes.push({ pos: lungeEnd.clone(), t: delay, target: null, r: k.radius, dmg: REF * k.dmg, jumps, kind: 'skyfall', meter: true, tele: vfx(p).tele(lungeEnd, k.radius, delay) });
   for (const [i, e] of targets.entries()) {
     const t = delay + i * 0.08;
-    p.vk.strikes.push({ pos: e.position.clone(), t, target: e, r: k.radius, dmg: REF * k.dmg, jumps, kind: 'skyfall', meter: true, tele: vfx(p).tele(e.position, k.radius, t) });
+    const far = e.position.distanceTo(p.position) > 9; // v2 unlimited range: far / off-screen marks get a chevron at your feet
+    p.vk.strikes.push({ pos: e.position.clone(), t, target: e, r: k.radius, dmg: REF * k.dmg, jumps, kind: 'skyfall', meter: true, tele: vfx(p).tele(e.position, k.radius, t), ptr: far ? vfx(p).ptr(t) : null });
   }
   p.world.sfx('vMark');
   p.world.effects.localRing(p.position, 0x4ad8ff, 1.6, 0.25);
@@ -283,7 +317,8 @@ export function vTick(p, dt) {
   for (let i = v.strikes.length - 1; i >= 0; i--) {
     const st = v.strikes[i]; st.t -= dt;
     if (st.target && st.t > 0.2 && st.target.canBeHit) { st.pos.copy(st.target.position).setY(0); st.tele?.ring.position.set(st.pos.x, 0.05, st.pos.z); st.tele?.fill.position.set(st.pos.x, 0.04, st.pos.z); }
-    if (st.t <= 0) { v.strikes.splice(i, 1); landStrike(p, st); }
+    if (st.ptr) vfx(p).aimPtr(st.ptr, p.position, st.pos);
+    if (st.t <= 0) { v.strikes.splice(i, 1); if (st.ptr) { st.ptr.life = 0; st.ptr.m.visible = false; } landStrike(p, st); }
   }
   // Shocked read: a few pooled cyan sparks on up to 4 Shocked enemies (no per-enemy meshes)
   if ((v.sparkT = (v.sparkT || 0) - dt) <= 0) { v.sparkT = 0.22; let k = 0; for (const e of enemies(p)) { if (k >= 4) break; if (e.canBeHit && isShocked(e)) { k++; p.world.effects.localSparks(e.position.clone().setY(1.2), 0x6ae4ff, 2, 3); } } }

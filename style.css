@@ -1291,7 +1291,7 @@ body:has(#upgrade-overlay.select:not(.hidden)) #touch-controls { opacity: 0; poi
 .rage.storm i { background: linear-gradient(90deg, #2a7aff, #4ad8ff); }
 .rage.storm.full i { background: #bfe8ff; box-shadow: 0 0 8px #4ad8ff; }
 .rage.storm b { font-size: 6px; letter-spacing: 0; }
-#vk-charge { position: absolute; left: 12px; top: 58px; display: flex; gap: 3px; align-items: center; pointer-events: none; font: 900 9px/1 system-ui, sans-serif; color: #bfe8ff; text-shadow: 0 0 3px #000; z-index: 5; }
+#vk-charge { position: absolute; left: 12px; top: 80px; display: flex; gap: 3px; align-items: center; pointer-events: none; font: 900 9px/1 system-ui, sans-serif; color: #bfe8ff; text-shadow: 0 0 3px #000; z-index: 5; }
 #vk-charge b { margin-right: 4px; letter-spacing: 1px; }
 #vk-charge i { width: 9px; height: 9px; border-radius: 2px; background: rgba(0,0,0,.55); border: 1px solid #4ad8ff66; transform: skewX(-12deg); }
 #vk-charge i.on { background: #4ad8ff; box-shadow: 0 0 5px #4ad8ff; }

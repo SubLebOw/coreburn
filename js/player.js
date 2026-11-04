@@ -1469,6 +1469,9 @@ export class Player {
     m.armL.rotation.set(P.guard - swing * P.armSwing * speedRatio + idleArm, 0, 0.15 + P.armOut);
     m.armR.rotation.set(P.guard + swing * P.armSwing * speedRatio - idleArm * P.armAsym, 0, -0.15 - P.armOut);
     if (this.kit === 'thane' && this.state !== 'attack') m.body.rotation.y = 0;
+    if (this.kit === 'thane' && this.state === 'normal') { // v2 idle / run: maul resting on the right shoulder, head up behind it
+      m.armR.rotation.set(-3.65 + Math.sin(now * P.breath) * 0.04 + swing * 0.08 * speedRatio, 0, 0.3);
+    }
     m.idle?.(now, speedRatio); // animated parts: Orin's motes, Axiom's head scan
     this.slashArc.material.opacity = Math.max(0, this.slashArc.material.opacity - dt * 6);
 
@@ -1484,9 +1487,15 @@ export class Player {
       const n = this.combo.length;
       const e = 1 - Math.pow(1 - t, 3); // ease out
       if (kit === 'thane') { // VOLKAR: overhead, back-hand, two-handed uppercut slam (the maul is in the right hand)
-        if (this.comboStep === 1) { m.armR.rotation.set(THREE.MathUtils.lerp(-3.0, -0.7, e), 0, -0.2); m.body.rotation.x = e * 0.2; }
-        else if (this.comboStep === 2) { m.armR.rotation.set(-1.4, 0, THREE.MathUtils.lerp(-1.4, 1.0, e)); m.body.rotation.y = THREE.MathUtils.lerp(0.4, -0.5, e); }
-        else { const x = THREE.MathUtils.lerp(-3.1, -0.5, e); m.armR.rotation.set(x, 0, 0.1); m.armL.rotation.set(x, 0, -0.5); m.body.rotation.x = e * 0.32; m.body.position.y = -0.08 * e; }
+        // v2 OVERHEAD SLAM for every hit: lift the maul overhead (t 0-0.38), drive it down (0.38-0.45), damage frame
+        // at t 0.45 = ground impact (unchanged hit timing), hold in the floor, then recover. 3rd hit (and a Discharge)
+        // is heavier: higher lift, deeper crouch.
+        const heavy = this.comboStep >= n || this.vk?.discharge, top = heavy ? -3.6 : -3.35, low = heavy ? -1.45 : -1.1; // maul head meets the floor ~1.6-1.9 m ahead
+        let x, lean, drop;
+        if (t < 0.38) { const u = t / 0.38, k = u * u * (3 - 2 * u); x = THREE.MathUtils.lerp(-2.6, top, k); lean = -0.16 * k * (heavy ? 1.4 : 1); drop = 0; }
+        else if (t < 0.45) { const u = (t - 0.38) / 0.07, k = u * u; x = THREE.MathUtils.lerp(top, low, k); lean = THREE.MathUtils.lerp(-0.16, heavy ? 0.55 : 0.42, k); drop = (heavy ? -0.18 : -0.1) * k; }
+        else { const u = Math.max(0, (t - 0.7) / 0.3); x = THREE.MathUtils.lerp(low, -2.6, u * u); lean = (heavy ? 0.55 : 0.42) * (1 - u); drop = (heavy ? -0.18 : -0.1) * (1 - u); }
+        m.armR.rotation.set(x, 0, 0.1); m.armL.rotation.set(x + 0.15, 0, -0.55); m.body.rotation.x = lean; m.body.rotation.y = 0; m.body.position.y = drop;
       } else if (kit === 'zaleks' && this.comboStep === 1) {
         // shield-bash: the left arm punches straight out
         m.armL.rotation.set(THREE.MathUtils.lerp(-0.4, -1.7, e), 0, 0.1);
@@ -1504,7 +1513,7 @@ export class Player {
         m.body.rotation.x = e * 0.25;
       }
       const fin = this.comboStep === n;
-      if (t > 0.3 && t < 0.6) {
+      if (t > 0.3 && t < 0.6 && kit !== 'thane') { // v2: Volkar slams, no sweep arc (the ground impact is in volkar.js)
         this.slashArc.material.opacity = fin ? 0.75 : 0.55;
         // finisher is orange at first; from weapon tier 3 every swing glows in the talons' tier colour
         this.slashArc.material.color.setHex(this.damageMult > 1 ? 0xff3a2a : (fin && this.loadout.tier < 3 ? 0xffa040 : this.bladeColor));

@@ -454,5 +454,83 @@ export function buildAxiom(t) {
       } };
 }
 
+// VOLKAR (thane, CoreBurnZ test build): stormforged breaker. Gunmetal-blue plate, copper coils, bone insulators,
+// a lightning-rod pauldron on the right and the CONDUIT MAUL: two copper coil rings spin round the head and a
+// pooled crackle (3 thin arc bars, always allocated) flickers between the prongs. Basic glow mats, no lights.
+export function buildThane(t) {
+  const mats = tint({
+    plate: L(0x2a3440), plateDark: L(0x161c24), coat: L(0x3a4656), orange: L(0xb8642a), bone: L(0xd8d2c4), metal: L(0x6a7480),
+    glow: G(0x4ad8ff), blade: G(0xbfe8ff, { transparent: true, opacity: 0.9 }),
+  }, t);
+  const d = design('thane', (d) => {
+    sym((s) => { const g = s > 0 ? 'legL' : 'legR';
+      d.add(g, 'plate', box(0.26, 0.4, 0.28), 0, -0.2, 0.02);                  // heavy thigh plate
+      d.add(g, 'orange', cyl(0.1, 0.1, 0.12, 8), 0, -0.42, 0.04, 0, 0, Math.PI / 2); // copper knee coil
+      d.add(g, 'plateDark', box(0.22, 0.36, 0.24), 0, -0.64, 0.0);
+      d.add(g, 'plate', box(0.28, 0.12, 0.38), 0, -0.86, 0.06);                // boots
+      d.add(g, 'glow', box(0.04, 0.14, 0.02), 0, -0.64, 0.125);
+    });
+    d.add('body', 'plateDark', box(0.5, 0.28, 0.3), 0, 1.02, 0);                // belt
+    d.add('body', 'orange', box(0.54, 0.06, 0.32), 0, 1.12, 0);
+    d.add('body', 'plate', cyl(0.36, 0.3, 0.66, 6), 0, 1.46, 0, 0, 0, 0, 1.15, 1, 0.8); // broad chest
+    d.add('body', 'coat', box(0.6, 0.18, 0.4), 0, 1.74, 0);                    // collar yoke
+    d.add('body', 'bone', box(0.16, 0.34, 0.08), 0, 1.46, 0.24);                 // insulator frame round the core
+    for (const y of [1.32, 1.6]) d.add('body', 'orange', tor(0.07, 0.02, 4, 10), 0, y, 0.27, 0, 0, Math.PI / 2);
+    d.add('body', 'plateDark', box(0.4, 0.5, 0.18), 0, 1.5, -0.27);             // capacitor pack
+    for (const x of [-0.12, 0.12]) { d.add('body', 'bone', cyl(0.05, 0.05, 0.42, 8), x, 1.55, -0.38); d.add('body', 'glow', cyl(0.02, 0.02, 0.44, 6), x, 1.55, -0.43); }
+    // right side: LIGHTNING-ROD PAULDRON (asymmetric), left: plain rounded guard
+    d.add('body', 'plate', sph(0.2, 8, 6), -0.46, 1.8, 0, 0, 0, 0, 1.2, 0.9, 1.1);
+    d.add('body', 'orange', cyl(0.22, 0.24, 0.08, 8), -0.48, 1.9, 0);
+    for (const [x, z, h] of [[-0.42, 0.08, 0.5], [-0.56, -0.05, 0.38], [-0.4, -0.12, 0.3]]) {
+      d.add('body', 'bone', cyl(0.035, 0.05, h, 6), x, 1.95 + h / 2, z);
+      for (let k = 1; k <= 2; k++) d.add('body', 'orange', tor(0.045, 0.012, 3, 8), x, 1.95 + h * k / 3, z, Math.PI / 2);
+      d.add('body', 'glow', oct(0.04), x, 1.97 + h, z);
+    }
+    d.add('body', 'plate', sph(0.17, 8, 6), 0.44, 1.78, 0, 0, 0, 0, 1.1, 0.8, 1);
+    // HEAD: squat helm with a cyan slit visor and a copper crest
+    d.add('head', 'plate', box(0.36, 0.3, 0.36), 0, 0.02, 0);
+    d.add('head', 'plateDark', box(0.38, 0.1, 0.06), 0, 0.0, 0.18);
+    d.add('head', 'glow', box(0.3, 0.035, 0.02), 0, 0.01, 0.215);
+    d.add('head', 'orange', box(0.06, 0.1, 0.4), 0, 0.2, -0.02);
+    sym((s) => d.add('head', 'bone', cyl(0.05, 0.06, 0.1, 6), s * 0.2, -0.02, 0, 0, 0, Math.PI / 2));
+    sym((s) => { const g = s > 0 ? 'armL' : 'armR';
+      d.add(g, 'coat', cyl(0.08, 0.07, 0.38, 6), 0, -0.22, 0);
+      d.add(g, 'orange', tor(0.08, 0.02, 4, 10), 0, -0.42, 0, Math.PI / 2);
+      d.add(g, 'plate', box(0.2, 0.3, 0.22), 0, -0.6, 0);                       // gauntlet
+      d.add(g, 'plateDark', box(0.16, 0.12, 0.18), 0, -0.8, 0);
+      d.add(g, 'glow', box(0.21, 0.025, 0.05), 0, -0.56, 0.09);
+    });
+    // CONDUIT MAUL in the right hand: haft along -Y, head across Z (points forward when the arm swings up)
+    d.add('armR', 'plateDark', cyl(0.04, 0.04, 1.0, 6), 0, -1.22, 0);
+    for (const y of [-0.95, -1.15]) d.add('armR', 'bone', cyl(0.055, 0.055, 0.06, 6), 0, y, 0);
+    d.add('armR', 'plate', box(0.3, 0.3, 0.5), 0, -1.78, 0);                      // maul head
+    d.add('armR', 'orange', box(0.34, 0.08, 0.54), 0, -1.78, 0);
+    sym((s) => { d.add('armR', 'metal', cyl(0.13, 0.16, 0.08, 8), 0, -1.78, s * 0.28, Math.PI / 2);   // strike faces
+      d.add('armR', 'glow', cyl(0.08, 0.08, 0.02, 8), 0, -1.78, s * 0.33, Math.PI / 2);
+      d.add('armR', 'bone', cone(0.04, 0.16, 5), 0, -1.6, s * 0.18, 0, 0, Math.PI); });    // prongs (up)
+    d.keep('ring', tor(0.24, 0.022, 4, 14)); d.keep('arc', box(1, 1, 1)); d.keep('core', box(0.9, 1.1, 1)); d.keep('blade', cyl(0.5, 0.5, 1, 6));
+  });
+  const m = assemble(d, mats, { legL: [0.17, 0.94, 0], legR: [-0.17, 0.94, 0], head: [0, 2.0, 0.02], armL: [0.5, 1.7, 0], armR: [-0.5, 1.7, 0] });
+  const core = addCore(m, d.extra.core, mats.glow, 0, 1.46, 0.25, Math.PI / 2); // vertical capsule core
+  const rings = [0, 1].map((i) => { const r = new THREE.Mesh(d.extra.ring, mats.orange); r.position.set(0, -1.78, 0); r.rotation.x = i ? 0.6 : -0.6; m.armR.add(r); return r; });
+  const arcs = [0, 1, 2].map(() => { const a = new THREE.Mesh(d.extra.arc, mats.glow); a.position.set(0, -1.68, 0); a.scale.set(0.02, 0.02, 0.36); m.armR.add(a); return a; });
+  const b = new THREE.Mesh(d.extra.blade, mats.blade); b.scale.set(0.03, 1, 0.03); b.position.set(0, -1.2, 0.05); m.armR.add(b);
+  const h = new THREE.Mesh(UNIT, G(0xbfe8ff, { transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })); h.position.copy(b.position); h.visible = false; m.armR.add(h);
+  let charge = 0;
+  return { ...m, core, flashMats: [mats.plate, mats.plateDark, mats.coat, mats.metal], blade: mats.blade, blades: [b], halos: [h], bladeBase: -0.95, bladeLen: 0.5,
+    rings, arcs, glowMat: mats.glow,
+    setCharge(v) { charge = v; }, // 0..1 (Charge stacks / Surge): coils spin faster, arcs crackle more
+    anchors: { headTop: 0.32, back: -0.42, shoulder: 0.5, scale: 1.18, headW: 0.2, faceZ: 0.22 }, style: 'bruiser',
+    idle(t) {
+      const sp = 3 + charge * 14;
+      rings[0].rotation.y = t * sp; rings[1].rotation.y = -t * sp * 1.3;
+      const live = 0.25 + charge * 0.75;
+      for (let i = 0; i < 3; i++) { const a = arcs[i], k = Math.sin(t * (37 + i * 11) + i * 2.1);
+        a.visible = k > 1 - live * 1.6;
+        a.position.set(Math.sin(t * 23 + i) * 0.1, -1.6 - i * 0.08, Math.cos(t * 19 + i * 3) * 0.05);
+        a.rotation.set(Math.sin(t * 29 + i) * 0.8, 0, Math.cos(t * 31 + i) * 0.5); a.scale.z = 0.25 + 0.2 * Math.abs(k); }
+    } };
+}
+
 // geometry/material counts (for the leak checks in the dev harness)
 export const modelCacheSize = () => Object.keys(CACHE).length;

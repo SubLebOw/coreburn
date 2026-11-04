@@ -39,6 +39,14 @@ export const MASTERIES = {
     { id: 'oChoir', row: 2, name: 'Drone Choir', desc: '+1 drone' },
     { id: 'oShell', row: 2, name: 'Magnet Shell', desc: 'Take 10% less damage while drones fly' },
   ],
+  thane: [ // Phase 6 TEST (Volkar)
+    { id: 'tPre', row: 0, name: 'Pre-Charged', desc: 'Start each run with 3 Charge' },
+    { id: 'tHeavy', row: 0, name: 'Heavy Head', desc: '+6% damage' },
+    { id: 'tLong', row: 1, name: 'Long Sky', desc: 'Skyfall finds targets 15% further away' },
+    { id: 'tConduct', row: 1, name: 'Conduction', desc: 'Shocked lasts 0.5s longer' },
+    { id: 'tSkyCd', row: 2, name: 'Storm Caller', desc: 'Skyfall cooldown -10%' },
+    { id: 'tLongStorm', row: 2, name: 'Prolonged Storm', desc: 'Tempest Surge lasts 1s longer' },
+  ],
   axiom: [
     { id: 'aNet', row: 0, name: 'Network Efficiency', desc: 'Start each run with 2 drones instead of 1' },
     { id: 'aBolt', row: 0, name: 'Focused Pulse', desc: '+6% damage' },

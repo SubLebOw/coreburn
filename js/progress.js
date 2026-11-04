@@ -11,7 +11,7 @@
 
 const KEY = 'coreburn-progress';
 const BASE_HEROES = ['sarrow', 'zaleks', 'iskra', 'orin'];
-export const HERO_IDS = [...BASE_HEROES, 'ninja', 'axiom'];
+export const HERO_IDS = [...BASE_HEROES, 'ninja', 'axiom', 'thane']; // thane = VOLKAR (Phase 6 test, additive: missing per-hero entries are filled in on load)
 const BASE_SLOTS = ['hat', 'mask', 'cape', 'aura', 'trail', 'banner']; // the level-up sets (order = unlock order: never change)
 // Phase 3B: two geometry slots on top (shoulder armour, weapon shape). Saved per hero in equipped[hero][slot].
 export const SLOTS = [...BASE_SLOTS, 'shoulder', 'weapon'];
@@ -23,9 +23,10 @@ const NAMES = {
   iskra:  { hat: 'Needle Tiara', mask: 'Lace Visor', cape: 'Phase Ribbon', aura: 'Static Motes', trail: 'Violet Streak', banner: 'Kite Tail' },
   orin:   { hat: 'Choir Horns', mask: 'Hymn Muzzle', cape: 'Organ-Pipe Mantle', aura: 'Drone Orbit', trail: 'Magnet Filings', banner: 'Tether Spire' },
   axiom:  { hat: 'Antenna Crown', mask: 'Null Visor', cape: 'Cable Mantle', aura: 'Drone Halo', trail: 'Red Scanline', banner: 'Network Pylon' },
+  thane:  { hat: 'Insulator Crown', mask: 'Arc Welder Visor', cape: 'Copper Coil Mantle', aura: 'Static Halo', trail: 'Ozone Wake', banner: 'Lightning Rod Standard' },
   ninja:  { hat: 'Ronin Kasa', mask: 'Oni Half-Mask', cape: 'Night Shroud', aura: 'Smoke Ring', trail: 'Shadow Wake', banner: 'Clan Sashimono' },
 };
-const COLORS = { sarrow: [0xe0702a, 0x3ff6e0], zaleks: [0xffa030, 0xd8cfb8], iskra: [0xe060ff, 0x9ffcff], orin: [0xff5a6a, 0xffd0a0], ninja: [0x5a3ad0, 0xc8c0ff], axiom: [0x8a1a22, 0xff3a4a] };
+const COLORS = { sarrow: [0xe0702a, 0x3ff6e0], zaleks: [0xffa030, 0xd8cfb8], iskra: [0xe060ff, 0x9ffcff], orin: [0xff5a6a, 0xffd0a0], ninja: [0x5a3ad0, 0xc8c0ff], axiom: [0x8a1a22, 0xff3a4a], thane: [0x2a3440, 0x4ad8ff] };
 
 // level 2 unlocks the first item, then one per level: every hero's hat, then every hero's mask...
 export const COSMETICS = [];
@@ -38,6 +39,8 @@ export const MAX_COSMETIC_LEVEL = 25;
 BASE_SLOTS.forEach((slot, si) => COSMETICS.push({ id: `ninja-${slot}`, hero: 'ninja', slot, name: NAMES.ninja[slot], level: 27 + si * 3, color: COLORS.ninja[si % 2], glow: COLORS.ninja[(si + 1) % 2] }));
 // AXIOM's set: account levels 45..60
 BASE_SLOTS.forEach((slot, si) => COSMETICS.push({ id: `axiom-${slot}`, hero: 'axiom', slot, name: NAMES.axiom[slot], level: 45 + si * 3, color: COLORS.axiom[si % 2], glow: COLORS.axiom[(si + 1) % 2] }));
+// VOLKAR's set: account levels 63..78 (after Axiom; existing levels unchanged)
+BASE_SLOTS.forEach((slot, si) => COSMETICS.push({ id: `thane-${slot}`, hero: 'thane', slot, name: NAMES.thane[slot], level: 63 + si * 3, color: COLORS.thane[si % 2], glow: COLORS.thane[(si + 1) % 2] }));
 // MASTERY cosmetics (hero level): gold versions of the hero's own shapes
 const MASTERY = [['aura', 7, 'Mastery Halo'], ['banner', 13, 'Mastery Standard'], ['cape', 18, 'Veteran Mantle'], ['hat', 24, 'Grand Crown']];
 for (const h of HERO_IDS) for (const [slot, hl, name] of MASTERY) COSMETICS.push({ id: `${h}-m-${slot}`, hero: h, slot, name, heroLevel: hl, color: 0xd8a83a, glow: 0xfff0a0, mastery: true });
@@ -54,9 +57,10 @@ const GEAR = {
   iskra:  [['shoulder', 'pads', 'Strike Pads', 'common', 250, 0x9aa0aa, 0xe060ff], ['hat', 'visorhelm', 'Recon Visor', 'rare', 400, 0xc9c4bc, 0xe060ff], ['weapon', 'prism', 'Prism Needles', 'rare', 450, 0, 0xffb0ff], ['cape', 'quiver', 'Needle Quiver', 'epic', 600, 0x433d58, 0xe060ff]],
   orin:   [['shoulder', 'coil', 'Tether Coils', 'common', 300, 0xb08a4a, 0x3ff6e0], ['hat', 'crown', 'Gravity Crown', 'rare', 500, 0xb08a4a, 0x3ff6e0], ['weapon', 'serrated', 'Hooked Sickles', 'rare', 400, 0, 0xff9080], ['cape', 'ring', 'Graviton Ring', 'epic', 700, 0x8a8580, 0xff4a5a]],
   ninja:  [['shoulder', 'sode', 'Lacquer Sode', 'common', 300, 0x7a1a22, 0xa08cff], ['mask', 'kitsune', 'Kitsune Mask', 'rare', 400, 0xe8e4dc, 0xff3a4a], ['weapon', 'tristar', 'Tri-Star', 'rare', 400, 0, 0xd0c8ff], ['cape', 'katanas', 'Twin Katana Rig', 'epic', 650, 0x14141b, 0xa08cff]],
+  thane:  [['shoulder', 'pauldron', 'Coil Pauldrons', 'common', 300, 0x2a3440, 0x4ad8ff], ['hat', 'visorhelm', 'Welder Helm', 'rare', 450, 0x3a4656, 0x4ad8ff], ['weapon', 'serrated', 'Toothed Maul', 'rare', 450, 0, 0xbfe8ff], ['cape', 'stacks', 'Capacitor Stacks', 'epic', 700, 0x161c24, 0x4ad8ff]],
   axiom:  [['shoulder', 'pylon', 'Drone Pylons', 'common', 350, 0x2c2e37, 0xff2a3a], ['hat', 'sensor', 'Sensor Array', 'rare', 450, 0x5e6270, 0xff2a3a], ['weapon', 'prism', 'Prism Emitters', 'rare', 450, 0, 0xff6a6a], ['cape', 'wings', 'Uplink Wings', 'epic', 750, 0x15161b, 0xff2a3a]],
 };
-const WEAPON_SHAPE = { sarrow: 'serrated', zaleks: 'serrated', iskra: 'prism', orin: 'serrated', ninja: 'tristar', axiom: 'prism' };
+const WEAPON_SHAPE = { sarrow: 'serrated', zaleks: 'serrated', iskra: 'prism', orin: 'serrated', ninja: 'tristar', axiom: 'prism', thane: 'serrated' };
 for (const h of HERO_IDS) {
   for (const [slot, shape, name, rarity, cost, color, glow] of GEAR[h]) COSMETICS.push({ id: `${h}-g-${shape}`, hero: h, slot, shape, name, rarity, cost, color: color || glow, glow, gear: true });
   // EARNED (never sold): this hero's best CoreBurnZ wave, every boss beaten, hero mastery level
@@ -81,6 +85,7 @@ const HERO_TITLES = {
   iskra:  ['Needle Novice', 'Phase Dancer', 'Storm Weaver', 'Untouchable', 'The Thousand Needles'],
   orin:   ['Silent Unit', 'Tether Cantor', 'Drone Shepherd', 'Hymn Breaker', 'The Rogue Choir'],
   axiom:  ['Boot Sequence', 'Drone Foreman', 'Hive Mind', 'War Network', 'The Machine Mind'],
+  thane:  ['Spark Apprentice', 'Coilbearer', 'Thunder Smith', 'Skybreaker', 'The Living Storm'],
   ninja:  ['Shadow Initiate', 'Star Thrower', 'Stepless', 'Twin Shade', 'The Unseen Blade'],
 };
 const HERO_TITLE_LEVELS = [5, 10, 20, 25, 30];
@@ -114,6 +119,7 @@ const SKIN_DATA = {
   iskra:  [['Rustlace', 0x8a6a40, 0xd8ff6a], ['Ember Needle', 0xff5a2a, 0xffe07a], ['Rime Dancer', 0xe0f4ff, 0x8affff], ['Midnight Choir', 0x8a2aff, 0xff4ad8], ['Lightning Kite', 0x3a4a6a, 0xfff27a]],
   orin:   [['Yard Hermit', 0x6a6a3a, 0xc8ff3a], ['Bellows Monk', 0xc04020, 0xffa040], ['Icebound Cantor', 0xcfe6ff, 0x7ad8ff], ['Neon Organist', 0xff2ac8, 0x3ad8ff], ['Storm Bellringer', 0x4a5a6a, 0xffe04a]],
   axiom:  [['Rustframe', 0x5a4a3a, 0xc8ff3a], ['Furnace Core', 0x6a1a10, 0xffb030], ['Coldboot', 0xc8dcf0, 0x6ad0ff], ['Neon Override', 0x3a1a6a, 0xff3ad8], ['Storm Relay', 0x3a4a5a, 0xfff05a]],
+  thane:  [['Slag Conductor', 0x5a4a3a, 0xc8ff3a], ['Forge Arc', 0x8a2a10, 0xffb030], ['Hoarfrost Breaker', 0xc8dcf0, 0x9ae8ff], ['Neon Tesla', 0x3a1a6a, 0xff3ad8], ['Rooftop Tempest', 0x2a3a4a, 0xfff05a]],
   ninja:  [['Ashfoot Shade', 0x5a4a3a, 0xc8ff3a], ['Ember Shinobi', 0xc0381a, 0xffb030], ['Snowveil', 0xd8ecff, 0x9ae0ff], ['Neon Ronin', 0x7a2aff, 0x3affd0], ['Stormstep', 0x3a4a5a, 0xfff05a]],
 };
 export const ARENA_SKINS = Object.fromEntries(HERO_IDS.map((h) => [h, ARENA.map((a, i) => ({

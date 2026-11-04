@@ -14,13 +14,18 @@ import { HERO_STATS } from './hero-stats.js?v=1.34.0';
 
 export const Z_BOSS_NAMES = [...new Set(Z_ROTATION.map((e) => e.def.name))];
 export const zBossCount = () => Z_BOSS_NAMES.filter((n) => (meta.data.stats.zBosses || []).includes(n)).length;
-const GATED = ['iskra', 'orin', 'ninja', 'axiom'];
+const GATED = ['iskra', 'orin', 'ninja', 'axiom', 'thane'];
+// VOLKAR (Phase 6 test): reach wave 40 with Zaleks in CoreBurnZ survival AND defeat 6 unique bosses. Not grandfathered (new hero).
+// The dev build can open him early through window.__CB_DEV_UNLOCK (set only by the dev site's dev-boot.js; never present in the public game).
+export const TH_WAVE = 40, TH_BOSSES = 6;
+const thaneCheck = () => ((meta.data.stats.heroBest || {}).zaleks || 0) >= TH_WAVE && zBossCount() >= TH_BOSSES ? unlock('thane') : [];
 export const AX_KILLS = 30000, AX_WAVE = 70;
 export const axiomProgress = () => { const s = meta.data.stats, hb = s.heroBest || {}; return { kills: s.zKills || 0, wave: Math.max(0, ...Object.keys(hb).filter((h) => h !== 'axiom').map((h) => hb[h] || 0)) }; };
-export const isLocked = (id) => GATED.includes(id) && !meta.data.unlocked[id];
+export const isLocked = (id) => GATED.includes(id) && !meta.data.unlocked[id] && !(typeof window !== 'undefined' && window.__CB_DEV_UNLOCK?.includes?.(id));
 export function lockHint(id) {
   if (id === 'iskra') return 'Reach wave 15 with Sarrow or Zaleks';
   if (id === 'orin') return 'Reach wave 50';
+  if (id === 'thane') return `Reach wave ${TH_WAVE} with Zaleks (best ${((meta.data.stats.heroBest || {}).zaleks || 0)}) and defeat ${TH_BOSSES} unique bosses (${Math.min(TH_BOSSES, zBossCount())}/${TH_BOSSES})`;
   if (id === 'ninja') return `Defeat all ${Z_BOSS_NAMES.length} unique bosses (${zBossCount()}/${Z_BOSS_NAMES.length})`;
   if (id === 'axiom') { const p = axiomProgress(); return `Lifetime kills: ${p.kills.toLocaleString()} / 30,000 · Best wave (other hero): ${p.wave} / 70`; }
   return '';
@@ -67,12 +72,13 @@ export function onWaveReached(n, heroId, z, survival) {
   const s = meta.data.stats;
   if (z && survival) { s.heroBest = s.heroBest || {}; if (n > (s.heroBest[heroId] || 0)) s.heroBest[heroId] = n; } // reusable per-hero best wave
   const got = z && survival && n >= 15 && (heroId === 'sarrow' || heroId === 'zaleks') ? unlock('iskra') : [];
-  return z && survival && heroId !== 'axiom' && n >= AX_WAVE ? got.concat(axiomCheck()) : got;
+  const th = z && survival && heroId === 'zaleks' && n >= TH_WAVE ? thaneCheck() : [];
+  return (z && survival && heroId !== 'axiom' && n >= AX_WAVE ? got.concat(axiomCheck()) : got).concat(th);
 }
 export function onBossDefeated(def, z) {
   if (!z || !def || !Z_BOSS_NAMES.includes(def.name)) return [];
   const s = meta.data.stats; s.zBosses = s.zBosses || [];
   if (!s.zBosses.includes(def.name)) { s.zBosses.push(def.name); meta.save(); } // repeats (and co-op echoes) count once
-  return zBossCount() >= Z_BOSS_NAMES.length ? unlock('ninja') : [];
+  return (zBossCount() >= Z_BOSS_NAMES.length ? unlock('ninja') : []).concat(zBossCount() >= TH_BOSSES ? thaneCheck() : []);
 }
 export const heroName = (id) => HERO_STATS[id]?.name || id;

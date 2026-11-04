@@ -40,7 +40,7 @@ export function tierColor(tier, base = TIER_COLOURS[0]) {
 
 // group: attack / mobility / ultimate / core. desc(level) = what the NEXT level gives.
 // heroes: only offered to those heroes (no `heroes` = a universal card every hero can roll).
-const S = ['sarrow'], Z = ['zaleks'], I = ['iskra'], O = ['orin'], N = ['ninja'], A = ['axiom'];
+const S = ['sarrow'], Z = ['zaleks'], I = ['iskra'], O = ['orin'], N = ['ninja'], A = ['axiom'], T = ['thane'];
 export const UPGRADES = {
   // ---- universal (every hero) ----
   edge:     { name: 'Core Edge', group: 'attack', icon: '✦', color: 0xff8a3a, max: 10, desc: () => '+3.5% damage (everything)' },
@@ -95,6 +95,15 @@ export const UPGRADES = {
   axPayload:{ name: 'Heavy Payload', heroes: A, group: 'attack', icon: '✺', color: 0xffa02a, max: 1, desc: () => 'Every 4th drone shot is a missile that splashes (drones grow missile pods)' },
   axFeedback:{ name: 'Feedback Loop', heroes: A, group: 'attack', icon: '↯', color: 0xff4a6a, max: 2, desc: () => 'Drone kills: +10% chance to fire an extra bolt at the next enemy' },
   axPlating:{ name: 'Reactive Plating', heroes: A, group: 'core', icon: '⛨', color: 0xc84a4a, max: 1, desc: () => 'Take 2% less damage per drone (max 20%)' },
+  // ---- VOLKAR (Phase 6 TEST BUILD, CoreBurnZ only) ----
+  tCharge:  { name: 'Capacitor Head', heroes: T, zonly: true, group: 'attack', icon: '⚡', color: 0x4ad8ff, max: 3, desc: () => 'Full Charge needs 1 fewer stack' },
+  tWave:    { name: 'Wide Conduction', heroes: T, zonly: true, group: 'attack', icon: '◎', color: 0x6ae4ff, max: 4, desc: () => '+12% maul shockwave radius, +10% shockwave damage' },
+  tArc:     { name: 'Forked Discharge', heroes: T, zonly: true, group: 'attack', icon: '⑂', color: 0x9ae8ff, max: 2, desc: () => 'Ground Discharge throws +1 arc' },
+  tSkyChain:{ name: 'Chain Lightning', heroes: T, zonly: true, group: 'mobility', icon: 'ϟ', color: 0x4ad8ff, max: 2, desc: () => 'Skyfall strikes chain to +1 enemy (60%; Shocked foes conduct for free)' },
+  tSkyCount:{ name: 'Thunderhead', heroes: T, zonly: true, group: 'mobility', icon: '☁', color: 0xbfe8ff, max: 2, desc: () => 'Skyfall calls +1 strike' },
+  tSkyQuick:{ name: 'Quickstrike', heroes: T, zonly: true, group: 'mobility', icon: '»', color: 0x7ad0ff, max: 3, desc: () => 'Skyfall lands 0.1s sooner, -0.5s cooldown' },
+  tSurge:   { name: 'Rising Storm', heroes: T, zonly: true, group: 'ultimate', icon: '⛈', color: 0x4a9aff, max: 4, desc: () => 'Tempest Surge +0.5s and +5% strike damage' },
+  tMeter:   { name: 'Static Build-up', heroes: T, zonly: true, group: 'ultimate', icon: '▲', color: 0x6ab8ff, max: 3, desc: () => '+10% Storm meter gain' },
   // ---- KAGERO (CoreBurnZ) ----
   nPierce:  { name: 'Razor Stars', heroes: N, group: 'attack', icon: '✴', color: 0xc8c0ff, max: 2, desc: () => 'Shurikens ricochet +1 more time' },
   nFan:     { name: 'Star Fan', heroes: N, group: 'attack', icon: '⋔', color: 0xa898ff, max: 2, desc: () => '+1 side shuriken each side per throw (30% damage)' },
@@ -365,6 +374,8 @@ export class Loadout {
     s.myCuts = L('myCuts'); s.myTempest = L('myTempest'); s.myWrath = L('myWrath'); s.myField = L('myField'); s.myCollapse = L('myCollapse');
     s.axCap = L('axCap'); s.axFactory = L('axFactory'); s.axServo = 0.15 * L('axServo'); s.axPayload = L('axPayload'); s.axFeedback = L('axFeedback'); s.axPlating = L('axPlating'); s.axEvo = L('eExtinct'); s.myAxSing = L('myAxSing');
     s.p5 = { momentum: L('p5Momentum'), plating: L('p5Plating'), conductor: L('p5Conductor'), overload: L('p5Overload'), vents: L('p5Vents'), echo: L('p5Echo'), overdrive: L('eOverdrive'), aegis: L('eAegis'), cascade: L('eCascade'), rift: L('myRift'), paradox: L('myParadox'), warforge: L('myWarforge') }; // PHASE 5
+    s.tCharge = L('tCharge'); s.tWave = L('tWave'); s.tArc = L('tArc'); s.tSkyChain = L('tSkyChain'); s.tSkyCount = L('tSkyCount'); s.tSkyQuick = L('tSkyQuick'); s.tSurge = L('tSurge'); s.tMeter = L('tMeter'); // VOLKAR (volkar.js)
+    if (L('tSkyQuick')) s.dashCd *= 1 - (0.5 / 7) * L('tSkyQuick');
     s.myEcho = L('myEcho'); s.myClock = L('myClock'); s.myStand = L('myStand'); s.noOrbHeal = L('myGlass');
     if (L('myGlass')) s.dmg *= 2;
     // CoreBurnZ v1.26 kits
@@ -378,7 +389,7 @@ export class Loadout {
     const ms = RULES.z ? (this.mastery || []) : [], M = (id) => ms.includes(id);
     s.m = {}; for (const id of ms) s.m[id] = 1;
     if (M('sLong')) s.dashTime *= 1.2;
-    if (M('sKeen') || M('iSharp') || M('oOver') || M('nSharp') || M('aBolt')) s.dmg *= 1.06;
+    if (M('sKeen') || M('iSharp') || M('oOver') || M('nSharp') || M('aBolt') || M('tHeavy')) s.dmg *= 1.06;
     if (M('sDouble') || M('zDouble') || M('iExtra') || M('nDouble')) s.dashCharges += 1;
     if (M('zPlate')) s.hurtMult *= Math.max(0.94, 0.68 / Math.max(0.7, dr)); // all card/relic/mastery DR together never above 32%
     if (M('zHeavy')) s.bashDmg *= 1.1;
@@ -391,6 +402,7 @@ export class Loadout {
     if (M('oChoir')) s.drones += 1;
     if (M('oShell')) s.shell += 0.1;
     if (M('nLong')) s.stepRange *= 1.15;
+    if (M('tSkyCd')) s.dashCd *= 0.9;
     if (M('nFanM')) s.starFan += 1;
     if (M('nClone')) { s.cloneTime += 2; s.cloneDmg += 0.1; }
     if (RULES.z && this.synergy?.length) applySynergies(s, this.synergy); // CoreBurnZ co-op synergies (synergy.js)

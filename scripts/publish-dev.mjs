@@ -30,7 +30,7 @@ for (const f of readdirSync(`${DIR}/devtools`)) if (f.endsWith('.js')) cpSync(`$
 // 2. version: clearly a dev build (also keeps dev co-op sessions from joining live players)
 const sha = sh('git rev-parse --short HEAD', SRC) + (sh('git status --porcelain -- js index.html style.css', SRC) ? '-dirty' : '');
 const base = readFileSync(`${DIR}/js/version.js`, 'utf8').match(/GAME_VERSION\s*=\s*'([^']+)'/)[1];
-const ver = `${base}-dev.${sha}`;
+const ver = `${base}-dev.${sha}${process.env.DEV_LABEL ? '-' + process.env.DEV_LABEL.replace(/[^\w.-]/g, '') : ''}`; // DEV_LABEL e.g. volkar-test
 const must = (s, a, b, what) => { if (!s.includes(a)) throw new Error(`publish-dev: hook point not found (${what}) - update scripts/publish-dev.mjs`); return s.replace(a, b); };
 writeFileSync(`${DIR}/js/version.js`, must(readFileSync(`${DIR}/js/version.js`, 'utf8'), `'${base}'`, `'${ver}'`, 'version'));
 

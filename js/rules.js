@@ -23,6 +23,7 @@ export const Z_HERO = { // v1.29: everyone starts weaker (was sarrow 1.25/1.25, 
   iskra: { hp: 1.1357143, dmg: 0.85 }, // v1.31: base max HP 66.5 -> 79.5 (+13)
   orin: { hp: 0.85, dmg: 0.75 },
   ninja: { hp: 0.85, dmg: 0.82 },
+  thane: { hp: 1.1, dmg: 1.1 }, // Phase 6 TEST: Volkar (spec numbers)
   axiom: { hp: 1.15, dmg: 1.1 }, // the only buff: he was already the weakest in bot play
 };
 // Classic per-hero tuning (v1.14 bot pass): weak heroes buffed up towards ORIN, nobody nerfed.

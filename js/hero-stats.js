@@ -104,10 +104,35 @@ export const HERO_STATS = {
     dashCd: 12, dashCharges: 1, barrier: 0.75, barrierCut: 0.6, overclock: 5, overclockRate: 0.35, killRefund: 0.3, refundCap: 3, refundEarly: 1,
     ultCd: 22, ascendTime: 10, ascendRate: 0.75, ascendTemp: 2,
   },
+  // VOLKAR (CoreBurnZ only, Phase 6 TEST BUILD): stormforged maul bruiser. Charge stacks -> slam discharge,
+  // Skyfall (mobility: telegraphed lightning strikes that chain), Storm meter -> Tempest Surge (ultimate).
+  // Kit logic lives in volkar.js. Damage numbers are flat bases like every other hero (x stats/tier/Z_HERO).
+  thane: {
+    id: 'thane', name: 'VOLKAR', title: 'Stormforged Breaker', tag: 'BRUISER', color: 0x4ad8ff, blade: 0xbfe8ff, zOnly: true,
+    blurb: 'A storm-forged maul brawler: every swing stores Charge, the slam discharges it, and a full Storm meter calls down the Tempest.',
+    hp: 200, speed: 6.4, dmg: 1, atkSpeed: 1, armor: 0,
+    abilities: {
+      attack: { name: 'Conduit Maul', short: 'MAUL', icon: '⚒', desc: '3-hit maul combo. Hits build Charge (x2 on Shocked foes); the 3rd-hit slam discharges it in a chain-lightning blast' },
+      mobility: { name: 'Skyfall', short: 'SKYFALL', icon: 'ϟ', desc: 'Lunge 3m and call 3 telegraphed lightning strikes on nearby foes; each strike chains and Shocks' },
+      ultimate: { name: 'Tempest Surge', short: 'TEMPEST', icon: '⛈', desc: 'Needs a full Storm meter. 1s wind-up, 8s of bolts on nearby foes, then a finisher; empowers your swings for 3s' },
+    },
+    combo: [
+      { damage: 30, knockback: 9, range: 2.7, duration: 0.50, arc: 0.15 },
+      { damage: 30, knockback: 9, range: 2.7, duration: 0.50, arc: 0.15 },
+      { damage: 44, knockback: 16, range: 3.1, duration: 0.55, arc: 0.25 },
+    ],
+    charge: { max: 10, perHit: 1, perShocked: 2, capPerSwing: 4, shockT: 3, wave: { r: 1.4, pct: 0.25, max: 4 }, discharge: { r: 3.2, dmg: 2.2, arcs: 3, arcRange: 4.5, arcPct: 0.6, stun: 0.4 } },
+    dashCd: 7, dashCharges: 1,
+    skyfall: { targets: 3, range: 12, delay: 0.65, radius: 1.6, dmg: 3.0, chainRange: 4.5, chainPct: 0.6, eliteChainBonus: 0.25, lunge: 3, chainJumps: 1, maxJumps: 6 },
+    meter: { max: 100, hit: 2, shockedHit: 3, skyStrike: 4, passive: 0.5, lockAfter: 6 },
+    surge: { windup: 1.0, time: 8, interval: 0.45, radius: 1.8, dmg: 2.0, targets: 2, finisherDmg: 6, finisherR: 3.5, empowerT: 3, empowerPct: 0.25, bossCapPct: 0.04 },
+    ultCd: 1, // the ultimate is gated by the Storm meter (volkar.js), not a timer
+    unit: 12, // damage bases above that say 'dmg: x' are multiples of this (REF 12, like the other kits)
+  },
 };
 export const CHARACTER_ORDER = ['sarrow', 'zaleks', 'iskra', 'orin'];
 // CoreBurnZ adds the ninja; classic keeps the original 4
-export const Z_HEROES = ['ninja', 'axiom'];
+export const Z_HEROES = ['ninja', 'axiom', 'thane'];
 export const ALL_HEROES = [...CHARACTER_ORDER, ...Z_HEROES];
 export const heroOrder = (z) => (z ? ALL_HEROES : CHARACTER_ORDER);
 

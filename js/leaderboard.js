@@ -17,7 +17,7 @@ import { GAME_VERSION } from './version.js?v=1.34.0';
 const LOCAL_KEY = 'coreburn-boards';
 const ID_KEY = 'coreburn-player-id';
 const NAME_KEY = 'coreburn-name';
-const HEROES = ['sarrow', 'zaleks', 'iskra', 'orin', 'ninja', 'axiom']; // ninja = CoreBurnZ boards only
+const HEROES = ['sarrow', 'zaleks', 'iskra', 'orin', 'ninja', 'axiom']; // ninja = CoreBurnZ boards only (Phase 6 test: Volkar has no boards yet)
 
 export const online = !!(CFG.enabled && CFG.supabaseUrl && CFG.supabaseAnonKey);
 

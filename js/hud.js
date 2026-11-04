@@ -66,18 +66,34 @@ export class Hud {
     this.setCooldown('spin', this.spinEls, player.spinCooldown, player.spinCooldownMax);
     // CoreBurnZ: Zaleks' RAGE bar on the Seismic Slam button
     const flow = RULES.z && player.kit === 'sarrow';
-    const rage = RULES.z && player.kit === 'zaleks' ? Math.round(player.rageFrac * 50) : flow ? (player.flow || 0) * 10 : -1; // Zaleks RAGE / Sarrow FLOW
-    if (this.last.rage !== rage) {
-      this.last.rage = rage;
+    const vk = RULES.z && player.kit === 'thane' && player.vk; // VOLKAR: STORM meter on the ultimate button (-1 while the Surge runs)
+    const vm = vk ? (player.vk.surge ? 50 : Math.floor(player.vk.meter / player.char.meter.max * 50)) : 0;
+    const rage = vk ? vm : RULES.z && player.kit === 'zaleks' ? Math.round(player.rageFrac * 50) : flow ? (player.flow || 0) * 10 : -1; // Zaleks RAGE / Sarrow FLOW
+    const rkey = rage + (vk ? (player.vk.surge ? 's' : 'v') : '');
+    if (this.last.rage !== rkey) {
+      this.last.rage = rkey;
       for (const el of this.spinEls) {
         let bar = el.querySelector('.rage');
         if (!bar) { bar = document.createElement('span'); bar.className = 'rage'; bar.innerHTML = '<i></i><b>RAGE</b>'; el.appendChild(bar); }
-        bar.querySelector('b').textContent = flow ? 'FLOW ' + '●'.repeat(player.flow || 0) + '○'.repeat(5 - (player.flow || 0)) : 'RAGE';
-        bar.classList.toggle('flow', flow);
+        bar.querySelector('b').textContent = vk ? (player.vk.surge ? 'TEMPEST!' : `STORM ${rage * 2}%`) : flow ? 'FLOW ' + '●'.repeat(player.flow || 0) + '○'.repeat(5 - (player.flow || 0)) : 'RAGE';
+        bar.classList.toggle('flow', flow); bar.classList.toggle('storm', !!vk);
         bar.style.display = rage < 0 ? 'none' : '';
         bar.querySelector('i').style.width = `${Math.max(0, rage) * 2}%`;
         bar.classList.toggle('full', rage >= 50);
         el.classList.toggle('quake', rage >= 50 && !flow);
+      }
+    }
+    // VOLKAR: CHARGE pips under the health bar (full = the next swing is a Ground Discharge)
+    const ck = vk ? `${player.vk.charge}/${10 - (player.stats.tCharge || 0)}${player.vk.empowerT > 0 ? 'e' : ''}` : '';
+    if (this.last.vcharge !== ck) {
+      this.last.vcharge = ck;
+      let c = document.getElementById('vk-charge');
+      if (!c && vk) { c = document.createElement('div'); c.id = 'vk-charge'; (this.healthFill.closest('#hud') || document.body).appendChild(c); }
+      if (c) {
+        c.style.display = vk ? '' : 'none';
+        if (vk) { const [n, max] = [player.vk.charge, 10 - (player.stats.tCharge || 0)];
+          c.innerHTML = `<b>CHARGE</b>${'<i class="on"></i>'.repeat(n)}${'<i></i>'.repeat(Math.max(0, max - n))}${player.vk.empowerT > 0 ? '<em>EMPOWERED</em>' : n >= max ? '<em>DISCHARGE READY</em>' : ''}`;
+          c.classList.toggle('full', n >= max); }
       }
     }
 
@@ -200,7 +216,7 @@ export class Hud {
       }
       b.className = 'ucard hero';
       b.style.setProperty('--c', hex(c.color));
-      const range = { sarrow: 0.3, zaleks: 0.25, iskra: 1, orin: 0.6, ninja: 0.85, axiom: 0.9 }[c.id] ?? 0.5;
+      const range = { sarrow: 0.3, zaleks: 0.25, iskra: 1, orin: 0.6, ninja: 0.85, axiom: 0.9, thane: 0.3 }[c.id] ?? 0.5;
       const kit = c.abilities ? ['attack', 'mobility', 'ultimate'].map((k, j) =>
         `<div class="kslot"><b>${zab(c.abilities[k]).icon} ${zab(c.abilities[k]).name}</b> <span>${['J', 'K', 'L'][j]}</span><i>${(RULES.z && c.abilities[k].zdesc) || zab(c.abilities[k]).desc}</i></div>`).join('') : '';
       b.innerHTML = `<span class="key">${i + 1}</span><div class="icon">⬢</div><div class="tname">${c.name}</div><div class="ubody"><div class="group"></div><div class="uname"></div><div class="effect"></div>` +

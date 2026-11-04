@@ -14,6 +14,7 @@ import { Loadout, tierColor } from './upgrades.js?v=1.34.0';
 import { CHARACTERS } from './characters.js?v=1.34.0';
 import { KIT } from './allies.js?v=1.34.0';
 import * as P5 from './phase5.js?v=1.34.0'; // CoreBurnZ Phase 5A/5B
+import * as V from './volkar.js?v=1.34.0'; // Phase 6 TEST: VOLKAR kit
 
 // The camera looks at the arena from the +X/+Z corner. These are the floor directions
 // that match "up the screen" and "right on the screen", so W always moves up the screen.
@@ -41,6 +42,7 @@ const MOTION = {
   agile:   { cadence: 1.2, stride: 0.8, bob: 0.06, lean: 0.16, crouch: 0.05, sway: 0.02, breath: 3.2, breathAmp: 0.012, guard: -0.75, armSwing: 0.35, armOut: 0.0, armIdle: 0.08, armAsym: -1 }, // Iskra: springy, light
   control: { cadence: 0.9, stride: 0.5, bob: 0.03, lean: 0.03, crouch: 0.0, sway: 0.0, breath: 1.2, breathAmp: 0.035, guard: -0.45, armSwing: 0.2, armOut: 0.18, armIdle: 0.1, armAsym: 1 },   // Orin: measured, floating calm
   ninja:   { cadence: 1.15, stride: 0.85, bob: 0.04, lean: 0.2, crouch: 0.08, sway: 0.0, breath: 2.2, breathAmp: 0.01, guard: -0.95, armSwing: 0.25, armOut: -0.05, armIdle: 0.03, armAsym: 1 }, // Kagero: low, stealthy
+  bruiser: { cadence: 0.82, stride: 0.6, bob: 0.1, lean: 0.1, crouch: 0.03, sway: 0.05, breath: 1.6, breathAmp: 0.028, guard: -0.4, armSwing: 0.2, armOut: 0.14, armIdle: 0.03, armAsym: 1 }, // Volkar: planted, heavy maul
   machine: { cadence: 0.95, stride: 0.6, bob: 0.05, lean: 0.05, crouch: 0.0, sway: 0.0, breath: 0.9, breathAmp: 0.02, guard: -0.55, armSwing: 0.32, armOut: 0.08, armIdle: 0.0, armAsym: 1 },  // Axiom: steady servo gait
 };
 
@@ -211,6 +213,7 @@ export class Player {
     this.loadout.reset();
     if (this.startCard) { this.loadout.levels[this.startCard] = 1; this.loadout.version++; this.loadout.recompute(); } // shop starting perk
     this.applyLoadout();
+    if (this.char.id === 'thane') V.vReset(this); else this.vk = null; // Phase 6 TEST: Volkar Charge / Storm meter
     this.hp = this.maxHp;
     this.dashCharges = this.maxCharges;
     this.trailTick = 0;
@@ -291,7 +294,7 @@ export class Player {
     const aim = moving ? dir.clone().normalize() : this.facingDir;
     // (presses are remembered for a moment, so an ultimate pressed mid-dash still comes out)
     // CoreBurnZ: pressing the ultimate again, or any attack / ability, cancels a running ultimate
-    if (RULES.z && this.state === 'spin' && this.stateTime > 0.12 &&
+    if (RULES.z && this.state === 'spin' && this.stateTime > 0.12 && this.kit !== 'thane' && // Volkar's Surge wind-up can't be cancelled
         (input.wasPressed('spin') || input.wasPressed('attack') || input.wasPressed('dash'))) {
       this.endUlt();
       this.ultCancelled = true;
@@ -302,6 +305,7 @@ export class Player {
     this.ultCancelled = false;
     this.mobBuffer -= dt; this.ultBuffer -= dt;
     if (this.kit === 'axiom') this.axiomTick(dt, input);
+    if (this.kit === 'thane') V.vTick(this, dt);
     if (this.mobBuffer > 0 && this.dashCharges > 0 && (this.state === 'normal' || this.state === 'attack')) {
       this.mobBuffer = 0;
       this.useMobility(aim);
@@ -413,6 +417,7 @@ export class Player {
       case 'iskra': return this.phaseHop(aim);
       case 'ninja': return this.shadowStep(aim);
       case 'axiom': return this.reforge();
+      case 'thane': return V.skyfall(this, aim);
       case 'orin': return RULES.z ? this.gravityWell(aim) : this.grapple(aim); // CoreBurnZ: Gravity Well replaces the grapple
       default: return this.startDash(aim);
     }
@@ -428,6 +433,7 @@ export class Player {
       case 'iskra': case 'ninja': case 'axiom': // the hop / step already happened; this is just the short blink-in pose
         if (this.stateTime >= 0.14) this.state = 'normal';
         return;
+      case 'thane': V.skyfallDash(this); return;
       case 'orin':
         this.velocity.copy(this.dashDir).multiplyScalar(this.char.grappleSpeed);
         if (this.stateTime >= this.dashLen) this.state = 'normal';
@@ -478,6 +484,7 @@ export class Player {
         break;
       case 'orin': this.hymnEngine(); break;
       case 'axiom': this.ascend(echo); break;
+      case 'thane': V.surgeStart(this, echo); break;
       case 'ninja': // SHADOW CLONE
         this.world.allies?.addClone(this, this.char.cloneTime + this.stats.cloneTime);
         this.world.effects.spawnRing(this.position, 0x8a7aff, 3, 0.45);
@@ -517,6 +524,9 @@ export class Player {
         if (moving) this.velocity.copy(dir).multiplyScalar(walk * 0.6);
         if (this.stateTime >= 0.4) end();
         return;
+      case 'thane': // Tempest Surge wind-up: rooted and fully vulnerable for 1s, then the storm runs on its own (volkar.js)
+        if (!V.surgeWindup(this)) end();
+        return;
       case 'ninja': // a quick hand-sign, then back to work while the clone fights
         if (moving) this.velocity.copy(dir).multiplyScalar(walk * 0.7);
         if (this.stateTime >= 0.35) end();
@@ -534,6 +544,7 @@ export class Player {
   startAttack(step, moveDir) {
     this.state = 'attack';
     this.comboStep = step;
+    if (this.kit === 'thane') { this.world.sfx('vSwing', step); V.onSwingStart(this); } else
     this.world.sfx('slash', this.kit === 'zaleks' ? step + 1 : step);
     this.stateTime = 0;
     this.hasHit = false;
@@ -567,12 +578,15 @@ export class Player {
       to.normalize();
       // only hit enemies in front of us, or really close ones
       if (forward.dot(to) < arcDot && dist > 1) continue;
-      this.strike(e, hit.damage * (zal ? s.bashDmg : s.arcDmg), to.x * knock, to.z * knock, fin, 'slash');
-      this.world.effects.spawnSparks(e.position.clone().setY(1.1), fin ? 0xffa040 : (zal ? 0xffd090 : 0x9ffff5), fin ? 12 : 6);
+      const thane = this.kit === 'thane', dmg = hit.damage * (zal ? s.bashDmg : s.arcDmg) * (thane ? V.swingMult(this) : 1);
+      this.strike(e, dmg, to.x * knock, to.z * knock, fin, 'slash');
+      this.world.effects.spawnSparks(e.position.clone().setY(1.1), thane ? (fin ? 0xe8fbff : 0x6ae4ff) : fin ? 0xffa040 : (zal ? 0xffd090 : 0x9ffff5), fin ? 12 : 6);
+      if (thane) V.onMaulHit(this, e, dmg, struck);
       struck.add(e);
       hitSomething = true;
       if (RULES.z && !zal && this.kit === 'sarrow') this.world.allies?.addBleed(this, e, fin ? 2 : 1); // CoreBurnZ BLEED
     }
+    if (this.kit === 'thane') V.afterSwing(this, forward, struck);
     if (zal && fin) this.world.effects.spawnRing(this.position.clone().addScaledVector(forward, 1.8), 0xffa030, 1.6, 0.3);
     if (zal && RULES.z && !this.world.netClient) P5.p5ZalBash(this, forward); // JUGGERNAUT COUNTER (after a block)
     // Shockwave Finisher (Sarrow): the 3rd hit sends out a ring that hits everything around you
@@ -1454,6 +1468,7 @@ export class Player {
     const idleArm = Math.sin(now * P.breath + 1) * P.armIdle * still;
     m.armL.rotation.set(P.guard - swing * P.armSwing * speedRatio + idleArm, 0, 0.15 + P.armOut);
     m.armR.rotation.set(P.guard + swing * P.armSwing * speedRatio - idleArm * P.armAsym, 0, -0.15 - P.armOut);
+    if (this.kit === 'thane' && this.state !== 'attack') m.body.rotation.y = 0;
     m.idle?.(now, speedRatio); // animated parts: Orin's motes, Axiom's head scan
     this.slashArc.material.opacity = Math.max(0, this.slashArc.material.opacity - dt * 6);
 
@@ -1468,7 +1483,11 @@ export class Player {
       const t = Math.min(1, this.stateTime / (hit.duration / this.char.atkSpeed));
       const n = this.combo.length;
       const e = 1 - Math.pow(1 - t, 3); // ease out
-      if (kit === 'zaleks' && this.comboStep === 1) {
+      if (kit === 'thane') { // VOLKAR: overhead, back-hand, two-handed uppercut slam (the maul is in the right hand)
+        if (this.comboStep === 1) { m.armR.rotation.set(THREE.MathUtils.lerp(-3.0, -0.7, e), 0, -0.2); m.body.rotation.x = e * 0.2; }
+        else if (this.comboStep === 2) { m.armR.rotation.set(-1.4, 0, THREE.MathUtils.lerp(-1.4, 1.0, e)); m.body.rotation.y = THREE.MathUtils.lerp(0.4, -0.5, e); }
+        else { const x = THREE.MathUtils.lerp(-3.1, -0.5, e); m.armR.rotation.set(x, 0, 0.1); m.armL.rotation.set(x, 0, -0.5); m.body.rotation.x = e * 0.32; m.body.position.y = -0.08 * e; }
+      } else if (kit === 'zaleks' && this.comboStep === 1) {
         // shield-bash: the left arm punches straight out
         m.armL.rotation.set(THREE.MathUtils.lerp(-0.4, -1.7, e), 0, 0.1);
         m.body.rotation.x = e * 0.15;
@@ -1498,6 +1517,8 @@ export class Player {
       } else if (kit === 'iskra' || kit === 'ninja' || kit === 'axiom') { // blink-in: crouched, arms spread
         m.body.rotation.x = 0.3;
         m.armL.rotation.set(0.4, 0, 1.2); m.armR.rotation.set(0.4, 0, -1.2);
+      } else if (kit === 'thane') { // Skyfall: maul raised to the sky during the Static Lunge
+        m.body.rotation.x = 0.25; m.armR.rotation.set(-3.0, 0, -0.15); m.armL.rotation.set(0.5, 0, 0.5);
       } else if (kit === 'orin') { // reeling in on the magnet line
         m.body.rotation.x = 0.4;
         m.armR.rotation.set(-1.7, 0, -0.1); m.armL.rotation.set(0.8, 0, 0.2);
@@ -1521,6 +1542,10 @@ export class Player {
         m.armL.rotation.set(-1.9, 0, -0.5); m.armR.rotation.set(-1.9, 0, 0.5);
       } else if (kit === 'axiom') { // arms flung wide as the reactor opens
         m.armL.rotation.set(-0.4, 0, 1.4); m.armR.rotation.set(-0.4, 0, -1.4); m.body.rotation.x = -0.2;
+      } else if (kit === 'thane') { // Surge wind-up: maul driven into the floor, kneeling
+        const k = Math.min(1, this.stateTime / 0.25);
+        m.armR.rotation.set(-0.9 - 0.3 * k, 0, 0.25); m.armL.rotation.set(-0.9 - 0.3 * k, 0, -0.45);
+        m.body.rotation.x = 0.35 * k; m.body.position.y = -0.18 * k; m.legL.rotation.x = -0.6 * k; m.legR.rotation.x = 0.4 * k;
       } else if (kit === 'orin') { // conducting the hymn: arms raised
         m.armL.rotation.set(-2.7, 0, 0.5); m.armR.rotation.set(-2.7, 0, -0.5);
         m.body.rotation.x = -0.15;

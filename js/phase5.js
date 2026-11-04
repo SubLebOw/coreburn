@@ -40,7 +40,7 @@ export const P5 = {
   warforge: { every: 12, shots: 5, dupes: 2, dmg: 0.9, icd: 0.15, minFree: 12 },
 };
 const ATTACK = new Set(['slash', 'needle', 'beam']);   // ordinary attacks (dash = a mobility ability)
-const ABILITY = new Set(['dash', 'spin']);             // mobility + ultimate hits
+const ABILITY = new Set(['dash', 'spin', 'skyfall']); // 'skyfall' = Volkar's mobility (Phase 6 test; no other hero uses it)             // mobility + ultimate hits
 const now = () => performance.now() / 1000;
 const flat = (p, x) => new THREE.Vector3(x.x, 0, x.z);
 const dist2 = (a, b) => { const dx = a.x - b.x, dz = a.z - b.z; return dx * dx + dz * dz; };
@@ -76,6 +76,7 @@ function statuses(p, e) { // existing statuses this enemy carries right now
   if (e.stun > 0) n++;
   if (e.wellUntil > t) n++;
   if (e.slowT > 0) n++;
+  if (p.kit === 'thane' && e.vShockUntil > t) n++; // Volkar's Shocked: only his own procs see it (other heroes unchanged)
   return n;
 }
 function chain(p, from, base, jumps, range, { falloff = 1, color = 0x7ae8ff, slowT = 0 } = {}) {

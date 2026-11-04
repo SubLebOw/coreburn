@@ -319,7 +319,8 @@ export class Player {
 
     this.stateTime += dt;
     this.velocity.set(0, 0, 0);
-    const walk = this.char.speed * (zHero(this.char.id).speed || 1) * this.stats.speed * (1 + 0.03 * (this.flow || 0)) * (RULES.z ? P5.p5Speed(this) : 1); // CoreBurnZ Flow (+ Phase 5 Vents / Overdrive Engine)
+    const walk = this.char.speed * (zHero(this.char.id).speed || 1) * this.stats.speed * (this.vk ? V.burstMult(this) : 1) * // v3 Volkar post-slam burst
+      (1 + 0.03 * (this.flow || 0)) * (RULES.z ? P5.p5Speed(this) : 1); // CoreBurnZ Flow (+ Phase 5 Vents / Overdrive Engine)
 
     switch (this.state) {
       case 'normal':
@@ -581,12 +582,20 @@ export class Player {
       const thane = this.kit === 'thane', dmg = hit.damage * (zal ? s.bashDmg : s.arcDmg) * (thane ? V.swingMult(this) : 1);
       this.strike(e, dmg, to.x * knock, to.z * knock, fin, 'slash');
       this.world.effects.spawnSparks(e.position.clone().setY(1.1), thane ? (fin ? 0xe8fbff : 0x6ae4ff) : fin ? 0xffa040 : (zal ? 0xffd090 : 0x9ffff5), fin ? 12 : 6);
-      if (thane) V.onMaulHit(this, e, dmg, struck);
+      if (thane) { V.onMaulHit(this, e, dmg, struck); V.killMeter(this, e); }
       struck.add(e);
       hitSomething = true;
       if (RULES.z && !zal && this.kit === 'sarrow') this.world.allies?.addBleed(this, e, fin ? 2 : 1); // CoreBurnZ BLEED
     }
-    if (this.kit === 'thane') V.afterSwing(this, forward, struck);
+    if (this.kit === 'thane') { // v3: maul-head area at the impact point (each enemy at most once per swing: struck set)
+      const dmg = hit.damage * s.arcDmg * V.swingMult(this);
+      for (const e of V.slamTargets(this, forward, struck)) {
+        const to = new THREE.Vector3().subVectors(e.position, this.position).setY(0).normalize();
+        this.strike(e, dmg, to.x * knock, to.z * knock, fin, 'slash');
+        V.onMaulHit(this, e, dmg, struck); V.killMeter(this, e); struck.add(e);
+      }
+      V.afterSwing(this, forward, struck);
+    }
     if (zal && fin) this.world.effects.spawnRing(this.position.clone().addScaledVector(forward, 1.8), 0xffa030, 1.6, 0.3);
     if (zal && RULES.z && !this.world.netClient) P5.p5ZalBash(this, forward); // JUGGERNAUT COUNTER (after a block)
     // Shockwave Finisher (Sarrow): the 3rd hit sends out a ring that hits everything around you
@@ -1566,7 +1575,7 @@ export class Player {
         this.spinRing.rotation.z -= dt * 18;
       }
     }
-    if (this.hurtTimer > 0) m.body.rotation.x -= 0.14 * Math.min(1, this.hurtTimer * 6); // hit flinch (visual only)
+    if (this.hurtTimer > 0 && !(this.kit === 'thane' && this.state === 'attack')) m.body.rotation.x -= 0.14 * Math.min(1, this.hurtTimer * 6); // hit flinch (visual only); v3: Volkar doesn't flinch mid-slam
     if (this.guard.visible) this.guard.material.opacity = 0.14 + 0.08 * Math.sin(performance.now() / 120);
 
     // flash red when hurt

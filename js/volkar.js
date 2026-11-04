@@ -104,7 +104,7 @@ export function vReset(p) {
   FX.get(p.scene)?.clear();
 }
 const S = (p) => p.stats;
-export const chargeMax = (p) => p.char.charge.max - (S(p).tCharge || 0);
+export const chargeMax = (p) => Math.max(p.char.charge.minMax || 1, p.char.charge.max - (S(p).tCharge || 0));
 const meterMul = (p) => (1 + 0.1 * (S(p).tMeter || 0)) * (1 + Math.max(0, 1 - (S(p).spinCd ?? 1))); // Static Build-up; Ultimate Coolant fills it faster
 export function addMeter(p, n) {
   const v = p.vk; if (!v || v.surge || v.lockT > 0) return;
@@ -121,15 +121,18 @@ function hit(p, e, base, kx, kz, heavy, kind, surge = false) {
   if (surge && e.isBoss) {
     const cap = (e.maxHp || 0) * p.char.surge.bossCapPct, dealt = p.vk.bossDealt.get(e) || 0;
     if (dealt >= cap) { p.world.effects.localSparks?.(e.position.clone().setY(1.4), 0x4ad8ff, 2, 3); return false; }
-    const before = e.hp; p.strike(e, base, kx, kz, heavy, kind);
+    const before = e.hp; p.strike(e, base, kx, kz, heavy, kind); killMeter(p, e);
     let d = Math.max(0, before - e.hp);
     if (dealt + d > cap && !e.dead) { e.hp += dealt + d - cap; d = cap - dealt; } // clamp the overshoot (Bossfang/crits applied first)
     p.vk.bossDealt.set(e, dealt + d);
     return true;
   }
   p.strike(e, base, kx, kz, heavy, kind);
+  killMeter(p, e);
   return true;
 }
+// v3: every kill by Volkar's own hits adds Storm meter (counted once per enemy)
+export function killMeter(p, e) { if (p.vk && !e.vKillMeter && (e.dead || e.hp <= 0)) { e.vKillMeter = true; addMeter(p, p.char.meter.kill || 0); } }
 const enemies = (p) => p.world.enemies.list;
 function near(p, pos, r, skip) {
   const out = [];
@@ -172,12 +175,18 @@ export function onMaulHit(p, e, swingDmg, struck) {
 }
 // swing start: is this swing the Ground Discharge?
 export function onSwingStart(p) { p.vk.swingGain = 0; p.vk.discharge = p.vk.charge >= chargeMax(p); if (p.vk.discharge) p.world.sfx('vMark'); }
+// v3: the maul head's own small area at the impact point; same swing damage, skips anything the swing already struck
+export function slamTargets(p, forward, struck) {
+  const a = p.char.charge.slamAoE, at = p.position.clone().addScaledVector(forward, a.at);
+  return near(p, at, a.r, struck);
+}
+export const burstMult = (p) => (p.vk?.burstT > 0 ? 1 + p.char.charge.burst.pct : 1);
 export const swingMult = (p) => (p.vk?.empowerT > 0 ? 1 + p.char.surge.empowerPct : 1);
 // after the swing's own hits: the Ground Discharge
 // v2: every maul hit is an overhead SLAM; this is the visual ground impact (no damage, purely cosmetic).
 // Hits 1-2 are quick slams, the 3rd a heavier one; a Ground Discharge is the same slam, bigger again.
 function slamImpact(p, forward, heavy, discharge) {
-  const at = p.position.clone().addScaledVector(forward, 1.6), fx = p.world.effects, f = vfx(p);
+  const at = p.position.clone().addScaledVector(forward, p.char.charge.slamAoE.at), fx = p.world.effects, f = vfx(p);
   const big = discharge ? 1.9 : heavy ? 1.35 : 1;
   fx.spawnRing(at, discharge ? 0x4ad8ff : 0x9adfff, 1.3 * big, 0.25);
   fx.localSparks(at.clone().setY(0.2), 0x7a6a58, heavy || discharge ? 10 : 6, 4); // dust
@@ -191,6 +200,7 @@ function slamImpact(p, forward, heavy, discharge) {
 }
 export function afterSwing(p, forward, struck) {
   const v = p.vk, heavy = p.comboStep >= p.combo.length;
+  v.burstT = p.char.charge.burst.t;
   if (!v.discharge) { slamImpact(p, forward, heavy, false); return; }
   v.discharge = false; v.charge = 0;
   const d = p.char.charge.discharge, at = p.position.clone().addScaledVector(forward, 1.2), fx = p.world.effects;
@@ -313,6 +323,7 @@ export function vTick(p, dt) {
   else if (v.charge > 0 && (v.decayT += dt) >= 1.5) { v.decayT = 0; v.charge--; }
   if (v.combatT < 3) v.decayT = 0;
   if (v.surge) surgeTick(p, dt);
+  if (v.burstT > 0) v.burstT -= dt;
   // strike scheduler: telegraphs follow their target until 0.2 s before impact, then lock
   for (let i = v.strikes.length - 1; i >= 0; i--) {
     const st = v.strikes[i]; st.t -= dt;

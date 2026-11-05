@@ -168,6 +168,7 @@ export const EVOLUTIONS = {
   eSingular:EV({ name: 'Singularity', icon: '◎', heroes: O, needs: ['oGrapple', 'oVortex'], text: 'Gravity Well +40% bigger, +1.5s, and detonates when it ends' }),
   eExtinct:EV({ name: 'Extinction Protocol', icon: '☢', heroes: A, needs: ['axFactory', 'axFeedback'], text: 'Every 5 drone kills builds a temporary drone (max 4, 12s, not counted against capacity)' }),
   eLegion: EV({ name: 'Shadow Legion', icon: '⧉', heroes: N, needs: ['nShade', 'nMirror'], text: 'Shadow Clone +15% of your damage and lasts 2s longer' }),
+  eSkysunder:EV({ name: 'Skysunder Volley', icon: '⚡', heroes: T, needs: ['tSkyChain', 'tSkyCount'], text: 'Each Skyfall mark becomes a 3-strike volley walking forward (follow-ups 60%); chains fork once at a Shocked foe, up to 8 jumps per volley' }),
   // PHASE 5B (phase5.js)
   eOverdrive:EV({ name: 'Overdrive Engine', icon: '⇶', needs: ['p5Momentum', 'speed'], text: '5 attack hits within 2s of moving = 3s OVERDRIVE: +20% speed and every attack hit pulses (10s cooldown). Replaces the capacitor burst while active' }),
   eAegis:   EV({ name: 'Reactive Aegis', icon: '⛉', needs: ['p5Plating', 'maxHp'], text: 'Plating shockwave is bigger and stuns; go 2s without being hit after it for a second recovery pulse' }),
@@ -187,6 +188,7 @@ export const MYTHICS = {
   myGlass:   MY({ name: 'Glass Cannon', icon: '◈', text: 'x2 damage, but health orbs no longer heal you' }),
   myClock:   MY({ name: 'Overclock', icon: '⧗', text: 'Every 30s: 5s with no Blink or ultimate cooldowns' }),
   myStand:   MY({ name: 'Last Stand', icon: '♛', text: 'Once per boss wave, lethal damage leaves you at 1 HP with +50% damage for 5s' }),
+  myVkSquall:MY({ name: 'Brewing Squall', icon: '⛈', heroes: T, text: 'Every 4th Ground Discharge leaves a storm cloud for 4s that strikes a Shocked enemy every 0.6s (max 1 cloud)' }),
   // PHASE 5B (phase5.js)
   myRift:    MY({ name: 'Graviton Rift', icon: '◍', text: 'Every 25 attack hits tears a gravity rift at your target for 2.5s: drags foes in, crushes them, then collapses (10s cooldown; bosses only slowed)' }),
   myParadox: MY({ name: 'Paradox Engine', icon: '∞', text: 'Alternate attacks and abilities 6 times: 5s PARADOX, attack hits fracture in bursts, one free mobility charge, and it ends in a collapse blast (15s cooldown)' }),
@@ -374,7 +376,7 @@ export class Loadout {
     s.myCuts = L('myCuts'); s.myTempest = L('myTempest'); s.myWrath = L('myWrath'); s.myField = L('myField'); s.myCollapse = L('myCollapse');
     s.axCap = L('axCap'); s.axFactory = L('axFactory'); s.axServo = 0.15 * L('axServo'); s.axPayload = L('axPayload'); s.axFeedback = L('axFeedback'); s.axPlating = L('axPlating'); s.axEvo = L('eExtinct'); s.myAxSing = L('myAxSing');
     s.p5 = { momentum: L('p5Momentum'), plating: L('p5Plating'), conductor: L('p5Conductor'), overload: L('p5Overload'), vents: L('p5Vents'), echo: L('p5Echo'), overdrive: L('eOverdrive'), aegis: L('eAegis'), cascade: L('eCascade'), rift: L('myRift'), paradox: L('myParadox'), warforge: L('myWarforge') }; // PHASE 5
-    s.tCharge = L('tCharge'); s.tWave = L('tWave'); s.tArc = L('tArc'); s.tSkyChain = L('tSkyChain'); s.tSkyCount = L('tSkyCount'); s.tSkyQuick = L('tSkyQuick'); s.tSurge = L('tSurge'); s.tMeter = L('tMeter'); // VOLKAR (volkar.js)
+    s.tCharge = L('tCharge'); s.tWave = L('tWave'); s.tArc = L('tArc'); s.tSkyChain = L('tSkyChain'); s.tSkyCount = L('tSkyCount'); s.tSkyQuick = L('tSkyQuick'); s.tSurge = L('tSurge'); s.tMeter = L('tMeter'); s.tEvo = L('eSkysunder'); s.myVk = L('myVkSquall'); // VOLKAR (volkar.js)
     if (L('tSkyQuick')) s.dashCd *= 1 - (0.5 / 7) * L('tSkyQuick');
     s.myEcho = L('myEcho'); s.myClock = L('myClock'); s.myStand = L('myStand'); s.noOrbHeal = L('myGlass');
     if (L('myGlass')) s.dmg *= 2;

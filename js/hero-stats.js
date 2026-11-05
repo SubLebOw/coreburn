@@ -125,7 +125,9 @@ export const HERO_STATS = {
     charge: { max: 6 /* v3: was 10 */, minMax: 3, perHit: 1, perShocked: 2, capPerSwing: 4, shockT: 3, wave: { r: 1.4, pct: 0.25, max: 4 }, discharge: { r: 3.2, dmg: 2.2, arcs: 3, arcRange: 4.5, arcPct: 0.6, stun: 0.4 },
       slamAoE: { r: 1.35, pct: 1, at: 1.8 } /* v3: maul head hits a 1.35 m area round the impact point, full swing damage, once per target */, burst: { pct: 0.2, t: 0.6 } /* v3: +20% move speed 0.6 s after each slam */ },
     dashCd: 5 /* v3: was 7 */, dashCharges: 1,
-    skyfall: { targets: 3, range: 999, /* v2: was 12 m, now effectively map-wide */ delay: 0.65, radius: 1.6, dmg: 3.0, chainRange: 4.5, chainPct: 0.6, eliteChainBonus: 0.25, lunge: 3, chainJumps: 1, maxJumps: 6 },
+    skyfall: { targets: 3, range: 999, /* v2: was 12 m, now effectively map-wide */ delay: 0.65, radius: 1.6, dmg: 3.0, chainRange: 4.5, chainPct: 0.6, eliteChainBonus: 0.25, lunge: 3, chainJumps: 1, maxJumps: 6,
+      evo: { strikes: 3, step: 1.8, gap: 0.15, followPct: 0.6, maxJumps: 8, bossCapPct: 0.03 } /* v4 Skysunder Volley */ },
+    mythic: { every: 4, time: 4, interval: 0.6, dmg: 2.0, radius: 1.2, range: 8, bossCapPct: 0.03 }, // v4 Brewing Squall
     meter: { max: 100, hit: 4, shockedHit: 6, skyStrike: 8, kill: 3, passive: 1, lockAfter: 6 }, // v3: hit 2->4, shocked 3->6, sky 4->8, passive 0.5->1, +3 per kill (new)
     surge: { windup: 1.0, time: 8, interval: 0.45, radius: 1.8, dmg: 2.0, targets: 2, finisherDmg: 6, finisherR: 3.5, empowerT: 3, empowerPct: 0.25, bossCapPct: 0.04 },
     ultCd: 1, // the ultimate is gated by the Storm meter (volkar.js), not a timer

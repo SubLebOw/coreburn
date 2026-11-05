@@ -25,3 +25,21 @@ js/volkar.js: chargeMax floor, killMeter (once per enemy), slamTargets, burstMul
 js/player.js: slam AoE pass (skips enemies already struck that swing), +20% walk for 0.6 s after each slam, no hit flinch mid-slam.
 Note: the game has no player knockback (only boss body-collision push), so "knockback resistance" = no flinch during the slam.
 Tests: hp 24/24, fingerprints byte-identical, smokes 0 errors. Time-to-full-Storm ~40 s -> ~11 s (bot, wave 8).
+
+## v4 (volkar-test4): evolution, Mythic, co-op visuals
+- **Evolution: Skysunder Volley** (`eSkysunder`, needs Chain Lightning + Thunderhead both maxed, gold card). Every Skyfall
+  mark becomes a 3-strike volley walking forward along the lunge (1.8 m steps, 0.15 s apart). Follow-ups 60% of the
+  Skyfall hit (3.0x base -> 1.8x), no meter. Chains fork once at a Shocked foe; 8 jumps max per volley (shared pool).
+  The follow-ups + chains share a 3% boss max-HP budget per cast. Named "Skysunder" since Skybreaker is a Volkar rank title.
+- **Mythic: Brewing Squall** (`myVkSquall`, Volkar only, normal Mythic rules: wave 75+). Every 4th Ground Discharge
+  leaves a storm cloud for 4 s (max 1). Every 0.6 s it strikes the nearest Shocked enemy within 8 m (2.0x base, 1.2 m area,
+  kind 'shock', re-Shocks). The cloud's own 3% boss max-HP cap. (The spec's "Living Storm" is a Volkar rank title.)
+- **Co-op visuals**: every pooled Volkar effect (bolt, arc, telegraph, crack, cloud) records on the host as a `vk` fx event
+  (`setVolkarRecorder` in coop.installRecorders) and is replayed by friends with `vfxReplay`. Skyfall impact rings now use the
+  recorded spawnRing. Rough edge: replayed telegraphs stay where they were placed (the host's follow the target); the
+  far-target chevrons are not sent.
+- **Perf**: bolt/arc/crack segments are now 3 InstancedMeshes (was up to ~100 separate meshes). The pool ticks once per frame
+  from main.js (`tickVolkarFX`), which also fixes the double-speed decay with 2 Volkars in one scene.
+- Dev: cbDev.volkarEvo(), cbDev.volkarMythic() (+ panel buttons). volkarCards now maxes only normal cards.
+- Tests: enemy (22) / boss (24) fingerprints byte-identical, hp.mjs 24/24, desktop + 844x390 smokes 0 errors,
+  simulated co-op (host recorder -> JSON -> friend replay) 73 events, 0 errors.

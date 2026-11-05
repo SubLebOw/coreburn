@@ -28,6 +28,7 @@ import { waveStats } from './waves.js?v=1.34.0';
 import { CHARACTERS, ALL_HEROES, DUPLICATE_TINTS, displayName } from './characters.js?v=1.34.0';
 import { GAME_VERSION } from './version.js?v=1.34.0';
 import { cleanLook } from './progress.js?v=1.34.0';
+import { setVolkarRecorder, vfxReplay } from './volkar.js?v=1.34.0'; // Phase 6 TEST: Volkar VFX for friends
 
 const SNAP_RATE = 15;   // host -> friends, per second
 const INPUT_RATE = 20;  // friend -> host, per second
@@ -377,6 +378,7 @@ export class Coop {
       const orig = effects[name].bind(effects);
       effects[name] = (...args) => { if (name !== 'spawnSparks' || this.fx.length < 80) rec(['fx', name, ...args.map(ser)]); return orig(...args); };
     }
+    setVolkarRecorder((op, a) => rec(['vk', op, ...a.map(ser)]));
     const sfx = world.sfx;
     world.sfx = (n, o) => { rec(['snd', n, o]); sfx(n, o); };
     const shake = world.shake;
@@ -857,6 +859,7 @@ export class Coop {
         case 'shk': world.shake(ev[1] * 0.7); break;
         case 'ban': hud.showBanner(ev[1], ev[2], ev[3]); hud.setMutator(/^MUTATOR/.test(ev[1]) ? { name: ev[1].slice(9), color: ev[3] } : (/CLEARED|BOSS/.test(ev[1]) ? null : undefined)); break;
         case 'bolt': this.ctx.arena.strikeVisual(deser(ev[1])); break;
+        case 'vk': vfxReplay(this.ctx.scene, ev[1], ev.slice(2).map(deser)); break;
         case 'cmb': this.comboView.events.push(...ev[1]); break;
       }
     } catch { /* a missing effect is never worth crashing over */ }

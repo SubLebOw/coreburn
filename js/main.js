@@ -26,6 +26,7 @@ import { Combo } from './combo.js?v=1.34.0';
 import { CHARACTERS, CHARACTER_ORDER, heroOrder, displayName } from './characters.js?v=1.34.0';
 import { isPickWave } from './upgrades.js?v=1.34.0';
 import { Coop } from './coop.js?v=1.34.0';
+import { tickVolkarFX } from './volkar.js?v=1.34.0'; // Phase 6 TEST: Volkar's pooled VFX (host + co-op friends)
 import { meta, scrapForRun, RARE_DROPS, SHOP } from './meta.js?v=1.34.0';
 import { MUTATORS, isMutatorWave, rollMutator } from './mutators.js?v=1.34.0';
 import { GOLD_TIME } from './golden.js?v=1.34.0';
@@ -1149,7 +1150,7 @@ function frame() {
   if (state === 'playing' && !world.runOver && !(player.dead && !coop.mode)) runClock += dt; // RUN TIMER
   hud.setTimer(runClock);
   if (coop.mode === 'host') coop.hostNet(dt, state); // snapshots to friends
-  if (state !== 'upgrade' && state !== 'paused') effects.update(worldDt);
+  if (state !== 'upgrade' && state !== 'paused') { effects.update(worldDt); tickVolkarFX(scene, worldDt); }
   updateCamera(dt);
   if (coop.mode === 'client' && coop.view) {
     const v = coop.view;

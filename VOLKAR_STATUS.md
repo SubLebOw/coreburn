@@ -71,3 +71,21 @@ Tests: hp 24/24, fingerprints byte-identical, smokes 0 errors. Time-to-full-Stor
   - Readable on the brightest arena (Frozen Scrap Tundra): MeshBasic telegraphs stay bright; ~12% ambient left for silhouettes.
   - Restores on Surge end / death / reset / wave begin. Synced via throttled `vk dark` (incl. flash flag). Extra draw calls ≈ +1 disc +1 sheet (vignette is DOM).
 - Tests: fingerprints byte-identical, hp 24/24, desktop + 844x390 smokes 0 errors. Surge draw calls ~108 idle-arena / ~446 with 14 enemies.
+
+## v7 (volkar-test7): moody Surge + Mjolnir throw (Zac playtest on v6)
+Zac: "literally can't see anything with the ultimate" / "hammer throw looks way too silly."
+
+- **Surge darkening (moody storm, not blackout):** halfway v5↔v6.
+  - hemi ≈ −52%, sun ≈ −60%, bg/fog partial lerp to stormy blue-grey `0x2a3548` (dark arenas deepen to `0x101820` instead of brightening).
+  - Light CSS vignette (opacity 0.5), softer storm disc (opacity 0.28), brief non-blinding sheet flashes (0.07 s, opacity ≤0.22).
+  - Faint cool enemy `baseEmissive` rim (`0x1a3048`) while storming; restored on clear.
+  - Mean screen luminance (Playwright screenshots, relative luminance):
+    - Frozen Scrap Tundra: **193.5 → 115.1 (59.5%)** — in the 55–70% target.
+    - Neon Rust Cathedral (darkest): **42.0 → 33.0 (78.7%)** — already-dark arena; stays readable, refuses further blackout.
+- **Hammer throw (still visual only; Skyfall gameplay/timing unchanged):**
+  - Hand-scale maul (matches arm model); head-first, low tight path (`+0.35 sin`), very fast linear out, slight axial spin.
+  - Side-arm / forward hurl poses (no floppy overhead). Short wind 0.1 s, catch snap 0.12 s.
+  - Tight electric afterimage streak (6 segs) + occasional local crackle arcs; tip corona for top-down readability.
+  - Impact: bolt hits planted maul + ground crack + sharp ring; fast same-line return; clean catch + small arm recoil.
+  - **Honest take:** from the top-down camera the hand-scale projectile still reads weakly next to bolts/telegraphs. Better than the v6 tumble, but if it still feels silly the stronger alternative is: maul stays in hand, Volkar points, the sky answers, maul crackles.
+- Tests: enemy (22) / boss (24) fingerprints byte-identical to v1.34.0, hp.mjs 24/24, desktop + 844×390 smokes 0 JS errors.

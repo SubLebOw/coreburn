@@ -1480,9 +1480,9 @@ export class Player {
     if (this.kit === 'thane' && this.state !== 'attack') m.body.rotation.y = 0;
     if (this.kit === 'thane' && this.state === 'normal') { // v2 idle / run: maul resting on the right shoulder, head up behind it
       const tp = this.vk?.throwPose;
-      if (tp === 'out' || tp === 'release') { m.body.rotation.x = 0.2; m.armR.rotation.set(-0.5, 0, -0.9); m.armL.rotation.set(0.4, 0, 0.35); } // empty-hand follow-through after the lunge
-      else if (tp === 'catch') { m.armR.rotation.set(-2.5, 0, 0.2); m.armL.rotation.set(0.3, 0, 0.3); }
-      else if (tp === 'wind') { m.body.rotation.x = -0.2; m.armR.rotation.set(-3.9, 0.5, -0.6); m.armL.rotation.set(0.2, 0, 0.5); }
+      if (tp === 'out' || tp === 'release') { m.body.rotation.x = 0.15; m.body.rotation.y = -0.25; m.armR.rotation.set(-1.4, -0.15, -0.35); m.armL.rotation.set(0.4, 0, 0.3); }
+      else if (tp === 'catch') { m.armR.rotation.set(-2.2, 0.1, 0.1); m.armL.rotation.set(0.25, 0, 0.3); }
+      else if (tp === 'wind') { m.body.rotation.y = 0.45; m.armR.rotation.set(-1.1, 0.7, -1.3); m.armL.rotation.set(0.3, 0, 0.4); }
       else m.armR.rotation.set(-3.65 + Math.sin(now * P.breath) * 0.04 + swing * 0.08 * speedRatio, 0, 0.3);
     }
     m.idle?.(now, speedRatio); // animated parts: Orin's motes, Axiom's head scan
@@ -1539,11 +1539,11 @@ export class Player {
       } else if (kit === 'iskra' || kit === 'ninja' || kit === 'axiom') { // blink-in: crouched, arms spread
         m.body.rotation.x = 0.3;
         m.armL.rotation.set(0.4, 0, 1.2); m.armR.rotation.set(0.4, 0, -1.2);
-      } else if (kit === 'thane') { // v6 Skyfall throw poses (override the old both-arms-raised lunge)
+      } else if (kit === 'thane') { // v7 Skyfall: short side-arm / forward hurl (not floppy overhead)
         const tp = this.vk?.throwPose;
-        if (tp === 'wind') { m.body.rotation.x = -0.25; m.body.rotation.y = 0.35; m.armR.rotation.set(-3.9, 0.5, -0.6); m.armL.rotation.set(0.2, 0, 0.5); } // overhead wind-up
-        else if (tp === 'release' || tp === 'out') { m.body.rotation.x = 0.45; m.body.rotation.y = -0.15; m.armR.rotation.set(-0.3, 0, -1.1); m.armL.rotation.set(0.6, 0, 0.4); } // hard forward release, empty hand
-        else if (tp === 'catch') { m.body.rotation.x = 0.1; m.armR.rotation.set(-2.4, 0, 0.25); m.armL.rotation.set(0.3, 0, 0.35); } // catch snap
+        if (tp === 'wind') { m.body.rotation.x = 0.05; m.body.rotation.y = 0.55; m.armR.rotation.set(-1.1, 0.8, -1.4); m.armL.rotation.set(0.35, 0, 0.45); } // coil back across the body
+        else if (tp === 'release' || tp === 'out') { m.body.rotation.x = 0.3; m.body.rotation.y = -0.4; m.armR.rotation.set(-1.6, -0.2, -0.3); m.armL.rotation.set(0.5, 0, 0.35); } // snap forward, empty hand
+        else if (tp === 'catch') { m.body.rotation.x = 0.05; m.body.rotation.y = 0.1; m.armR.rotation.set(-2.1, 0.15, 0.15); m.armL.rotation.set(0.25, 0, 0.3); } // clean catch recoil
         else { m.body.rotation.x = 0.25; m.armR.rotation.set(-3.0, 0, -0.15); m.armL.rotation.set(0.5, 0, 0.5); }
       } else if (kit === 'orin') { // reeling in on the magnet line
         m.body.rotation.x = 0.4;

@@ -520,6 +520,7 @@ export function buildThane(t) {
   return { ...m, core, flashMats: [mats.plate, mats.plateDark, mats.coat, mats.metal], blade: mats.blade, blades: [b], halos: [h], bladeBase: -0.95, bladeLen: 0.5,
     rings, arcs, glowMat: mats.glow,
     setCharge(v) { charge = v; }, // 0..1 (Charge stacks / Surge): coils spin faster, arcs crackle more
+    setMaulVisible(on) { for (const x of [...rings, ...arcs, b, h]) x.visible = on; }, // v5: hide coils/blade (shaft is baked into the arm mesh — see VOLKAR_STATUS)
     anchors: { headTop: 0.32, back: -0.42, shoulder: 0.5, scale: 1.18, headW: 0.2, faceZ: 0.22 }, style: 'bruiser',
     idle(t) {
       const sp = 3 + charge * 14;

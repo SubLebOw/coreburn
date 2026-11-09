@@ -43,3 +43,17 @@ Tests: hp 24/24, fingerprints byte-identical, smokes 0 errors. Time-to-full-Stor
 - Dev: cbDev.volkarEvo(), cbDev.volkarMythic() (+ panel buttons). volkarCards now maxes only normal cards.
 - Tests: enemy (22) / boss (24) fingerprints byte-identical, hp.mjs 24/24, desktop + 844x390 smokes 0 errors,
   simulated co-op (host recorder -> JSON -> friend replay) 73 events, 0 errors.
+
+## v5 (volkar-test5): Grounded, Surge sky, hammer throw, kill shatter, audio
+- **Grounded passive:** stand still in `normal` for **1.0 s** → next slam deals **+18%** damage (`swingMult`). No DR / i-frames.
+  Visual: cyan ring on ready, maul coils crackle harder, ground arcs + `vCrackle` every 0.28 s while held. Consumed on swing start.
+- **Surge sky darkening:** during Tempest Surge the background/fog lerp toward night, hemi −45%, sun −65%, camera pulls back up to **+4** units.
+  Thunder rumbles every 1.8 s in the storm phase. Restores on Surge end, death, `vReset`, and wave begin. Recorded as `vk dark` for friends (throttled).
+- **Skyfall hammer throw (visual only):** on cast a pooled glowing maul flies to the first mark, lightning lands on it, then it returns in 0.35 s.
+  Gameplay (lunge, damage, timing, marks) unchanged. Coils/blade hide; the shaft is baked into the arm mesh so a faint hand-maul remains (rough edge).
+  Recorded as `vk throwMaul`.
+- **Kill shatter (visual only):** enemies killed by Volkar slams or Ground Discharge set `e.vShatter` and skip normal scrap — instead pooled cracks + cyan arcs/sparks (cap **3 new / frame**).
+  Drops / kill logic / fingerprints untouched. Recorded as `vk shatter`.
+- **Audio:** 3rd slam gets a heavier thunder (`vSwing` step≥3); Charge ticks add bandpass crackle; Discharge is a bigger boom; new `vCrackle` / `vShatter` cues. All go through the existing synth + mute/volume bus.
+- Tests: enemy/boss fingerprints byte-identical, hp 24/24, desktop + 844x390 smokes 0 errors.
+  Draw calls during Surge ~256–387 avg (15 enemies); during shatter bursts ~310.

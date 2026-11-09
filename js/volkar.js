@@ -15,7 +15,7 @@ const now = () => performance.now() / 1000;
 const isShocked = (e) => (e.vShockUntil || 0) > now();
 
 // ---------------- pooled VFX (one per scene) ----------------
-const BOLTS = 8, ARCS = 18, TELES = 10, CRACKS = 4, PTRS = 6;
+const BOLTS = 8, ARCS = 18, TELES = 10, CRACKS = 8, PTRS = 6; // v5: +4 cracks for kill-shatter
 class VolkarFX {
   constructor(scene) {
     this.scene = scene;
@@ -52,6 +52,13 @@ class VolkarFX {
     const chev = new THREE.ConeGeometry(0.32, 0.9, 3); chev.rotateX(Math.PI / 2); chev.scale(1, 0.15, 1);
     this.ptrMat = new THREE.MeshBasicMaterial({ color: 0x6ae4ff });
     this.ptrs = Array.from({ length: PTRS }, () => { const m = new THREE.Mesh(chev, this.ptrMat); m.visible = false; m.frustumCulled = false; scene.add(m); return { m, life: 0 }; });
+    // v5: thrown maul for Skyfall (visual only) + shatter budget
+    this.throwG = new THREE.Group(); this.throwG.visible = false; scene.add(this.throwG);
+    const shaft = new THREE.Mesh(seg, new THREE.MeshBasicMaterial({ color: 0x3a3e46 })); shaft.scale.set(0.09, 1.2, 0.09); shaft.position.y = 0.65; this.throwG.add(shaft);
+    const head = new THREE.Mesh(seg, new THREE.MeshBasicMaterial({ color: 0x6a7078 })); head.scale.set(0.42, 0.34, 0.6); head.position.y = 0; this.throwG.add(head);
+    const band = new THREE.Mesh(seg, new THREE.MeshBasicMaterial({ color: 0xe0702a })); band.scale.set(0.46, 0.1, 0.64); band.position.y = 0; this.throwG.add(band);
+    const glow = new THREE.Mesh(seg, new THREE.MeshBasicMaterial({ color: 0xbfe8ff })); glow.scale.set(0.5, 0.4, 0.7); glow.position.y = 0; this.throwG.add(glow);
+    this.throw = null; this.shatterN = 0;
   }
   crack(pos, dir, size) { // radiating dark shards on the floor at a slam impact
     rec('crack', pos, dir, size);
@@ -95,7 +102,69 @@ class VolkarFX {
     t.ring.scale.setScalar(r); t.fill.scale.setScalar(0.01); t.ring.visible = t.fill.visible = true; return t;
   }
   cloud(pos, life) { rec('cloud', pos, life); this.cloudG.position.set(pos.x, 6.5, pos.z); this.cloudLife = life; this.cloudG.visible = life > 0; }
+  // v5 Skyfall hammer throw (visual only). `out` seconds to the mark, then a short hold, then `back` seconds home.
+  throwMaul(from, to, out, back = 0.35) {
+    rec('throwMaul', from, to, out, back);
+    const g = this.throwG; g.visible = true;
+    this.throw = { from: from.clone(), to: to.clone().setY(1.2), out, back, t: 0, phase: 'out', home: from.clone() };
+    g.position.copy(from).setY(1.6);
+  }
+  // v5 kill shatter: glowing cracks + cyan sparks; hard cap 3 new ones per frame (shatterN reset in update)
+  shatter(pos, y = 1.2) {
+    if (this.shatterN >= 3) return;
+    this.shatterN++;
+    rec('shatter', pos, y);
+    const p = pos.clone ? pos.clone() : new THREE.Vector3(pos.x, 0, pos.z);
+    const was = REPLAY; REPLAY = true; // play crack/arc without a second co-op record (shatter itself is the event)
+    try {
+      this.crack(p, new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize(), 1.4);
+      this.arc(p.clone().setY(y), p.clone().setY(y).add(new THREE.Vector3(1.2, 0, 0)));
+      this.arc(p.clone().setY(y), p.clone().setY(y).add(new THREE.Vector3(-0.8, 0, 1)));
+    } finally { REPLAY = was; }
+    if (this._world?.effects) { this._world.effects.localSparks?.(p.clone().setY(y), 0xe8fbff, 10, 7); this._world.effects.localRing?.(p, 0x4ad8ff, 1.6, 0.25); }
+  }
+  // v5 Surge sky darkening (friends replay). k=1 full dark, k=0 clear. Camera pull lives on the shared world flag.
+  dark(k, cam = 4) {
+    // only record when the darkness steps (Surge ticks every frame; don't flood the co-op fx buffer)
+    if (this._darkK === undefined || Math.abs(this._darkK - k) > 0.08 || ((k <= 0) !== (this._darkK <= 0))) rec('dark', k, cam);
+    this._darkK = k;
+    const sc = this.scene, w = this._world;
+    if (!w) return;
+    if (k <= 0) {
+      const snap = w._vStormSnap; if (!snap) { w.vCamExtra = 0; w._vStormSnap = null; return; }
+      sc.background?.copy?.(snap.bg); if (sc.fog) { sc.fog.color.copy(snap.fogC); sc.fog.near = snap.near; sc.fog.far = snap.far; }
+      w.env.hemi.intensity = snap.hemi; w.env.baseHemi = snap.base; w.env.sun.intensity = snap.sun;
+      w.vCamExtra = 0; w._vStormSnap = null; return;
+    }
+    if (!w._vStormSnap) {
+      w._vStormSnap = { bg: sc.background?.clone?.() || new THREE.Color(0x14191d), fogC: sc.fog?.color.clone() || new THREE.Color(0x14191d),
+        near: sc.fog?.near ?? 45, far: sc.fog?.far ?? 95, hemi: w.env.hemi.intensity, base: w.env.baseHemi, sun: w.env.sun.intensity };
+    }
+    const snap = w._vStormSnap, darkCol = new THREE.Color(0x060814);
+    if (sc.background) sc.background.copy(snap.bg).lerp(darkCol, 0.7 * k);
+    if (sc.fog) { sc.fog.color.copy(snap.fogC).lerp(darkCol, 0.7 * k); sc.fog.near = snap.near * (1 - 0.45 * k); sc.fog.far = snap.far * (1 - 0.2 * k); }
+    w.env.baseHemi = snap.base * (1 - 0.45 * k); w.env.hemi.intensity = w.env.baseHemi;
+    w.env.sun.intensity = snap.sun * (1 - 0.65 * k);
+    w.vCamExtra = cam * k;
+  }
   update(dt) {
+    this.shatterN = 0;
+    if (this.throw) { // v5 maul flight
+      const th = this.throw, g = this.throwG; th.t += dt;
+      if (th.phase === 'out') {
+        const u = Math.min(1, th.t / Math.max(0.05, th.out)), e = u * u * (3 - 2 * u);
+        g.position.lerpVectors(th.from, th.to, e); g.position.y = 1.6 + Math.sin(u * Math.PI) * 2.4;
+        g.rotation.set(u * 6.5, Math.atan2(th.to.x - th.from.x, th.to.z - th.from.z), 0.4);
+        if (u >= 1) { th.phase = 'hold'; th.t = 0; }
+      } else if (th.phase === 'hold') {
+        if (th.t >= 0.12) { th.phase = 'back'; th.t = 0; th.from.copy(g.position); }
+      } else {
+        const u = Math.min(1, th.t / Math.max(0.05, th.back)), e = u * u * (3 - 2 * u);
+        g.position.lerpVectors(th.from, th.home, e); g.position.y = 1.4 + Math.sin(u * Math.PI) * 1.6;
+        g.rotation.x = 6.5 * (1 - u);
+        if (u >= 1) { g.visible = false; this.throw = null; if (this._throwOwner) { this._throwOwner.model?.setMaulVisible?.(true); this._throwOwner = null; } }
+      }
+    }
     const off = (x) => { for (const s of x.segs) { s.visible = false; s.g.dirty = true; } };
     for (const b of this.bolts) if (b.life > 0 && (b.life -= dt) <= 0) off(b);
     for (const z of this.arcs) if (z.life > 0 && (z.life -= dt) <= 0) off(z);
@@ -114,25 +183,29 @@ class VolkarFX {
       t.fill.scale.setScalar(Math.max(0.01, t.r * (1 - t.life / t.max)));
     }
   }
-  clear() { this.cloudLife = 0; this.cloudG.visible = false; for (const g of this.inst) g.dirty = true; for (const b of [...this.bolts, ...this.arcs]) { b.life = 0; for (const s of b.segs) s.visible = false; } for (const t of this.teles) { t.life = 0; t.ring.visible = t.fill.visible = false; } for (const c of this.cracks) { c.life = 0; for (const s of c.segs) s.visible = false; } for (const q of this.ptrs) { q.life = 0; q.m.visible = false; } }
+  clear() { this.cloudLife = 0; this.cloudG.visible = false; this.throw = null; this.throwG.visible = false; if (this._throwOwner) { this._throwOwner.model?.setMaulVisible?.(true); this._throwOwner = null; } this.dark(0); for (const g of this.inst) g.dirty = true; for (const b of [...this.bolts, ...this.arcs]) { b.life = 0; for (const s of b.segs) s.visible = false; } for (const t of this.teles) { t.life = 0; t.ring.visible = t.fill.visible = false; } for (const c of this.cracks) { c.life = 0; for (const s of c.segs) s.visible = false; } for (const q of this.ptrs) { q.life = 0; q.m.visible = false; } }
   get live() { return this.bolts.filter((b) => b.life > 0).length + this.arcs.filter((b) => b.life > 0).length + this.teles.filter((t) => t.life > 0).length; }
 }
 const _up = new THREE.Vector3(0, 1, 0), _v = new THREE.Vector3(), _zero = new THREE.Matrix4().makeScale(0, 0, 0);
 const FX = new WeakMap();
 const fxFor = (scene) => { let f = FX.get(scene); if (!f) { f = new VolkarFX(scene); FX.set(scene, f); } return f; };
-export function vfx(p) { return fxFor(p.scene); }
+export function vfx(p) { const f = fxFor(p.scene); if (p.world) { f._world = p.world; p.world.volkarShatter = (pos, y) => f.shatter(pos, y); } return f; }
 // v4 CO-OP: the host records every pooled Volkar effect (coop.installRecorders sets REC); friends replay them into
 // their own pool (vfxReplay). Telegraphs replay where they were placed (they don't follow the target on friends).
 let REC = null, REPLAY = false;
 function rec(op, ...a) { if (REC && !REPLAY) REC(op, a); }
 export function setVolkarRecorder(f) { REC = f; }
-export function vfxReplay(scene, op, args) { const f = fxFor(scene); if (typeof f[op] !== 'function') return; REPLAY = true; try { f[op](...args); } finally { REPLAY = false; } }
+export function vfxReplay(scene, op, args, world) { const f = fxFor(scene); if (world) f._world = world; if (typeof f[op] !== 'function') return; REPLAY = true; try { f[op](...args); } finally { REPLAY = false; } }
 // one tick per frame for the shared scene pool (main loop; host and friends), however many Volkars are in the run
 export function tickVolkarFX(scene, dt) { FX.get(scene)?.update(dt); }
 
 // ---------------- state ----------------
+export function stormClear(p) { // restore Surge sky / camera (death, reset, surge end)
+  const f = FX.get(p?.scene); if (f) f.dark(0); else if (p?.world) { p.world.vCamExtra = 0; p.world._vStormSnap = null; }
+}
 export function vReset(p) {
-  p.vk = { charge: 0, meter: 0, lockT: 0, combatT: 99, decayT: 0, strikes: [], surge: null, empowerT: 0, bossDealt: new Map(), discharge: false, swingGain: 0, dischargeN: 0, cloud: null };
+  stormClear(p);
+  p.vk = { charge: 0, meter: 0, lockT: 0, combatT: 99, decayT: 0, strikes: [], surge: null, empowerT: 0, bossDealt: new Map(), discharge: false, swingGain: 0, dischargeN: 0, cloud: null, stillT: 0, grounded: false, groundedSwing: false };
   if (p.char.id === 'thane' && p.stats?.m?.tPre) p.vk.charge = 3;
   FX.get(p.scene)?.clear();
 }
@@ -163,8 +236,10 @@ function hit(p, e, base, kx, kz, heavy, kind, surge = false) {
   }
   p.strike(e, base, kx, kz, heavy, kind);
   killMeter(p, e);
+  if (arguments[8] && (e.dead || e.hp <= 0)) e.vShatter = true; // v5: optional shatter tag (Discharge)
   return true;
 }
+export function tagShatter(e) { if (e && (e.dead || e.hp <= 0)) e.vShatter = true; }
 // v3: every kill by Volkar's own hits adds Storm meter (counted once per enemy)
 export function killMeter(p, e) { if (p.vk && !e.vKillMeter && (e.dead || e.hp <= 0)) { e.vKillMeter = true; addMeter(p, p.char.meter.kill || 0); } }
 const enemies = (p) => p.world.enemies.list;
@@ -210,14 +285,18 @@ export function onMaulHit(p, e, swingDmg, struck) {
   if (n) p.world.effects.localRing(e.position, 0x6ae4ff, r, 0.18);
 }
 // swing start: is this swing the Ground Discharge?
-export function onSwingStart(p) { p.vk.swingGain = 0; p.vk.discharge = p.vk.charge >= chargeMax(p); if (p.vk.discharge) p.world.sfx('vMark'); }
+export function onSwingStart(p) {
+  const v = p.vk; v.swingGain = 0; v.discharge = v.charge >= chargeMax(p); if (v.discharge) p.world.sfx('vMark');
+  // v5 Grounded: the built static empowers THIS slam, then clears
+  v.groundedSwing = !!v.grounded; v.grounded = false; v.stillT = 0;
+}
 // v3: the maul head's own small area at the impact point; same swing damage, skips anything the swing already struck
 export function slamTargets(p, forward, struck) {
   const a = p.char.charge.slamAoE, at = p.position.clone().addScaledVector(forward, a.at);
   return near(p, at, a.r, struck);
 }
 export const burstMult = (p) => (p.vk?.burstT > 0 ? 1 + p.char.charge.burst.pct : 1);
-export const swingMult = (p) => (p.vk?.empowerT > 0 ? 1 + p.char.surge.empowerPct : 1);
+export const swingMult = (p) => { let m = 1; if (p.vk?.empowerT > 0) m *= 1 + p.char.surge.empowerPct; if (p.vk?.groundedSwing) m *= 1.18; return m; }; // v5 Grounded: +18% on the charged slam
 // after the swing's own hits: the Ground Discharge
 // v2: every maul hit is an overhead SLAM; this is the visual ground impact (no damage, purely cosmetic).
 // Hits 1-2 are quick slams, the 3rd a heavier one; a Ground Discharge is the same slam, bigger again.
@@ -237,7 +316,8 @@ function slamImpact(p, forward, heavy, discharge) {
 export function afterSwing(p, forward, struck) {
   const v = p.vk, heavy = p.comboStep >= p.combo.length;
   v.burstT = p.char.charge.burst.t;
-  if (!v.discharge) { slamImpact(p, forward, heavy, false); return; }
+  const groundedHit = v.groundedSwing; v.groundedSwing = false; // consume after the damage frame has used swingMult
+  if (!v.discharge) { slamImpact(p, forward, heavy, false); if (groundedHit) vfx(p).arc(p.position.clone().setY(0.4), p.position.clone().addScaledVector(forward, 1.5).setY(0.1)); return; }
   v.discharge = false; v.charge = 0;
   if (S(p).myVk && ++v.dischargeN % p.char.mythic.every === 0) { // v4 MYTHIC (Brewing Squall): every 4th Ground Discharge
     const my = p.char.mythic; v.cloud = { pos: p.position.clone().addScaledVector(forward, 1.2).setY(0), t: my.time, tick: 0.3, cap: { map: new Map(), pct: my.bossCapPct } };
@@ -252,7 +332,7 @@ export function afterSwing(p, forward, struck) {
   const hitSet = new Set();
   for (const e of near(p, at, d.r)) {
     const dx = e.position.x - at.x, dz = e.position.z - at.z, dd = Math.hypot(dx, dz) || 1;
-    hit(p, e, REF * d.dmg, dx / dd * 10, dz / dd * 10, true, 'shock');
+    hit(p, e, REF * d.dmg, dx / dd * 10, dz / dd * 10, true, 'shock', false, true);
     if (!e.isBoss) p.stun(e, d.stun);
     shock(p, e); hitSet.add(e);
   }
@@ -286,6 +366,9 @@ export function skyfall(p, aim) {
   }
   p.world.sfx('vMark');
   p.world.effects.localRing(p.position, 0x4ad8ff, 1.6, 0.25);
+  // v5: hurl the maul at the first mark (or the empty lunge end); lightning + return are timed to the first strike
+  const dest = (targets[0]?.position || lungeEnd).clone().setY(1.2), f = vfx(p);
+  p.model?.setMaulVisible?.(false); f._throwOwner = p; f.throwMaul(p.position.clone().setY(1.6), dest, Math.max(0.25, delay - 0.05), 0.35);
 }
 export function skyfallDash(p) { // the 0.18 s Static Lunge (no i-frames: takeDamage has no thane exception)
   const k = p.char.skyfall;
@@ -295,6 +378,7 @@ export function skyfallDash(p) { // the 0.18 s Static Lunge (no i-frames: takeDa
 
 function landStrike(p, st) {
   const fx = vfx(p); fx.bolt(st.pos);
+  if (st.kind === 'skyfall' && fx.throw && fx.throw.phase !== 'back') { fx.throw.phase = 'hold'; fx.throw.t = 0.12; } // v5: lightning hits the planted maul, then it returns
   p.world.effects.spawnRing(st.pos, 0x9ae8ff, st.r * 1.1, 0.25); // v4: recorded, friends see the impact ring
   p.world.effects.localSparks?.(st.pos.clone().setY(0.4), 0xbfe8ff, 8, 6);
   p.world.sfx(st.big ? 'vFinisher' : 'vStrike');
@@ -327,9 +411,10 @@ export function surgeStart(p, echo) {
     queueFinisher(p, 0.6); return;
   }
   v.meter = 0; v.bossDealt = new Map();
-  v.surge = { phase: 'wind', t: 0, tick: 0, end: p.char.surge.time + 0.5 * (S(p).tSurge || 0) + (S(p).m?.tLongStorm ? 1 : 0) };
+  v.surge = { phase: 'wind', t: 0, tick: 0, end: p.char.surge.time + 0.5 * (S(p).tSurge || 0) + (S(p).m?.tLongStorm ? 1 : 0), rumble: 0 };
   p.world.sfx('vWindup');
   p.world.effects.spawnRing(p.position, 0x4ad8ff, 2.4, 0.6);
+  vfx(p).dark(0.35, 2); // v5: sky begins to darken during wind-up
 }
 function queueFinisher(p, delay) {
   const c = p.char.surge;
@@ -347,10 +432,13 @@ function surgeTick(p, dt) {
   const v = p.vk, sg = v.surge, c = p.char.surge;
   sg.t += dt;
   if (sg.phase === 'wind') {
-    if (sg.t >= c.windup) { sg.phase = 'storm'; sg.t = 0; p.world.sfx('thunder'); if (p.state === 'spin') p.endUlt(); }
+    vfx(p).dark(0.35 + 0.65 * Math.min(1, sg.t / c.windup), 2 + 2 * Math.min(1, sg.t / c.windup));
+    if (sg.t >= c.windup) { sg.phase = 'storm'; sg.t = 0; p.world.sfx('thunder'); vfx(p).dark(1, 4); if (p.state === 'spin') p.endUlt(); }
     return;
   }
   if (sg.phase === 'storm') {
+    vfx(p).dark(1, 4);
+    if ((sg.rumble = (sg.rumble || 0) - dt) <= 0) { sg.rumble = 1.8; p.world.sfx('thunder'); } // v5 rumble
     sg.tick -= dt;
     if (sg.tick <= 0) {
       sg.tick = c.interval;
@@ -360,19 +448,35 @@ function surgeTick(p, dt) {
     if (sg.t >= sg.end) { sg.phase = 'fin'; sg.t = 0; queueFinisher(p, 0.8); }
     return;
   }
-  if (sg.phase === 'fin' && sg.t >= 0.85) { v.surge = null; v.lockT = p.char.meter.lockAfter; v.empowerT = c.empowerT; p.world.effects.spawnRing(p.position, 0xe8fbff, 2, 0.4); }
+  if (sg.phase === 'fin') {
+    vfx(p).dark(Math.max(0, 1 - sg.t / 0.85), 4 * Math.max(0, 1 - sg.t / 0.85));
+    if (sg.t >= 0.85) { v.surge = null; v.lockT = p.char.meter.lockAfter; v.empowerT = c.empowerT; p.world.effects.spawnRing(p.position, 0xe8fbff, 2, 0.4); stormClear(p); }
+  }
 }
 
 // ---------------- per-frame ----------------
 export function vTick(p, dt) {
   const v = p.vk; if (!v) return;
+  if (p.dead) { if (v.surge) { v.surge = null; stormClear(p); } return; }
   v.combatT += dt; v.lockT -= dt; v.empowerT -= dt;
   if (v.combatT < 3) addMeter(p, p.char.meter.passive * dt);
   else if (v.charge > 0 && (v.decayT += dt) >= 1.5) { v.decayT = 0; v.charge--; }
   if (v.combatT < 3) v.decayT = 0;
   if (v.surge) surgeTick(p, dt);
+  else if (p.world?._vStormSnap) stormClear(p); // safety: restore if Surge was cleared elsewhere
   if (v.cloud) cloudTick(p, dt);
   if (v.burstT > 0) v.burstT -= dt;
+  // v5 Grounded passive: stand still ~1s (normal state) to charge the next slam (+18%, no DR)
+  const still = p.state === 'normal' && p.velocity.lengthSq() < 0.04;
+  if (still) {
+    v.stillT += dt;
+    if (!v.grounded && v.stillT >= 1) { v.grounded = true; p.world.sfx('vMark'); p.world.effects.localRing(p.position, 0x6ae4ff, 1.2, 0.3); }
+    if (v.grounded && (v.crackleT = (v.crackleT || 0) - dt) <= 0) {
+      v.crackleT = 0.28; p.world.sfx('vCrackle');
+      const f = vfx(p), at = p.position; f.arc(at.clone().setY(0.2), at.clone().add(new THREE.Vector3(0.7, 0, 0.2)).setY(0.05));
+      p.world.effects.localSparks(at.clone().setY(0.3), 0xbfe8ff, 2, 2);
+    }
+  } else { v.stillT = 0; if (p.state !== 'attack') v.grounded = false; }
   // strike scheduler: telegraphs follow their target until 0.2 s before impact, then lock
   for (let i = v.strikes.length - 1; i >= 0; i--) {
     const st = v.strikes[i]; st.t -= dt;
@@ -385,7 +489,7 @@ export function vTick(p, dt) {
   // the ultimate is meter-gated: no timer, just "full or not"
   p.spinCooldown = meterFull(p) ? 0 : p.spinCooldownMax;
   // the maul reacts: coils spin faster / arcs crackle with Charge and during the Surge
-  p.model.setCharge?.(v.surge ? 1 : Math.min(1, v.charge / chargeMax(p)));
+  p.model.setCharge?.(v.surge ? 1 : Math.min(1, (v.charge / chargeMax(p)) * 0.7 + (v.grounded || v.groundedSwing ? 0.45 : 0)));
 }
 // v4 MYTHIC cloud: max 1, strikes ONE Shocked enemy within range every 0.6 s (2.0 x base, area 1.2 m), own 3% boss cap
 function cloudTick(p, dt) {

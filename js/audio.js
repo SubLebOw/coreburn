@@ -207,7 +207,7 @@ class SoundEngine {
 }
 
 // How often (seconds) each sound may repeat
-const THROTTLE = { stomp: 0.18, clank: 0.09, charge: 0.35, spitCharge: 0.3, fuse: 0.06, scrap: 0.07, hit: 0.045, shot: 0.06, enemyDeath: 0.05, hurt: 0.12, bossWarning: 0.3, zap: 0.08, sizzle: 0.3, heal: 0.06, shieldBlock: 0.1, vCharge: 0.05, vStrike: 0.07, vDischarge: 0.12 };
+const THROTTLE = { stomp: 0.18, clank: 0.09, charge: 0.35, spitCharge: 0.3, fuse: 0.06, scrap: 0.07, hit: 0.045, shot: 0.06, enemyDeath: 0.05, hurt: 0.12, bossWarning: 0.3, zap: 0.08, sizzle: 0.3, heal: 0.06, shieldBlock: 0.1, vCharge: 0.05, vStrike: 0.07, vDischarge: 0.12, vCrackle: 0.18, vShatter: 0.04 };
 
 // ---------- The sound effects ----------
 const SFX = {
@@ -308,13 +308,21 @@ const SFX = {
   },
   heal(a, t) { a.tone(t, { type: 'sine', f0: 880, f1: 1320, dur: 0.1, vol: 0.08 }); },
   // ---- VOLKAR (Phase 6 test) ----
-  vSwing(a, t, step = 1) { a.tone(t, { type: 'sawtooth', f0: 160 + step * 30, f1: 60, dur: 0.16, vol: 0.09, lowpass: 900 }); a.noise(t, { dur: 0.12, vol: 0.08, filter: 'bandpass', f0: 500, f1: 220, q: 1.5 }); },
-  vCharge(a, t, n = 1) { a.tone(t, { type: 'square', f0: 900 + n * 70, f1: 1200 + n * 90, dur: 0.05, vol: 0.035, lowpass: 4200 }); },
-  vDischarge(a, t) { a.noise(t, { dur: 0.06, vol: 0.32, filter: 'highpass', f0: 2500 }); a.tone(t, { type: 'sawtooth', f0: 220, f1: 40, dur: 0.35, vol: 0.18, lowpass: 1600 }); a.noise(t + 0.02, { dur: 0.4, vol: 0.18, filter: 'lowpass', f0: 1200, f1: 120 }); },
+  vSwing(a, t, step = 1) { a.tone(t, { type: 'sawtooth', f0: 160 + step * 30, f1: 60, dur: 0.16, vol: 0.09, lowpass: 900 }); a.noise(t, { dur: 0.12, vol: 0.08, filter: 'bandpass', f0: 500, f1: 220, q: 1.5 });
+    if (step >= 3) { a.noise(t, { dur: 0.08, vol: 0.4, filter: 'highpass', f0: 1800 }); a.noise(t + 0.02, { dur: 0.7, vol: 0.32, filter: 'lowpass', f0: 900, f1: 50 }); a.tone(t, { type: 'sine', f0: 70, f1: 28, dur: 0.55, vol: 0.28 }); } }, // v5: heavier thunder on the 3rd slam
+  vCharge(a, t, n = 1) { a.tone(t, { type: 'square', f0: 900 + n * 70, f1: 1200 + n * 90, dur: 0.05, vol: 0.035, lowpass: 4200 }); a.noise(t, { dur: 0.07, vol: 0.04 + n * 0.008, filter: 'bandpass', f0: 2500, f1: 5000, q: 5 }); }, // v5: crackle as Charge builds
+  vDischarge(a, t) { // v5: bigger boom
+    a.noise(t, { dur: 0.1, vol: 0.55, filter: 'highpass', f0: 1800 });
+    a.noise(t + 0.03, { dur: 0.9, vol: 0.42, filter: 'lowpass', f0: 1100, f1: 50 });
+    a.tone(t, { type: 'sine', f0: 70, f1: 22, dur: 0.8, vol: 0.4 });
+    a.tone(t, { type: 'sawtooth', f0: 180, f1: 35, dur: 0.45, vol: 0.16, lowpass: 1400 });
+  },
   vMark(a, t) { a.tone(t, { type: 'sine', f0: 300, f1: 1400, dur: 0.5, vol: 0.05 }); a.noise(t, { dur: 0.5, vol: 0.04, filter: 'bandpass', f0: 2000, f1: 5000, q: 6 }); },
   vStrike(a, t) { a.noise(t, { dur: 0.05, vol: 0.34, filter: 'highpass', f0: 3000 }); a.noise(t + 0.02, { dur: 0.5, vol: 0.22, filter: 'lowpass', f0: 1100, f1: 80 }); a.tone(t, { type: 'sine', f0: 90, f1: 35, dur: 0.4, vol: 0.2 }); },
   vWindup(a, t) { a.tone(t, { type: 'sawtooth', f0: 80, f1: 520, dur: 1.0, vol: 0.09, lowpass: 1800 }); a.noise(t, { dur: 1.0, vol: 0.07, filter: 'bandpass', f0: 400, f1: 3000, q: 3 }); },
   vFinisher(a, t) { a.noise(t, { dur: 0.1, vol: 0.55, filter: 'highpass', f0: 1800 }); a.noise(t + 0.04, { dur: 1.6, vol: 0.45, filter: 'lowpass', f0: 1000, f1: 50 }); a.tone(t, { type: 'sine', f0: 65, f1: 25, dur: 1.2, vol: 0.38 }); },
+  vCrackle(a, t) { a.noise(t, { dur: 0.12, vol: 0.07, filter: 'bandpass', f0: 3000, f1: 5500, q: 4 }); a.tone(t, { type: 'square', f0: 1600, f1: 900, dur: 0.06, vol: 0.03, lowpass: 5000 }); }, // v5 Grounded static
+  vShatter(a, t) { a.noise(t, { dur: 0.08, vol: 0.22, filter: 'highpass', f0: 2800 }); a.tone(t, { type: 'square', f0: 700, f1: 180, dur: 0.12, vol: 0.06, lowpass: 3000 }); },
   // ---- arena hazards ----
   thunder(a, t) {
     a.noise(t, { dur: 0.08, vol: 0.5, filter: 'highpass', f0: 2000 });

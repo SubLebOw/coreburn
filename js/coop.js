@@ -859,7 +859,7 @@ export class Coop {
         case 'shk': world.shake(ev[1] * 0.7); break;
         case 'ban': hud.showBanner(ev[1], ev[2], ev[3]); hud.setMutator(/^MUTATOR/.test(ev[1]) ? { name: ev[1].slice(9), color: ev[3] } : (/CLEARED|BOSS/.test(ev[1]) ? null : undefined)); break;
         case 'bolt': this.ctx.arena.strikeVisual(deser(ev[1])); break;
-        case 'vk': vfxReplay(this.ctx.scene, ev[1], ev.slice(2).map(deser)); break;
+        case 'vk': vfxReplay(this.ctx.scene, ev[1], ev.slice(2).map(deser), this.ctx.world); break;
         case 'cmb': this.comboView.events.push(...ev[1]); break;
       }
     } catch { /* a missing effect is never worth crashing over */ }

@@ -613,12 +613,14 @@ export class Enemy {
       this._deathFx = true;
       const fx = this.world.effects, heavy = HEAVY.has(T) || (this.elite && T !== 'mite');
       const y = (ANCHOR[T] || 1.2) * this.scale;
-      if (!this.crumble || (this.nid || 0) % 2) { // boss-death crumble waves: half the debris
+      if (this.vShatter && this.world.volkarShatter) { // v5 Volkar kill shatter (visual only; drops/kills unchanged)
+        this.world.volkarShatter(this.position, y);
+      } else if (!this.crumble || (this.nid || 0) % 2) { // boss-death crumble waves: half the debris
         fx?.scrap?.(this.position, T === 'mite' ? 2 : heavy ? 7 : 4, [this.type.main, METAL[T] ?? 0x666058, this.type.dark], y, heavy ? 1.3 : 1);
         fx?.localSparks?.(this.position.clone().setY(y), coreMat(T).color.getHex(), heavy ? 6 : 3, heavy ? 6 : 4);
         if (heavy) fx?.localRing?.(this.position, coreMat(T).color.getHex(), 2.2 * this.scale, 0.35);
       }
-      this.cue(heavy ? 'stomp' : 'scrap', 0.05);
+      this.cue(this.vShatter ? 'vShatter' : heavy ? 'stomp' : 'scrap', 0.05);
       this.fallDir = Math.cos((this.hitDir ?? this.facing + Math.PI) - this.facing) > 0 ? 1 : -1; // forward if hit from behind
       if (this.charge) this.charge.scale.setScalar(0.01);
       if (this.chamber) this.chamber.scale.setScalar(0.4);

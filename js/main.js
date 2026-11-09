@@ -26,7 +26,7 @@ import { Combo } from './combo.js?v=1.34.0';
 import { CHARACTERS, CHARACTER_ORDER, heroOrder, displayName } from './characters.js?v=1.34.0';
 import { isPickWave } from './upgrades.js?v=1.34.0';
 import { Coop } from './coop.js?v=1.34.0';
-import { tickVolkarFX } from './volkar.js?v=1.34.0'; // Phase 6 TEST: Volkar's pooled VFX (host + co-op friends)
+import { tickVolkarFX, stormClear } from './volkar.js?v=1.34.0'; // Phase 6 TEST: Volkar's pooled VFX (host + co-op friends)
 import { meta, scrapForRun, RARE_DROPS, SHOP } from './meta.js?v=1.34.0';
 import { MUTATORS, isMutatorWave, rollMutator } from './mutators.js?v=1.34.0';
 import { GOLD_TIME } from './golden.js?v=1.34.0';
@@ -174,6 +174,7 @@ const world = {
   },
   // A new wave is about to start: every 10 waves we move to the next arena
   onWaveBegin(n) {
+    if (player.vk?.surge) { player.vk.surge = null; stormClear(player); } // v5: Surge sky always restores on wave end/begin
     const st = meta.data.stats;
     if (mode !== 'rush') st.bestWave = Math.max(st.bestWave, n); // rush waves jump by 5: they don't count
     if (n >= 10 && mode !== 'rush' && !coop.mode && !st.heroWave10.includes(player.char.id)) st.heroWave10.push(player.char.id);
@@ -1051,7 +1052,7 @@ function updateCamera(dt, snap = false) {
   // smoothly follow the hero
   const follow = snap ? 1 : 1 - Math.exp(-6 * dt);
   cameraTarget.lerp(player.position, follow);
-  camera.position.copy(cameraTarget).addScaledVector(CAMERA_DIR, cameraDistance);
+  camera.position.copy(cameraTarget).addScaledVector(CAMERA_DIR, cameraDistance + (world.vCamExtra || 0)); // v5 Volkar Surge pull-back
   // screen shake
   if (shakeAmount > 0) {
     camera.position.x += (Math.random() - 0.5) * shakeAmount;

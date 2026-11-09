@@ -582,7 +582,7 @@ export class Player {
       const thane = this.kit === 'thane', dmg = hit.damage * (zal ? s.bashDmg : s.arcDmg) * (thane ? V.swingMult(this) : 1);
       this.strike(e, dmg, to.x * knock, to.z * knock, fin, 'slash');
       this.world.effects.spawnSparks(e.position.clone().setY(1.1), thane ? (fin ? 0xe8fbff : 0x6ae4ff) : fin ? 0xffa040 : (zal ? 0xffd090 : 0x9ffff5), fin ? 12 : 6);
-      if (thane) { V.onMaulHit(this, e, dmg, struck); V.killMeter(this, e); }
+      if (thane) { V.onMaulHit(this, e, dmg, struck); V.killMeter(this, e); V.tagShatter(e); }
       struck.add(e);
       hitSomething = true;
       if (RULES.z && !zal && this.kit === 'sarrow') this.world.allies?.addBleed(this, e, fin ? 2 : 1); // CoreBurnZ BLEED
@@ -592,7 +592,7 @@ export class Player {
       for (const e of V.slamTargets(this, forward, struck)) {
         const to = new THREE.Vector3().subVectors(e.position, this.position).setY(0).normalize();
         this.strike(e, dmg, to.x * knock, to.z * knock, fin, 'slash');
-        V.onMaulHit(this, e, dmg, struck); V.killMeter(this, e); struck.add(e);
+        V.onMaulHit(this, e, dmg, struck); V.killMeter(this, e); V.tagShatter(e); struck.add(e);
       }
       V.afterSwing(this, forward, struck);
     }

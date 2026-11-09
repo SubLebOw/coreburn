@@ -52,13 +52,22 @@ class VolkarFX {
     const chev = new THREE.ConeGeometry(0.32, 0.9, 3); chev.rotateX(Math.PI / 2); chev.scale(1, 0.15, 1);
     this.ptrMat = new THREE.MeshBasicMaterial({ color: 0x6ae4ff });
     this.ptrs = Array.from({ length: PTRS }, () => { const m = new THREE.Mesh(chev, this.ptrMat); m.visible = false; m.frustumCulled = false; scene.add(m); return { m, life: 0 }; });
-    // v5: thrown maul for Skyfall (visual only) + shatter budget
+    // v6: thrown maul (bigger, readable) + ribbon trail + Surge storm disc / vignette / sheet flash
     this.throwG = new THREE.Group(); this.throwG.visible = false; scene.add(this.throwG);
-    const shaft = new THREE.Mesh(seg, new THREE.MeshBasicMaterial({ color: 0x3a3e46 })); shaft.scale.set(0.09, 1.2, 0.09); shaft.position.y = 0.65; this.throwG.add(shaft);
-    const head = new THREE.Mesh(seg, new THREE.MeshBasicMaterial({ color: 0x6a7078 })); head.scale.set(0.42, 0.34, 0.6); head.position.y = 0; this.throwG.add(head);
-    const band = new THREE.Mesh(seg, new THREE.MeshBasicMaterial({ color: 0xe0702a })); band.scale.set(0.46, 0.1, 0.64); band.position.y = 0; this.throwG.add(band);
-    const glow = new THREE.Mesh(seg, new THREE.MeshBasicMaterial({ color: 0xbfe8ff })); glow.scale.set(0.5, 0.4, 0.7); glow.position.y = 0; this.throwG.add(glow);
+    const mkM = (mat, sx, sy, sz, y=0) => { const m = new THREE.Mesh(seg, mat); m.scale.set(sx, sy, sz); m.position.y = y; this.throwG.add(m); return m; };
+    const mPlate = new THREE.MeshBasicMaterial({ color: 0x5a6068 }), mDark = new THREE.MeshBasicMaterial({ color: 0x2a3038 });
+    const mOrange = new THREE.MeshBasicMaterial({ color: 0xe0702a }), mCyan = new THREE.MeshBasicMaterial({ color: 0xbfe8ff });
+    mkM(mDark, 0.11, 1.45, 0.11, 0.75); mkM(mPlate, 0.52, 0.42, 0.72, 0); mkM(mOrange, 0.58, 0.12, 0.78, 0); mkM(mCyan, 0.62, 0.48, 0.82, 0);
+    // 6 trail ribbons (stretched boxes) — one draw cost each, pooled
+    this.trailMat = new THREE.MeshBasicMaterial({ color: 0x6ae4ff, transparent: true, opacity: 0.55, depthWrite: false });
+    this.trails = Array.from({ length: 6 }, () => { const m = new THREE.Mesh(seg, this.trailMat); m.visible = false; scene.add(m); return m; });
     this.throw = null; this.shatterN = 0;
+    // Surge overhead storm disc (one mesh) + distant sheet flash plane + DOM vignette
+    const stormGeo = new THREE.CircleGeometry(28, 24); stormGeo.rotateX(-Math.PI / 2);
+    this.stormDisc = new THREE.Mesh(stormGeo, new THREE.MeshBasicMaterial({ color: 0x0a1020, transparent: true, opacity: 0.0, depthWrite: false }));
+    this.stormDisc.position.y = 16; this.stormDisc.visible = false; scene.add(this.stormDisc);
+    const sheetGeo = new THREE.PlaneGeometry(80, 40); this.sheet = new THREE.Mesh(sheetGeo, new THREE.MeshBasicMaterial({ color: 0xd0e8ff, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
+    this.sheet.position.set(0, 14, -20); this.sheet.visible = false; scene.add(this.sheet); this.flashT = 0;
   }
   crack(pos, dir, size) { // radiating dark shards on the floor at a slam impact
     rec('crack', pos, dir, size);
@@ -102,12 +111,11 @@ class VolkarFX {
     t.ring.scale.setScalar(r); t.fill.scale.setScalar(0.01); t.ring.visible = t.fill.visible = true; return t;
   }
   cloud(pos, life) { rec('cloud', pos, life); this.cloudG.position.set(pos.x, 6.5, pos.z); this.cloudLife = life; this.cloudG.visible = life > 0; }
-  // v5 Skyfall hammer throw (visual only). `out` seconds to the mark, then a short hold, then `back` seconds home.
-  throwMaul(from, to, out, back = 0.35) {
+  // v6 Skyfall hammer throw: wind-up → release → spinning flight with trail → impact → fast return → catch
+  throwMaul(from, to, out, back = 0.28) {
     rec('throwMaul', from, to, out, back);
-    const g = this.throwG; g.visible = true;
-    this.throw = { from: from.clone(), to: to.clone().setY(1.2), out, back, t: 0, phase: 'out', home: from.clone() };
-    g.position.copy(from).setY(1.6);
+    this.throw = { from: from.clone(), to: to.clone().setY(1.3), out: Math.max(0.28, out), back, t: 0, phase: 'wind', home: from.clone(), trail: [] };
+    this.throwG.visible = false; // stays hidden until release (hand still holds the real maul)
   }
   // v5 kill shatter: glowing cracks + cyan sparks; hard cap 3 new ones per frame (shatterN reset in update)
   shatter(pos, y = 1.2) {
@@ -123,46 +131,91 @@ class VolkarFX {
     } finally { REPLAY = was; }
     if (this._world?.effects) { this._world.effects.localSparks?.(p.clone().setY(y), 0xe8fbff, 10, 7); this._world.effects.localRing?.(p, 0x4ad8ff, 1.6, 0.25); }
   }
-  // v5 Surge sky darkening (friends replay). k=1 full dark, k=0 clear. Camera pull lives on the shared world flag.
-  dark(k, cam = 4) {
-    // only record when the darkness steps (Surge ticks every frame; don't flood the co-op fx buffer)
-    if (this._darkK === undefined || Math.abs(this._darkK - k) > 0.08 || ((k <= 0) !== (this._darkK <= 0))) rec('dark', k, cam);
+  // v6 Surge darkening: much darker blue-black, storm disc, vignette, optional lightning flash. k=1 full, k=0 clear.
+  _vignette() {
+    if (this._vig) return this._vig;
+    const el = document.createElement('div'); el.id = 'vk-storm-vig';
+    el.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:20;opacity:0;transition:opacity .15s linear;background:radial-gradient(ellipse at center,transparent 30%,rgba(2,6,18,.55) 62%,rgba(0,2,10,.92) 100%)';
+    document.body.appendChild(el); return (this._vig = el);
+  }
+  dark(k, cam = 5, flash = 0) {
+    if (this._darkK === undefined || Math.abs(this._darkK - k) > 0.06 || ((k <= 0) !== (this._darkK <= 0)) || flash) rec('dark', k, cam, flash);
     this._darkK = k;
     const sc = this.scene, w = this._world;
     if (!w) return;
+    const vig = this._vignette();
     if (k <= 0) {
-      const snap = w._vStormSnap; if (!snap) { w.vCamExtra = 0; w._vStormSnap = null; return; }
+      const snap = w._vStormSnap; vig.style.opacity = '0'; this.stormDisc.visible = false; this.stormDisc.material.opacity = 0; this.sheet.visible = false; this.sheet.material.opacity = 0; this.flashT = 0;
+      if (!snap) { w.vCamExtra = 0; w._vStormSnap = null; return; }
       sc.background?.copy?.(snap.bg); if (sc.fog) { sc.fog.color.copy(snap.fogC); sc.fog.near = snap.near; sc.fog.far = snap.far; }
-      w.env.hemi.intensity = snap.hemi; w.env.baseHemi = snap.base; w.env.sun.intensity = snap.sun;
+      w.env.hemi.color.copy(snap.hemiC); w.env.hemi.intensity = snap.hemi; w.env.baseHemi = snap.base; w.env.sun.intensity = snap.sun; w.env.sun.color.copy(snap.sunC);
       w.vCamExtra = 0; w._vStormSnap = null; return;
     }
     if (!w._vStormSnap) {
       w._vStormSnap = { bg: sc.background?.clone?.() || new THREE.Color(0x14191d), fogC: sc.fog?.color.clone() || new THREE.Color(0x14191d),
-        near: sc.fog?.near ?? 45, far: sc.fog?.far ?? 95, hemi: w.env.hemi.intensity, base: w.env.baseHemi, sun: w.env.sun.intensity };
+        near: sc.fog?.near ?? 45, far: sc.fog?.far ?? 95, hemi: w.env.hemi.intensity, base: w.env.baseHemi, sun: w.env.sun.intensity,
+        hemiC: w.env.hemi.color.clone(), sunC: w.env.sun.color.clone() };
     }
-    const snap = w._vStormSnap, darkCol = new THREE.Color(0x060814);
-    if (sc.background) sc.background.copy(snap.bg).lerp(darkCol, 0.7 * k);
-    if (sc.fog) { sc.fog.color.copy(snap.fogC).lerp(darkCol, 0.7 * k); sc.fog.near = snap.near * (1 - 0.45 * k); sc.fog.far = snap.far * (1 - 0.2 * k); }
-    w.env.baseHemi = snap.base * (1 - 0.45 * k); w.env.hemi.intensity = w.env.baseHemi;
-    w.env.sun.intensity = snap.sun * (1 - 0.65 * k);
+    const snap = w._vStormSnap, darkCol = new THREE.Color(0x010308), blue = new THREE.Color(0x152848);
+    // hard darken (readable: leave ~12% ambient so silhouettes + MeshBasic telegraphs still pop)
+    if (sc.background) sc.background.copy(snap.bg).lerp(darkCol, 0.94 * k);
+    if (sc.fog) { sc.fog.color.copy(snap.fogC).lerp(darkCol, 0.9 * k); sc.fog.near = snap.near * (1 - 0.7 * k); sc.fog.far = snap.far * (1 - 0.4 * k); }
+    w.env.baseHemi = snap.base * (1 - 0.88 * k); w.env.hemi.intensity = w.env.baseHemi + flash * 8;
+    w.env.hemi.color.copy(snap.hemiC).lerp(blue, 0.8 * k);
+    w.env.sun.intensity = snap.sun * (1 - 0.95 * k) + flash * 5; w.env.sun.color.copy(snap.sunC).lerp(new THREE.Color(0xa8c8ff), 0.55 * k);
     w.vCamExtra = cam * k;
+    vig.style.opacity = String(Math.min(1, 1.05 * k));
+    this.stormDisc.visible = k > 0.05; this.stormDisc.material.opacity = 0.72 * k; this.stormDisc.scale.setScalar(0.75 + 0.35 * k);
+    if (flash > 0) { this.flashT = 0.12; this.sheet.visible = true; this.sheet.material.opacity = 0.55 * flash; }
   }
   update(dt) {
     this.shatterN = 0;
-    if (this.throw) { // v5 maul flight
-      const th = this.throw, g = this.throwG; th.t += dt;
-      if (th.phase === 'out') {
+    if (this.flashT > 0) { this.flashT -= dt; this.sheet.material.opacity = Math.max(0, this.flashT * 4); if (this.flashT <= 0) this.sheet.visible = false; }
+    if (this.stormDisc.visible) { this.stormDisc.rotation.y += dt * 0.15; const o = this._throwOwner || this._world?.player; if (o?.position) this.stormDisc.position.set(o.position.x, 16, o.position.z); }
+    if (this.throw) { // v6 maul flight with wind / trail / catch
+      const th = this.throw, g = this.throwG, owner = this._throwOwner; th.t += dt;
+      const setPose = (p) => { if (owner?.vk) owner.vk.throwPose = p; };
+      const hideTrail = () => { for (const t of this.trails) t.visible = false; };
+      const pushTrail = () => {
+        th.trail.push(g.position.clone()); if (th.trail.length > 7) th.trail.shift();
+        for (let i = 0; i < this.trails.length; i++) {
+          const a = th.trail[i], b = th.trail[i + 1], m = this.trails[i];
+          if (!a || !b) { m.visible = false; continue; }
+          m.position.copy(a).add(b).multiplyScalar(0.5); m.scale.set(0.08, a.distanceTo(b), 0.08);
+          m.quaternion.setFromUnitVectors(_up, _v.copy(b).sub(a).normalize()); m.visible = true;
+          this.trailMat.opacity = 0.15 + 0.5 * (i / this.trails.length);
+        }
+      };
+      if (th.phase === 'wind') {
+        setPose('wind');
+        // keep home glued to the hand during wind so the release starts from the real shoulder
+        if (owner) th.from.copy(owner.position).setY(1.7);
+        if (th.t >= 0.2) { // hard release: empty the hand, fling the pooled maul
+          th.phase = 'out'; th.t = 0; setPose('release');
+          owner?.model?.setMaulVisible?.(false); g.visible = true; g.position.copy(th.from);
+          this._world?.sfx?.('vSwing', 3);
+        }
+      } else if (th.phase === 'out') {
+        setPose('out');
         const u = Math.min(1, th.t / Math.max(0.05, th.out)), e = u * u * (3 - 2 * u);
-        g.position.lerpVectors(th.from, th.to, e); g.position.y = 1.6 + Math.sin(u * Math.PI) * 2.4;
-        g.rotation.set(u * 6.5, Math.atan2(th.to.x - th.from.x, th.to.z - th.from.z), 0.4);
+        g.position.lerpVectors(th.from, th.to, e);
+        g.position.y = 1.5 + Math.sin(u * Math.PI) * 3.2; // clear arc
+        g.rotation.set(u * 14, Math.atan2(th.to.x - th.from.x, th.to.z - th.from.z), u * 2.5); // end-over-end
+        pushTrail();
         if (u >= 1) { th.phase = 'hold'; th.t = 0; }
       } else if (th.phase === 'hold') {
-        if (th.t >= 0.12) { th.phase = 'back'; th.t = 0; th.from.copy(g.position); }
-      } else {
-        const u = Math.min(1, th.t / Math.max(0.05, th.back)), e = u * u * (3 - 2 * u);
-        g.position.lerpVectors(th.from, th.home, e); g.position.y = 1.4 + Math.sin(u * Math.PI) * 1.6;
-        g.rotation.x = 6.5 * (1 - u);
-        if (u >= 1) { g.visible = false; this.throw = null; if (this._throwOwner) { this._throwOwner.model?.setMaulVisible?.(true); this._throwOwner = null; } }
+        setPose('out');
+        if (th.t >= 0.18) { th.phase = 'back'; th.t = 0; th.from.copy(g.position); if (owner) th.home.copy(owner.position).setY(1.5); }
+      } else if (th.phase === 'back') {
+        setPose('out');
+        const u = Math.min(1, th.t / Math.max(0.05, th.back)), e = u * u;
+        g.position.lerpVectors(th.from, th.home, e); g.position.y = 1.3 + Math.sin(u * Math.PI) * 2.0;
+        g.rotation.set(14 * (1 - u) + u * 2, g.rotation.y, 0);
+        pushTrail();
+        if (u >= 1) { th.phase = 'catch'; th.t = 0; hideTrail(); g.visible = false; owner?.model?.setMaulVisible?.(true); setPose('catch'); this._world?.sfx?.('vCrackle'); this._world?.effects?.localSparks?.(th.home.clone().setY(1.4), 0xe8fbff, 8, 5); }
+      } else { // catch snap (~0.22 s hand recoil)
+        setPose('catch');
+        if (th.t >= 0.22) { this.throw = null; setPose(null); hideTrail(); this._throwOwner = null; }
       }
     }
     const off = (x) => { for (const s of x.segs) { s.visible = false; s.g.dirty = true; } };
@@ -183,7 +236,7 @@ class VolkarFX {
       t.fill.scale.setScalar(Math.max(0.01, t.r * (1 - t.life / t.max)));
     }
   }
-  clear() { this.cloudLife = 0; this.cloudG.visible = false; this.throw = null; this.throwG.visible = false; if (this._throwOwner) { this._throwOwner.model?.setMaulVisible?.(true); this._throwOwner = null; } this.dark(0); for (const g of this.inst) g.dirty = true; for (const b of [...this.bolts, ...this.arcs]) { b.life = 0; for (const s of b.segs) s.visible = false; } for (const t of this.teles) { t.life = 0; t.ring.visible = t.fill.visible = false; } for (const c of this.cracks) { c.life = 0; for (const s of c.segs) s.visible = false; } for (const q of this.ptrs) { q.life = 0; q.m.visible = false; } }
+  clear() { this.cloudLife = 0; this.cloudG.visible = false; this.throw = null; this.throwG.visible = false; for (const t of this.trails) t.visible = false; if (this._throwOwner) { this._throwOwner.model?.setMaulVisible?.(true); if (this._throwOwner.vk) this._throwOwner.vk.throwPose = null; this._throwOwner = null; } this.dark(0); for (const g of this.inst) g.dirty = true; for (const b of [...this.bolts, ...this.arcs]) { b.life = 0; for (const s of b.segs) s.visible = false; } for (const t of this.teles) { t.life = 0; t.ring.visible = t.fill.visible = false; } for (const c of this.cracks) { c.life = 0; for (const s of c.segs) s.visible = false; } for (const q of this.ptrs) { q.life = 0; q.m.visible = false; } }
   get live() { return this.bolts.filter((b) => b.life > 0).length + this.arcs.filter((b) => b.life > 0).length + this.teles.filter((t) => t.life > 0).length; }
 }
 const _up = new THREE.Vector3(0, 1, 0), _v = new THREE.Vector3(), _zero = new THREE.Matrix4().makeScale(0, 0, 0);
@@ -205,7 +258,7 @@ export function stormClear(p) { // restore Surge sky / camera (death, reset, sur
 }
 export function vReset(p) {
   stormClear(p);
-  p.vk = { charge: 0, meter: 0, lockT: 0, combatT: 99, decayT: 0, strikes: [], surge: null, empowerT: 0, bossDealt: new Map(), discharge: false, swingGain: 0, dischargeN: 0, cloud: null, stillT: 0, grounded: false, groundedSwing: false };
+  p.vk = { charge: 0, meter: 0, lockT: 0, combatT: 99, decayT: 0, strikes: [], surge: null, empowerT: 0, bossDealt: new Map(), discharge: false, swingGain: 0, dischargeN: 0, cloud: null, stillT: 0, grounded: false, groundedSwing: false, throwPose: null };
   if (p.char.id === 'thane' && p.stats?.m?.tPre) p.vk.charge = 3;
   FX.get(p.scene)?.clear();
 }
@@ -366,9 +419,11 @@ export function skyfall(p, aim) {
   }
   p.world.sfx('vMark');
   p.world.effects.localRing(p.position, 0x4ad8ff, 1.6, 0.25);
-  // v5: hurl the maul at the first mark (or the empty lunge end); lightning + return are timed to the first strike
-  const dest = (targets[0]?.position || lungeEnd).clone().setY(1.2), f = vfx(p);
-  p.model?.setMaulVisible?.(false); f._throwOwner = p; f.throwMaul(p.position.clone().setY(1.6), dest, Math.max(0.25, delay - 0.05), 0.35);
+  // v6: wind-up then hurl; flight timed so the maul plants as the first strike lands
+  const dest = (targets[0]?.position || lungeEnd).clone().setY(1.3), f = vfx(p);
+  f._throwOwner = p; p.vk.throwPose = 'wind';
+  // wind 0.2s is inside throw update; flight covers the rest of the telegraph so the maul plants with the bolt
+  f.throwMaul(p.position.clone().setY(1.7), dest, Math.max(0.35, delay - 0.2), 0.3);
 }
 export function skyfallDash(p) { // the 0.18 s Static Lunge (no i-frames: takeDamage has no thane exception)
   const k = p.char.skyfall;
@@ -378,7 +433,12 @@ export function skyfallDash(p) { // the 0.18 s Static Lunge (no i-frames: takeDa
 
 function landStrike(p, st) {
   const fx = vfx(p); fx.bolt(st.pos);
-  if (st.kind === 'skyfall' && fx.throw && fx.throw.phase !== 'back') { fx.throw.phase = 'hold'; fx.throw.t = 0.12; } // v5: lightning hits the planted maul, then it returns
+  if (st.kind === 'skyfall' && fx.throw && fx.throw.phase === 'out') {
+    // v6 impact: bolt already fired above; plant the flying maul (never abort wind-up)
+    fx.throw.phase = 'hold'; fx.throw.t = 0; fx.throw.to.copy(st.pos).setY(1.2); fx.throwG.position.copy(st.pos).setY(1.2); fx.throwG.visible = true;
+    p.world.effects.spawnRing(st.pos, 0xe8fbff, st.r * 1.4, 0.3);
+    p.world.shake(0.35);
+  }
   p.world.effects.spawnRing(st.pos, 0x9ae8ff, st.r * 1.1, 0.25); // v4: recorded, friends see the impact ring
   p.world.effects.localSparks?.(st.pos.clone().setY(0.4), 0xbfe8ff, 8, 6);
   p.world.sfx(st.big ? 'vFinisher' : 'vStrike');
@@ -414,7 +474,7 @@ export function surgeStart(p, echo) {
   v.surge = { phase: 'wind', t: 0, tick: 0, end: p.char.surge.time + 0.5 * (S(p).tSurge || 0) + (S(p).m?.tLongStorm ? 1 : 0), rumble: 0 };
   p.world.sfx('vWindup');
   p.world.effects.spawnRing(p.position, 0x4ad8ff, 2.4, 0.6);
-  vfx(p).dark(0.35, 2); // v5: sky begins to darken during wind-up
+  vfx(p).dark(0.5, 3); // v6: sky drops hard on wind-up
 }
 function queueFinisher(p, delay) {
   const c = p.char.surge;
@@ -432,13 +492,14 @@ function surgeTick(p, dt) {
   const v = p.vk, sg = v.surge, c = p.char.surge;
   sg.t += dt;
   if (sg.phase === 'wind') {
-    vfx(p).dark(0.35 + 0.65 * Math.min(1, sg.t / c.windup), 2 + 2 * Math.min(1, sg.t / c.windup));
-    if (sg.t >= c.windup) { sg.phase = 'storm'; sg.t = 0; p.world.sfx('thunder'); vfx(p).dark(1, 4); if (p.state === 'spin') p.endUlt(); }
+    vfx(p).dark(0.5 + 0.5 * Math.min(1, sg.t / c.windup), 3 + 2 * Math.min(1, sg.t / c.windup));
+    if (sg.t >= c.windup) { sg.phase = 'storm'; sg.t = 0; p.world.sfx('thunder'); vfx(p).dark(1, 5, 1); if (p.state === 'spin') p.endUlt(); }
     return;
   }
   if (sg.phase === 'storm') {
-    vfx(p).dark(1, 4);
-    if ((sg.rumble = (sg.rumble || 0) - dt) <= 0) { sg.rumble = 1.8; p.world.sfx('thunder'); } // v5 rumble
+    // periodic sheet-lightning: dark() with flash, plus rumble
+    if ((sg.rumble = (sg.rumble || 0) - dt) <= 0) { sg.rumble = 1.1 + Math.random() * 0.7; p.world.sfx('thunder'); vfx(p).dark(1, 5, 0.7 + Math.random() * 0.3); }
+    else vfx(p).dark(1, 5);
     sg.tick -= dt;
     if (sg.tick <= 0) {
       sg.tick = c.interval;
@@ -449,7 +510,7 @@ function surgeTick(p, dt) {
     return;
   }
   if (sg.phase === 'fin') {
-    vfx(p).dark(Math.max(0, 1 - sg.t / 0.85), 4 * Math.max(0, 1 - sg.t / 0.85));
+    vfx(p).dark(Math.max(0, 1 - sg.t / 0.85), 5 * Math.max(0, 1 - sg.t / 0.85));
     if (sg.t >= 0.85) { v.surge = null; v.lockT = p.char.meter.lockAfter; v.empowerT = c.empowerT; p.world.effects.spawnRing(p.position, 0xe8fbff, 2, 0.4); stormClear(p); }
   }
 }

@@ -57,3 +57,17 @@ Tests: hp 24/24, fingerprints byte-identical, smokes 0 errors. Time-to-full-Stor
 - **Audio:** 3rd slam gets a heavier thunder (`vSwing` step≥3); Charge ticks add bandpass crackle; Discharge is a bigger boom; new `vCrackle` / `vShatter` cues. All go through the existing synth + mute/volume bus.
 - Tests: enemy/boss fingerprints byte-identical, hp 24/24, desktop + 844x390 smokes 0 errors.
   Draw calls during Surge ~256–387 avg (15 enemies); during shatter bursts ~310.
+
+## v6 (volkar-test6): throw + Surge darkening rework (Zac playtest)
+- **Hammer throw (still visual only):**
+  - Maul is now a **separate group** on armR (not baked into the merged arm mesh) so `setMaulVisible(false)` fully empties the hand.
+  - Real throw poses: overhead **wind-up** (0.2 s) → hard forward **release** → empty-hand follow-through → **catch** snap. Overrides the old both-arms-raised Skyfall lunge.
+  - Flying maul is bigger, cyan-glowing, end-over-end spin, clear arc, and a 6-segment lightning ribbon trail.
+  - Impact: bolt + bright ring + light shake; return spins back fast; catch restores the hand maul with crackle + sparks + `vCrackle`.
+  - Skyfall gameplay / timing / damage unchanged. Synced via `vk throwMaul`.
+- **Surge darkening (made dramatic):**
+  - Hard blue-black: bg lerp ~94%, hemi −88%, sun −95%, fog pulled in, camera +5.
+  - CSS radial **vignette**, rotating overhead **storm disc**, periodic **sheet-lightning** flashes (hemi/sun spikes + flash plane) ~every 1.1–1.8 s with thunder.
+  - Readable on the brightest arena (Frozen Scrap Tundra): MeshBasic telegraphs stay bright; ~12% ambient left for silhouettes.
+  - Restores on Surge end / death / reset / wave begin. Synced via throttled `vk dark` (incl. flash flag). Extra draw calls ≈ +1 disc +1 sheet (vignette is DOM).
+- Tests: fingerprints byte-identical, hp 24/24, desktop + 844x390 smokes 0 errors. Surge draw calls ~108 idle-arena / ~446 with 14 enemies.

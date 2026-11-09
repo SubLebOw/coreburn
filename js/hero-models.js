@@ -500,29 +500,37 @@ export function buildThane(t) {
       d.add(g, 'plateDark', box(0.16, 0.12, 0.18), 0, -0.8, 0);
       d.add(g, 'glow', box(0.21, 0.025, 0.05), 0, -0.56, 0.09);
     });
-    // CONDUIT MAUL in the right hand: haft along -Y, head across Z (points forward when the arm swings up)
-    d.add('armR', 'plateDark', cyl(0.04, 0.04, 1.0, 6), 0, -1.22, 0);
-    for (const y of [-0.95, -1.15]) d.add('armR', 'bone', cyl(0.055, 0.055, 0.06, 6), 0, y, 0);
-    d.add('armR', 'plate', box(0.3, 0.3, 0.5), 0, -1.78, 0);                      // maul head
-    d.add('armR', 'orange', box(0.34, 0.08, 0.54), 0, -1.78, 0);
-    sym((s) => { d.add('armR', 'metal', cyl(0.13, 0.16, 0.08, 8), 0, -1.78, s * 0.28, Math.PI / 2);   // strike faces
-      d.add('armR', 'glow', cyl(0.08, 0.08, 0.02, 8), 0, -1.78, s * 0.33, Math.PI / 2);
-      d.add('armR', 'bone', cone(0.04, 0.16, 5), 0, -1.6, s * 0.18, 0, 0, Math.PI); });    // prongs (up)
+    // v6: CONDUIT MAUL is a SEPARATE group on armR (not baked), so Skyfall can fully hide it mid-throw
     d.keep('ring', tor(0.24, 0.022, 4, 14)); d.keep('arc', box(1, 1, 1)); d.keep('core', box(0.9, 1.1, 1)); d.keep('blade', cyl(0.5, 0.5, 1, 6));
+    d.keep('mShaft', cyl(0.04, 0.04, 1.0, 6)); d.keep('mHead', box(0.3, 0.3, 0.5)); d.keep('mBand', box(0.34, 0.08, 0.54));
+    d.keep('mFace', cyl(0.13, 0.16, 0.08, 8)); d.keep('mGlow', cyl(0.08, 0.08, 0.02, 8)); d.keep('mProng', cone(0.04, 0.16, 5));
+    d.keep('mRing', cyl(0.055, 0.055, 0.06, 6));
   });
   const m = assemble(d, mats, { legL: [0.17, 0.94, 0], legR: [-0.17, 0.94, 0], head: [0, 2.0, 0.02], armL: [0.5, 1.7, 0], armR: [-0.5, 1.7, 0] });
   const core = addCore(m, d.extra.core, mats.glow, 0, 1.46, 0.25, Math.PI / 2); // vertical capsule core
-  const rings = [0, 1].map((i) => { const r = new THREE.Mesh(d.extra.ring, mats.orange); r.position.set(0, -1.78, 0); r.rotation.x = i ? 0.6 : -0.6; m.armR.add(r); return r; });
-  const arcs = [0, 1, 2].map(() => { const a = new THREE.Mesh(d.extra.arc, mats.glow); a.position.set(0, -1.68, 0); a.scale.set(0.02, 0.02, 0.36); m.armR.add(a); return a; });
-  const b = new THREE.Mesh(d.extra.blade, mats.blade); b.scale.set(0.03, 1, 0.03); b.position.set(0, -1.2, 0.05); m.armR.add(b);
-  const h = new THREE.Mesh(UNIT, G(0xbfe8ff, { transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })); h.position.copy(b.position); h.visible = false; m.armR.add(h);
+  // v6: maul as its own group on armR (fully hideable for Skyfall throw)
+  const maul = new THREE.Group(); m.armR.add(maul);
+  const shaft = new THREE.Mesh(d.extra.mShaft, mats.plateDark); shaft.position.set(0, -1.22, 0); maul.add(shaft);
+  for (const y of [-0.95, -1.15]) { const r = new THREE.Mesh(d.extra.mRing, mats.bone); r.position.set(0, y, 0); maul.add(r); }
+  const head = new THREE.Mesh(d.extra.mHead, mats.plate); head.position.set(0, -1.78, 0); maul.add(head);
+  const band = new THREE.Mesh(d.extra.mBand, mats.orange); band.position.set(0, -1.78, 0); maul.add(band);
+  for (const s of [-1, 1]) {
+    const face = new THREE.Mesh(d.extra.mFace, mats.metal); face.position.set(0, -1.78, s * 0.28); face.rotation.x = Math.PI / 2; maul.add(face);
+    const gl = new THREE.Mesh(d.extra.mGlow, mats.glow); gl.position.set(0, -1.78, s * 0.33); gl.rotation.x = Math.PI / 2; maul.add(gl);
+    const pr = new THREE.Mesh(d.extra.mProng, mats.bone); pr.position.set(0, -1.6, s * 0.18); pr.rotation.z = Math.PI; maul.add(pr);
+  }
+  const rings = [0, 1].map((i) => { const r = new THREE.Mesh(d.extra.ring, mats.orange); r.position.set(0, -1.78, 0); r.rotation.x = i ? 0.6 : -0.6; maul.add(r); return r; });
+  const arcs = [0, 1, 2].map(() => { const a = new THREE.Mesh(d.extra.arc, mats.glow); a.position.set(0, -1.68, 0); a.scale.set(0.02, 0.02, 0.36); maul.add(a); return a; });
+  const b = new THREE.Mesh(d.extra.blade, mats.blade); b.scale.set(0.03, 1, 0.03); b.position.set(0, -1.2, 0.05); maul.add(b);
+  const h = new THREE.Mesh(UNIT, G(0xbfe8ff, { transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })); h.position.copy(b.position); h.visible = false; maul.add(h);
   let charge = 0;
   return { ...m, core, flashMats: [mats.plate, mats.plateDark, mats.coat, mats.metal], blade: mats.blade, blades: [b], halos: [h], bladeBase: -0.95, bladeLen: 0.5,
-    rings, arcs, glowMat: mats.glow,
+    rings, arcs, glowMat: mats.glow, maul,
     setCharge(v) { charge = v; }, // 0..1 (Charge stacks / Surge): coils spin faster, arcs crackle more
-    setMaulVisible(on) { for (const x of [...rings, ...arcs, b, h]) x.visible = on; }, // v5: hide coils/blade (shaft is baked into the arm mesh — see VOLKAR_STATUS)
+    setMaulVisible(on) { maul.visible = on; }, // v6: whole maul group toggles (hand truly empty mid-throw)
     anchors: { headTop: 0.32, back: -0.42, shoulder: 0.5, scale: 1.18, headW: 0.2, faceZ: 0.22 }, style: 'bruiser',
     idle(t) {
+      if (!maul.visible) return; // don't animate hidden coils
       const sp = 3 + charge * 14;
       rings[0].rotation.y = t * sp; rings[1].rotation.y = -t * sp * 1.3;
       const live = 0.25 + charge * 0.75;
